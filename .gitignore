@@ -1,6 +1,5 @@
 venv/
 .venv/
-database/users.db
 __pycache__/
 *.pyc
 *.bin
