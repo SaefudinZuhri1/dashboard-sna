@@ -1,0 +1,11 @@
+venv/
+.venv/
+models/
+database/users.db
+__pycache__/
+*.pyc
+*.bin
+*.pt
+*.pkl
+*.dll
+*.lib
