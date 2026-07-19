@@ -1,3 +1,6 @@
+# Path: requirements.txt
+# Dependency lengkap Dashboard Analisis Sentimen & SNA Telkom Group
+
 # === WEB ===
 streamlit==1.35.0
 streamlit-option-menu==0.3.12
@@ -8,13 +11,13 @@ extra-streamlit-components==0.1.71
 
 # === DATA ===
 pandas==2.2.2
-numpy==1.26.4          # wajib <2.0 — constraint streamlit 1.35
+numpy==1.26.4          # wajib <2.0 — constraint Streamlit 1.35
 
 # === VISUALISASI ===
 plotly==5.21.0
 matplotlib==3.8.4
 wordcloud==1.9.3
-pillow==10.3.0         # wajib <11 — constraint streamlit 1.35
+Pillow==10.3.0         # wajib <11 — constraint Streamlit 1.35
 
 # === NETWORK ANALYSIS ===
 networkx==3.3
@@ -37,3 +40,10 @@ openpyxl==3.1.4
 # === UTILS ===
 python-dateutil==2.9.0
 tqdm==4.66.4
+huggingface-hub==0.23.4
+
+# === GEMINI API — TAHAP 4 FASE 10 ===
+python-dotenv>=1.0.0
+
+# === GEMINI API — TAHAP 4 FASE 10 (SDK RESMI TERBARU) ===
+google-genai>=1.0.0

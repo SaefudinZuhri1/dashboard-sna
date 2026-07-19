@@ -1,9 +1,46 @@
-venv/
-.venv/
+# Path: .gitignore
+
+# Rahasia dan konfigurasi lokal
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Python cache dan artefak build
 __pycache__/
 *.pyc
-*.bin
-*.pt
-*.pkl
-*.dll
-*.lib
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Editor dan sistem operasi
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Log dan file sementara
+*.log
+*.tmp
+*.temp
+
+# Database lokal pengguna
+database/users.db
+
+# Model besar lokal
+models/
+
+# Rahasia Streamlit dan seluruh file backup-nya
+.streamlit/secrets.toml*
+!.streamlit/secrets.toml.example

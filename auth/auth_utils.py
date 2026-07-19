@@ -1,6 +1,7 @@
 """Utilitas autentikasi dan manajemen database pengguna SQLite."""
 
 import hashlib
+import logging
 import secrets
 import sqlite3
 from datetime import datetime, timedelta
@@ -9,6 +10,8 @@ from pathlib import Path
 
 import bcrypt
 from PIL import Image
+
+LOGGER = logging.getLogger(__name__)
 
 DB_DIR = "database"
 DB_NAME = "users.db"
@@ -23,7 +26,7 @@ ADMIN_SEED = {
 
 
 def get_db_path() -> str:
-    """Return path absolut ke database/users.db."""
+    """Bangun path database dari lokasi folder proyek secara portabel."""
     base = Path(__file__).resolve().parent.parent
     db_dir = base / DB_DIR
     db_dir.mkdir(parents=True, exist_ok=True)
@@ -89,7 +92,7 @@ def init_db() -> None:
             )
             conn.commit()
     except Exception as e:
-        print(f"[init_db] Error: {e}")
+        LOGGER.exception("init_db gagal: %s", e)
         raise RuntimeError(f"Gagal inisialisasi database: {e}") from e
 
 
@@ -99,7 +102,7 @@ def hash_password(password: str) -> str:
         hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
         return hashed.decode("utf-8")
     except Exception as e:
-        print(f"[hash_password] Error: {e}")
+        LOGGER.exception("hash_password gagal: %s", e)
         return ""
 
 
@@ -108,7 +111,7 @@ def verify_password(password: str, hashed: str) -> bool:
     try:
         return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
     except Exception as e:
-        print(f"[verify_password] Error: {e}")
+        LOGGER.exception("verify_password gagal: %s", e)
         return False
 
 
@@ -124,7 +127,7 @@ def get_user(username: str) -> dict | None:
             )
             return _row_to_dict(cursor.fetchone())
     except Exception as e:
-        print(f"[get_user] Error: {e}")
+        LOGGER.exception("get_user gagal: %s", e)
         return None
 
 
@@ -137,7 +140,7 @@ def get_user_by_id(user_id: int) -> dict | None:
             cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
             return _row_to_dict(cursor.fetchone())
     except Exception as e:
-        print(f"[get_user_by_id] Error: {e}")
+        LOGGER.exception("get_user_by_id gagal: %s", e)
         return None
 
 
@@ -176,7 +179,7 @@ def create_user(
             conn.commit()
         return True, "Akun berhasil dibuat"
     except Exception as e:
-        print(f"[create_user] Error: {e}")
+        LOGGER.exception("create_user gagal: %s", e)
         return False, f"Gagal membuat akun: {e}"
 
 
@@ -206,7 +209,7 @@ def update_user_profile(user_id: int, fullname: str, email: str) -> tuple[bool, 
             conn.commit()
         return True, "Profil berhasil diperbarui"
     except Exception as e:
-        print(f"[update_user_profile] Error: {e}")
+        LOGGER.exception("update_user_profile gagal: %s", e)
         return False, f"Gagal memperbarui profil: {e}"
 
 
@@ -228,7 +231,7 @@ def _save_password(user_id: int, new_password: str) -> tuple[bool, str]:
             conn.commit()
         return True, "Password berhasil diubah"
     except Exception as e:
-        print(f"[_save_password] Error: {e}")
+        LOGGER.exception("_save_password gagal: %s", e)
         return False, f"Gagal mengubah password: {e}"
 
 
@@ -249,7 +252,7 @@ def update_password(
 
         return _save_password(user_id, new_password)
     except Exception as e:
-        print(f"[update_password] Error: {e}")
+        LOGGER.exception("update_password gagal: %s", e)
         return False, f"Gagal mengubah password: {e}"
 
 
@@ -267,7 +270,7 @@ def update_profile_picture(user_id: int, image_bytes: bytes) -> bool:
             conn.commit()
         return True
     except Exception as e:
-        print(f"[update_profile_picture] Error: {e}")
+        LOGGER.exception("update_profile_picture gagal: %s", e)
         return False
 
 
@@ -286,7 +289,7 @@ def get_all_users() -> list[dict]:
             )
             return [_row_to_dict(row) for row in cursor.fetchall()]
     except Exception as e:
-        print(f"[get_all_users] Error: {e}")
+        LOGGER.exception("get_all_users gagal: %s", e)
         return []
 
 
@@ -304,7 +307,7 @@ def delete_user(user_id: int) -> tuple[bool, str]:
             conn.commit()
         return True, "User berhasil dihapus"
     except Exception as e:
-        print(f"[delete_user] Error: {e}")
+        LOGGER.exception("delete_user gagal: %s", e)
         return False, f"Gagal menghapus user: {e}"
 
 
@@ -341,7 +344,7 @@ def get_user_stats() -> dict:
             "latest_user": latest_user,
         }
     except Exception as e:
-        print(f"[get_user_stats] Error: {e}")
+        LOGGER.exception("get_user_stats gagal: %s", e)
         return {
             "total_users": 0,
             "total_admin": 0,
@@ -378,7 +381,7 @@ def create_remember_token(user_id: int) -> str | None:
             conn.commit()
         return token
     except Exception as e:
-        print(f"[create_remember_token] Error: {e}")
+        LOGGER.exception("create_remember_token gagal: %s", e)
         return None
 
 
@@ -417,7 +420,7 @@ def validate_remember_token(token: str) -> dict | None:
             revoke_remember_token(token)
         return user
     except Exception as e:
-        print(f"[validate_remember_token] Error: {e}")
+        LOGGER.exception("validate_remember_token gagal: %s", e)
         return None
 
 
@@ -436,7 +439,7 @@ def revoke_remember_token(token: str) -> bool:
             conn.commit()
         return True
     except Exception as e:
-        print(f"[revoke_remember_token] Error: {e}")
+        LOGGER.exception("revoke_remember_token gagal: %s", e)
         return False
 
 
@@ -452,7 +455,7 @@ def revoke_all_remember_tokens(user_id: int) -> bool:
             conn.commit()
         return True
     except Exception as e:
-        print(f"[revoke_all_remember_tokens] Error: {e}")
+        LOGGER.exception("revoke_all_remember_tokens gagal: %s", e)
         return False
 
 
@@ -471,7 +474,7 @@ def verify_login(username: str, password: str) -> dict | None:
             return user
         return None
     except Exception as e:
-        print(f"[verify_login] Error: {e}")
+        LOGGER.exception("verify_login gagal: %s", e)
         return None
 
 
@@ -490,7 +493,7 @@ def register_user(
             return True, "Registrasi berhasil. Silakan login."
         return False, message
     except Exception as e:
-        print(f"[register_user] Error: {e}")
+        LOGGER.exception("register_user gagal: %s", e)
         return False, f"Registrasi gagal: {e}"
 
 
@@ -519,7 +522,7 @@ def update_avatar(user_id: int, image_bytes: bytes) -> tuple[bool, str]:
             return True, "Avatar berhasil diperbarui."
         return False, "Gagal menyimpan avatar."
     except Exception as e:
-        print(f"[update_avatar] Error: {e}")
+        LOGGER.exception("update_avatar gagal: %s", e)
         return False, f"Gagal menyimpan avatar: {e}"
 
 
@@ -542,7 +545,7 @@ def update_user_role(user_id: int, new_role: str) -> tuple[bool, str]:
             conn.commit()
         return True, "Role berhasil diperbarui."
     except Exception as e:
-        print(f"[update_user_role] Error: {e}")
+        LOGGER.exception("update_user_role gagal: %s", e)
         return False, f"Gagal mengubah role: {e}"
 
 
@@ -567,7 +570,7 @@ def admin_create_user(
             conn.commit()
         return True, "Akun baru berhasil dibuat."
     except Exception as e:
-        print(f"[admin_create_user] Error: {e}")
+        LOGGER.exception("admin_create_user gagal: %s", e)
         return False, f"Gagal membuat akun: {e}"
 
 
@@ -580,5 +583,5 @@ def format_created_at(value) -> str:
             return value
         return datetime.fromisoformat(str(value)).strftime("%d-%m-%Y %H:%M")
     except Exception as e:
-        print(f"[format_created_at] Error: {e}")
+        LOGGER.exception("format_created_at gagal: %s", e)
         return "-"

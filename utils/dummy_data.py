@@ -285,6 +285,61 @@ def get_dummy_sna_data() -> pd.DataFrame:
         raise RuntimeError(f"Gagal membuat data SNA dummy: {exc}") from exc
 
 
+def get_dummy_telkomsel_sna() -> pd.DataFrame:
+    """Kembalikan fallback SNA khusus Telkomsel dari contoh metodologi skripsi.
+
+    Data ini hanya menjaga halaman tetap dapat dibuka ketika file aktual belum
+    ditempel. Seluruh edge diarahkan ke layanan Telkomsel dan tidak pernah
+    ditulis ke file penelitian pengguna.
+    """
+    try:
+        edges = [
+            # TikTok, komentar menuju akun resmi Telkomsel.
+            ("yxxawx", "telkomsel", "comment", 320, "tiktok"),
+            ("zahranurhakiki", "telkomsel", "comment", 890, "tiktok"),
+            ("roni..08", "telkomsel", "comment", 380, "tiktok"),
+            ("b3n1115", "telkomsel", "comment", 210, "tiktok"),
+            ("moba_51", "telkomsel", "comment", 145, "tiktok"),
+            ("sutardi.wasimin", "telkomsel", "comment", 1612, "tiktok"),
+            ("riswanda822", "telkomsel", "comment", 559, "tiktok"),
+            ("akakpro46", "telkomsel", "comment", 620, "tiktok"),
+            ("triaa.ni", "telkomsel", "comment", 43, "tiktok"),
+            ("gonjeng2gd", "telkomsel", "comment", 168, "tiktok"),
+            # Instagram, komentar menuju akun resmi Telkomsel.
+            ("rizkimaulana_rm", "telkomsel", "comment", 2, "instagram"),
+            ("pakidi_123", "telkomsel", "comment", 212, "instagram"),
+            ("riyanti.apg", "telkomsel", "comment", 250, "instagram"),
+            ("faishalfrss", "telkomsel", "comment", 1060, "instagram"),
+            ("zidnyilma23", "telkomsel", "comment", 847, "instagram"),
+            ("kuntarineti", "telkomsel", "comment", 407, "instagram"),
+            ("akri64", "telkomsel", "comment", 1110, "instagram"),
+            ("tayo.gt_", "telkomsel", "comment", 100, "instagram"),
+            ("dkdiki_", "telkomsel", "comment", 1588, "instagram"),
+            ("zyders_1", "telkomsel", "comment", 6, "instagram"),
+            # Twitter/X, mention dan reply berarah.
+            ("bellaablee", "telkomsel", "mention", 174, "twitter"),
+            ("telkomsel", "bellaablee", "reply", 0, "twitter"),
+            ("matchalle", "telkomsel", "mention", 9, "twitter"),
+            ("telkomsel", "matchalle", "reply", 0, "twitter"),
+            ("jangzaokan", "bellaablee", "reply", 441, "twitter"),
+            ("dewa_brahma", "telkomsel", "mention", 76, "twitter"),
+            ("telkomsel", "dewa_brahma", "reply", 0, "twitter"),
+            ("dewa_brahma", "commuterline", "reply", 76, "twitter"),
+            ("dewa_brahma", "ajengndita", "reply", 76, "twitter"),
+            ("cobeyisyolkek", "telkomsel", "mention", 219, "twitter"),
+            ("telkomsel", "cobeyisyolkek", "reply", 0, "twitter"),
+            ("syafrizalj79805", "cobeyisyolkek", "reply", 0, "twitter"),
+        ]
+        dataframe = pd.DataFrame(
+            edges,
+            columns=["source", "target", "relationship", "followers", "platform"],
+        )
+        dataframe["layanan"] = "Telkomsel"
+        return dataframe
+    except Exception as exc:
+        raise RuntimeError(f"Gagal membuat data SNA dummy Telkomsel: {exc}") from exc
+
+
 def get_dummy_wordcloud_data() -> dict[str, str]:
     """Kembalikan corpus teks per sentimen untuk WordCloud."""
     try:
@@ -444,3 +499,327 @@ def get_dummy_topics() -> list[dict]:
         }
         for _, row in df.iterrows()
     ]
+
+# ================================================================
+# TAHAP 3 FASE 14 - DATA DUMMY KHUSUS INDIBIZ
+# ================================================================
+# Random generator memakai seed lokal. Hasil tetap konsisten pada setiap restart
+# dan tidak memengaruhi generator dummy layanan lain.
+
+INDIBIZ_SENTIMENT_REQUIRED_COLUMNS = [
+    "username",
+    "platform",
+    "content",
+    "predicted_sentiment",
+    "confidence_score",
+    "followers",
+]
+INDIBIZ_SNA_REQUIRED_COLUMNS = [
+    "source",
+    "target",
+    "relationship",
+    "followers",
+    "platform",
+]
+INDIBIZ_TOPIC_REQUIRED_COLUMNS = ["sentiment", "topik", "keywords"]
+INDIBIZ_TOP_KATA_REQUIRED_COLUMNS = ["sentiment", "rank", "kata", "frekuensi"]
+
+
+def _validasi_dummy_indibiz(
+    dataframe: pd.DataFrame,
+    nama_data: str,
+    jumlah_baris: int,
+    kolom_wajib: list[str],
+) -> pd.DataFrame:
+    """Validasi kontrak dummy sebelum DataFrame dikirim ke dashboard."""
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError(f"{nama_data} bukan DataFrame.")
+    if len(dataframe) != jumlah_baris:
+        raise ValueError(
+            f"{nama_data} harus berisi {jumlah_baris} baris, "
+            f"tetapi ditemukan {len(dataframe)} baris."
+        )
+    missing = [column for column in kolom_wajib if column not in dataframe.columns]
+    if missing:
+        raise ValueError(f"Kolom {nama_data} belum lengkap: {', '.join(missing)}")
+    return dataframe.reset_index(drop=True)
+
+
+def get_dummy_indibiz_sentiment() -> pd.DataFrame:
+    """Buat 50 komentar dummy IndiBiz dengan sentimen negatif lebih dominan."""
+    try:
+        rng = np.random.default_rng(1701)
+
+        komentar_negatif = [
+            "Internet IndiBiz sering putus saat toko sedang ramai pelanggan",
+            "Kecepatan paket bisnis menurun pada jam operasional kantor",
+            "Jaringan IndiBiz lambat dan menghambat transaksi kasir",
+            "Gangguan internet belum selesai sejak pagi",
+            "Harga paket bisnis terasa mahal dibanding kualitas jaringan",
+            "Koneksi tidak stabil saat rapat daring dengan klien",
+            "Layanan pelanggan lambat merespons tiket gangguan",
+            "Proses perbaikan jaringan terlalu lama untuk kebutuhan usaha",
+            "Internet sering terputus ketika mengunggah data penjualan",
+            "Kecepatan unggah tidak sesuai paket yang dipilih",
+            "Gangguan jaringan membuat sistem pembayaran tidak dapat digunakan",
+            "Teknisi belum datang meskipun laporan sudah dibuat",
+            "Tagihan meningkat tetapi kualitas koneksi tidak membaik",
+            "WiFi bisnis sering hilang di beberapa ruangan kantor",
+            "Koneksi IndiBiz lemot saat dipakai banyak perangkat",
+            "Informasi estimasi perbaikan gangguan tidak jelas",
+            "Internet mati mendadak dan mengganggu pelayanan pelanggan",
+            "Paket bisnis kurang stabil untuk kegiatan live streaming",
+            "Respons admin terhadap keluhan perusahaan masih lambat",
+            "Jaringan sering bermasalah saat cuaca buruk",
+            "Kecepatan internet tidak konsisten sepanjang hari",
+            "Instalasi terlambat dari jadwal yang sudah disepakati",
+            "Gangguan berulang membuat operasional UMKM terganggu",
+            "Harga layanan belum sebanding dengan dukungan teknis",
+        ]
+        komentar_positif = [
+            "Internet IndiBiz stabil untuk operasional toko setiap hari",
+            "Teknisi datang tepat waktu dan instalasi dilakukan dengan rapi",
+            "Kecepatan internet bisnis sesuai dengan paket yang dipilih",
+            "Layanan pelanggan membantu menyelesaikan gangguan dengan cepat",
+            "Koneksi stabil saat digunakan untuk rapat daring",
+            "Paket IndiBiz membantu digitalisasi usaha kecil kami",
+            "Proses pemasangan mudah dan informasinya jelas",
+            "Internet lancar untuk sistem kasir dan pembayaran digital",
+            "Admin responsif ketika kami meminta bantuan teknis",
+            "Kualitas jaringan membaik setelah dilakukan pengecekan",
+            "Paket bisnis cukup sesuai untuk kebutuhan kantor kecil",
+            "Teknisi ramah dan menjelaskan penggunaan perangkat dengan baik",
+            "Koneksi unggah stabil untuk pencadangan data perusahaan",
+            "Pelayanan gangguan kali ini cepat dan solutif",
+            "IndiBiz mendukung aktivitas penjualan daring tanpa kendala",
+            "Jaringan tetap stabil meskipun digunakan banyak perangkat",
+        ]
+        komentar_netral = [
+            "Berapa harga paket IndiBiz untuk usaha kecil",
+            "Apakah IndiBiz tersedia di wilayah Bandung Timur",
+            "Mohon informasi pilihan kecepatan internet bisnis",
+            "Bagaimana cara mengecek status pemasangan IndiBiz",
+            "Apakah ada paket khusus untuk kafe dan restoran",
+            "Mohon informasi nomor layanan pelanggan IndiBiz",
+            "Berapa lama proses instalasi setelah pendaftaran",
+            "Apakah paket IndiBiz sudah termasuk perangkat router",
+            "Saya ingin mengetahui promo IndiBiz bulan ini",
+            "Bagaimana cara mengubah paket internet bisnis",
+        ]
+
+        konten = komentar_negatif + komentar_positif + komentar_netral
+        sentimen = (
+            ["negative"] * len(komentar_negatif)
+            + ["positive"] * len(komentar_positif)
+            + ["neutral"] * len(komentar_netral)
+        )
+        platform = ["twitter", "instagram", "tiktok"]
+        tanggal_awal = pd.Timestamp("2025-11-01 08:00:00")
+
+        rows = []
+        for index, (content, label) in enumerate(zip(konten, sentimen), start=1):
+            date_created = tanggal_awal + pd.Timedelta(
+                days=(index * 5) % 61,
+                hours=(index * 3) % 12,
+            )
+            rows.append(
+                {
+                    "username": f"pelaku_usaha_{index:02d}",
+                    "platform": platform[(index - 1) % len(platform)],
+                    "content": content,
+                    "predicted_sentiment": label,
+                    "confidence_score": round(float(rng.uniform(0.65, 0.99)), 3),
+                    "followers": int(rng.integers(20, 25001)),
+                    # Dua kolom kompatibilitas dipertahankan untuk timeline dan teks bersih.
+                    "date_created": date_created,
+                    "content_clean": _clean_content(content),
+                }
+            )
+
+        dataframe = pd.DataFrame(rows)
+        _validasi_dummy_indibiz(
+            dataframe,
+            "dummy sentimen IndiBiz",
+            50,
+            INDIBIZ_SENTIMENT_REQUIRED_COLUMNS,
+        )
+        if not dataframe["platform"].isin({"twitter", "instagram", "tiktok"}).all():
+            raise ValueError("Platform dummy sentimen IndiBiz tidak valid.")
+        if not dataframe["predicted_sentiment"].isin(
+            {"positive", "neutral", "negative"}
+        ).all():
+            raise ValueError("Label dummy sentimen IndiBiz tidak valid.")
+        if not dataframe["confidence_score"].between(0.65, 0.99).all():
+            raise ValueError("Confidence dummy sentimen IndiBiz di luar rentang 0.65-0.99.")
+        counts = dataframe["predicted_sentiment"].value_counts()
+        if int(counts.get("negative", 0)) <= max(
+            int(counts.get("positive", 0)), int(counts.get("neutral", 0))
+        ):
+            raise ValueError("Sentimen negatif dummy IndiBiz harus paling dominan.")
+        return dataframe.reset_index(drop=True)
+    except Exception as error:
+        raise RuntimeError(f"Gagal membuat dummy sentimen IndiBiz: {error}") from error
+
+
+def get_dummy_indibiz_sna() -> pd.DataFrame:
+    """Buat 30 edge dummy SNA IndiBiz dengan node target utama indibiz."""
+    try:
+        sumber = [
+            "usaha_kopi_bdg", "toko_makmur", "studio_kreatif", "klinik_sehat",
+            "bengkel_jaya", "warung_digital", "kantor_hukum", "umkm_cantik",
+            "gudang_online", "resto_nusantara", "agen_travel", "laundry_bersih",
+            "percetakan_maju", "sekolah_mandiri", "apotek_sentosa", "hotel_mini",
+            "konveksi_baru", "peternak_online", "toko_elektronik", "kafe_sudut",
+            "indibiz", "admin_indibiz", "usaha_kopi_bdg", "studio_kreatif",
+            "klinik_sehat", "toko_makmur", "resto_nusantara", "gudang_online",
+            "umkm_cantik", "kafe_sudut",
+        ]
+        target = [
+            "indibiz", "indibiz", "indibiz", "indibiz", "indibiz",
+            "indibiz", "indibiz", "indibiz", "indibiz", "indibiz",
+            "indibiz", "indibiz", "indibiz", "indibiz", "indibiz",
+            "indibiz", "indibiz", "indibiz", "indibiz", "indibiz",
+            "usaha_kopi_bdg", "toko_makmur", "admin_indibiz", "indibiz",
+            "indibiz", "admin_indibiz", "indibiz", "indibiz",
+            "indibiz", "indibiz",
+        ]
+        relationship = [
+            "comment", "mention", "reply", "comment", "mention",
+            "comment", "reply", "comment", "mention", "comment",
+            "reply", "comment", "mention", "comment", "reply",
+            "comment", "mention", "comment", "reply", "comment",
+            "reply", "reply", "mention", "reply", "comment",
+            "mention", "reply", "comment", "mention", "comment",
+        ]
+        platform = ["twitter", "instagram", "tiktok"] * 10
+        followers = [
+            1250, 840, 3100, 2250, 760, 1450, 980, 5400, 1320, 4150,
+            1880, 670, 960, 3520, 2110, 1750, 2860, 730, 6200, 3900,
+            125000, 18300, 1250, 3100, 2250, 840, 4150, 1320, 5400, 3900,
+        ]
+
+        dataframe = pd.DataFrame(
+            {
+                "source": sumber,
+                "target": target,
+                "relationship": relationship,
+                "followers": followers,
+                "platform": platform,
+            },
+            columns=INDIBIZ_SNA_REQUIRED_COLUMNS,
+        )
+        _validasi_dummy_indibiz(
+            dataframe, "dummy SNA IndiBiz", 30, INDIBIZ_SNA_REQUIRED_COLUMNS
+        )
+        if not dataframe["relationship"].isin({"comment", "mention", "reply"}).all():
+            raise ValueError("Relationship dummy SNA IndiBiz tidak valid.")
+        if dataframe["target"].value_counts().idxmax() != "indibiz":
+            raise ValueError("Node target utama dummy SNA harus indibiz.")
+        return dataframe.reset_index(drop=True)
+    except Exception as error:
+        raise RuntimeError(f"Gagal membuat dummy SNA IndiBiz: {error}") from error
+
+
+def get_dummy_indibiz_topics() -> pd.DataFrame:
+    """Buat 15 baris topik IndiBiz: lima topik dikalikan tiga sentimen."""
+    try:
+        topik_dan_kata = {
+            "gangguan jaringan": {
+                "positive": "jaringan | pulih | stabil",
+                "neutral": "jaringan | status | wilayah",
+                "negative": "jaringan | lambat | gangguan",
+            },
+            "kecepatan internet": {
+                "positive": "cepat | stabil | lancar",
+                "neutral": "kecepatan | paket | perangkat",
+                "negative": "lemot | lambat | tidak stabil",
+            },
+            "harga paket bisnis": {
+                "positive": "harga | sesuai | manfaat",
+                "neutral": "harga | paket | pilihan",
+                "negative": "mahal | tagihan | tidak sebanding",
+            },
+            "layanan pelanggan": {
+                "positive": "responsif | ramah | solutif",
+                "neutral": "admin | informasi | bantuan",
+                "negative": "lambat | tiket | tidak jelas",
+            },
+            "instalasi": {
+                "positive": "teknisi | cepat | rapi",
+                "neutral": "jadwal | pemasangan | perangkat",
+                "negative": "terlambat | teknisi | menunggu",
+            },
+        }
+
+        rows = []
+        for topik, kata_per_sentimen in topik_dan_kata.items():
+            for sentiment in ("positive", "neutral", "negative"):
+                rows.append(
+                    {
+                        "sentiment": sentiment,
+                        "topik": topik,
+                        "keywords": kata_per_sentimen[sentiment],
+                    }
+                )
+        dataframe = pd.DataFrame(rows, columns=INDIBIZ_TOPIC_REQUIRED_COLUMNS)
+        _validasi_dummy_indibiz(
+            dataframe, "dummy topik IndiBiz", 15, INDIBIZ_TOPIC_REQUIRED_COLUMNS
+        )
+        if dataframe["topik"].nunique() != 5:
+            raise ValueError("Dummy topik IndiBiz harus memiliki tepat lima topik.")
+        if not dataframe["keywords"].str.contains(r"\s\|\s", regex=True).all():
+            raise ValueError("Keywords dummy topik harus dipisahkan dengan ' | '.")
+        return dataframe.reset_index(drop=True)
+    except Exception as error:
+        raise RuntimeError(f"Gagal membuat dummy topik IndiBiz: {error}") from error
+
+
+def get_dummy_indibiz_top_kata() -> pd.DataFrame:
+    """Buat 45 baris top kata IndiBiz: 15 kata untuk setiap sentimen."""
+    try:
+        kata_per_sentimen = {
+            "positive": [
+                ("stabil", 34), ("cepat", 31), ("lancar", 29), ("membantu", 27),
+                ("responsif", 25), ("teknisi", 23), ("rapi", 21), ("solutif", 19),
+                ("sesuai", 18), ("mudah", 17), ("bagus", 16), ("usaha", 15),
+                ("digital", 14), ("pelayanan", 13), ("puas", 12),
+            ],
+            "neutral": [
+                ("paket", 30), ("harga", 28), ("informasi", 26), ("indibiz", 24),
+                ("internet", 22), ("bisnis", 20), ("wilayah", 18), ("promo", 17),
+                ("instalasi", 16), ("router", 15), ("kecepatan", 14), ("layanan", 13),
+                ("daftar", 12), ("status", 11), ("kantor", 10),
+            ],
+            "negative": [
+                ("gangguan", 42), ("lambat", 39), ("jaringan", 37), ("lemot", 34),
+                ("mahal", 31), ("putus", 29), ("teknisi", 26), ("tagihan", 24),
+                ("instalasi", 22), ("menunggu", 20), ("tidak", 19), ("stabil", 18),
+                ("respons", 16), ("operasional", 15), ("terlambat", 14),
+            ],
+        }
+
+        rows = []
+        for sentiment in ("positive", "neutral", "negative"):
+            for rank, (kata, frekuensi) in enumerate(kata_per_sentimen[sentiment], start=1):
+                rows.append(
+                    {
+                        "sentiment": sentiment,
+                        "rank": rank,
+                        "kata": kata,
+                        "frekuensi": frekuensi,
+                    }
+                )
+        dataframe = pd.DataFrame(rows, columns=INDIBIZ_TOP_KATA_REQUIRED_COLUMNS)
+        _validasi_dummy_indibiz(
+            dataframe,
+            "dummy top kata IndiBiz",
+            45,
+            INDIBIZ_TOP_KATA_REQUIRED_COLUMNS,
+        )
+        per_sentiment = dataframe.groupby("sentiment").size().to_dict()
+        if per_sentiment != {"negative": 15, "neutral": 15, "positive": 15}:
+            raise ValueError("Setiap sentimen harus memiliki tepat 15 kata.")
+        return dataframe.reset_index(drop=True)
+    except Exception as error:
+        raise RuntimeError(f"Gagal membuat dummy top kata IndiBiz: {error}") from error
+

@@ -2,16 +2,16 @@
 
 import streamlit as st
 
-PRIMARY = "#1DA1F2"
-ACCENT = "#E53935"
+PRIMARY = "#E53935"
+ACCENT = "#B71C1C"
 POSITIVE = "#4CAF50"
 NEGATIVE = "#F44336"
 NEUTRAL = "#FF9800"
 CARD_RADIUS = "12px"
-HEADER_GRAD = "linear-gradient(135deg, #1DA1F2, #0D47A1)"
+HEADER_GRAD = "linear-gradient(135deg, #B71C1C, #E53935, #F05A56)"
 
 
-def load_css(dark_mode: bool = True, hide_sidebar: bool = False) -> None:
+def load_css(dark_mode: bool = False, hide_sidebar: bool = False) -> None:
     """Terapkan tema global, sidebar, komponen, dan mode gelap dashboard."""
     try:
         if dark_mode:
@@ -27,17 +27,17 @@ def load_css(dark_mode: bool = True, hide_sidebar: bool = False) -> None:
             shadow = "0 10px 30px rgba(0, 0, 0, 0.28)"
             table_header = "#1E293B"
         else:
-            app_bg = "#F6F8FB"
+            app_bg = "#F7F8FA"
             sidebar_bg = "#FFFFFF"
             card_bg = "#FFFFFF"
-            secondary_bg = "#EEF3F8"
-            input_bg = "#FFFFFF"
-            text = "#1F2937"
-            muted = "#64748B"
-            border = "#DCE4ED"
+            secondary_bg = "#F4F5F7"
+            input_bg = "#F4F5F7"
+            text = "#1F1F1F"
+            muted = "#5F6368"
+            border = "#E5E7EB"
             header_bg = "rgba(255, 255, 255, 0.90)"
             shadow = "0 10px 28px rgba(15, 23, 42, 0.08)"
-            table_header = "#EEF3F8"
+            table_header = "#FFF1F1"
 
         sidebar_visibility = (
             """
@@ -55,7 +55,7 @@ def load_css(dark_mode: bool = True, hide_sidebar: bool = False) -> None:
         st.markdown(
             f"""
             <style>
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
                 :root {{
                     --app-primary: {PRIMARY};
@@ -78,8 +78,7 @@ def load_css(dark_mode: bool = True, hide_sidebar: bool = False) -> None:
                 body,
                 [class*="css"],
                 .stApp {{
-                    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
-                        'Segoe UI', sans-serif;
+                    font-family: 'Plus Jakarta Sans', sans-serif;
                 }}
 
                 html,
@@ -257,7 +256,7 @@ def load_css(dark_mode: bool = True, hide_sidebar: bool = False) -> None:
 
                 .metric-card:hover {{
                     transform: translateY(-2px);
-                    box-shadow: 0 12px 30px rgba(29, 161, 242, 0.18);
+                    box-shadow: 0 12px 30px rgba(229, 57, 53, 0.14);
                 }}
 
                 .banner-header,
@@ -267,7 +266,7 @@ def load_css(dark_mode: bool = True, hide_sidebar: bool = False) -> None:
                     padding: 2rem;
                     border-radius: {CARD_RADIUS};
                     margin-bottom: 1.5rem;
-                    box-shadow: 0 12px 30px rgba(13, 71, 161, 0.20);
+                    box-shadow: 0 12px 30px rgba(183, 28, 28, 0.18);
                     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
                 }}
 
@@ -478,7 +477,7 @@ def load_css(dark_mode: bool = True, hide_sidebar: bool = False) -> None:
                 }}
 
                 ::-webkit-scrollbar-thumb:hover {{
-                    background: #0D47A1;
+                    background: #B71C1C;
                 }}
 
                 @keyframes fadeIn {{
@@ -523,12 +522,34 @@ def load_css(dark_mode: bool = True, hide_sidebar: bool = False) -> None:
                     overflow-x: hidden;
                 }}
 
-                [data-testid="collapsedControl"] button {{
-                    color: {text} !important;
-                    background: {card_bg} !important;
-                    border: 1px solid {border} !important;
-                    border-radius: 10px !important;
+                /* HOTFIX FASE 15: hilangkan seluruh panel ketika sidebar ditutup.
+                   Tombol pembuka bawaan Streamlit berada di luar section sidebar,
+                   sehingga tetap dapat digunakan untuk membuka sidebar kembali. */
+                section[data-testid="stSidebar"][aria-expanded="false"] {{
+                    display: none !important;
+                    width: 0 !important;
+                    min-width: 0 !important;
+                    max-width: 0 !important;
+                    overflow: hidden !important;
+                    border-right: 0 !important;
+                    box-shadow: none !important;
                 }}
+
+                section[data-testid="stSidebar"][aria-expanded="false"] > div,
+                section[data-testid="stSidebar"][aria-expanded="false"] > div:first-child {{
+                    display: none !important;
+                    width: 0 !important;
+                    min-width: 0 !important;
+                    max-width: 0 !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    overflow: hidden !important;
+                    opacity: 0 !important;
+                    pointer-events: none !important;
+                }}
+
+                /* Kontrol buka/tutup sidebar ditangani khusus di app.py.
+                   Hindari override warna berdasarkan mode terang/gelap. */
 
                 .sidebar-brand {{
                     display: flex;
@@ -898,12 +919,12 @@ def render_data_badge(is_real: bool) -> None:
 
 
 def render_coming_soon_card(layanan: str, fitur: str) -> None:
-    """Render kartu Coming Soon untuk layanan yang belum tersedia."""
+    """Render kartu status pengembangan untuk layanan yang belum tersedia."""
     try:
         st.markdown(
             f"""
             <div class="metric-card" style="border-left:4px solid #9E9E9E;">
-                <span class="badge badge-soon">Coming Soon</span><br><br>
+                <span class="badge badge-soon">Dalam Pengembangan</span><br><br>
                 <strong>⏳ {layanan}</strong><br>
                 <span style="color:var(--app-muted);">
                     {fitur} belum tersedia untuk layanan ini.
@@ -913,7 +934,7 @@ def render_coming_soon_card(layanan: str, fitur: str) -> None:
             unsafe_allow_html=True,
         )
     except Exception:
-        st.error("Informasi Coming Soon belum dapat ditampilkan.")
+        st.error("Informasi pengembangan belum dapat ditampilkan.")
 
 
 def render_page_header(title: str, subtitle: str = None) -> None:

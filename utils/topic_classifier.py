@@ -1,18 +1,593 @@
-"""
-Modul klasifikasi topik berbasis keyword matching untuk komentar IndiHome.
+# utils/topic_classifier.py
+# Klasifikasi topik berbasis keyword untuk komentar Telkom Group
+# Mendukung layanan: IndiHome, IndiBiz, Telkomsel
+# Sentimen: Positif, Netral, Negatif — minimal 15 topik per sentimen
 
-Mengelompokkan teks ke dalam topik dominan per sentimen (positif, netral, negatif)
-menggunakan kamus kata kunci TOPICS.
-"""
+"""Klasifikasi topik berbasis keyword untuk komentar layanan Telkom Group."""
 
 from __future__ import annotations
 
 import re
 from collections import Counter
+from functools import lru_cache
+from typing import Any, Iterable
 
 import pandas as pd
 
-# --- Pemetaan label sentimen ke kunci kanonik ---
+TOPICS = {'Positif': {'Kecepatan Stabil': ['cepat',
+                                  'cepet',
+                                  'kencang',
+                                  'ngebut',
+                                  'stabil',
+                                  'lancar',
+                                  'mulus',
+                                  'speed bagus',
+                                  'koneksi cepat',
+                                  'internet lancar',
+                                  'wifi stabil',
+                                  'sinyal kencang'],
+             'Promo Menarik': ['promo',
+                               'diskon',
+                               'cashback',
+                               'potongan harga',
+                               'harga promo',
+                               'voucher',
+                               'bonus kuota',
+                               'gratis',
+                               'hemat',
+                               'murah banget',
+                               'deal bagus',
+                               'promo mantap'],
+             'Instalasi Cepat': ['cepat pasang',
+                                 'pemasangan cepat',
+                                 'instalasi cepat',
+                                 'langsung aktif',
+                                 'teknisi cepat datang',
+                                 'proses cepat',
+                                 'sat set',
+                                 'gercep pasang',
+                                 'hari ini pasang',
+                                 'besok aktif',
+                                 'pemasangan lancar'],
+             'CS Ramah & Responsif': ['cs ramah',
+                                      'admin ramah',
+                                      'cepat balas',
+                                      'responsif',
+                                      'fast response',
+                                      'helpful',
+                                      'solutif',
+                                      'ditanggapi cepat',
+                                      'gercep jawab',
+                                      'pelayanan ramah',
+                                      'cs mantap'],
+             'Coverage Luas': ['coverage luas',
+                               'jangkauan luas',
+                               'jaringan luas',
+                               'sampai pelosok',
+                               'ada di mana mana',
+                               'sinyal sampai desa',
+                               'tersedia luas',
+                               'coverage mantap',
+                               'jangkauan nasional',
+                               'area terjangkau',
+                               'koneksi di mana saja'],
+             'Harga Terjangkau': ['harga terjangkau',
+                                  'murah',
+                                  'ramah kantong',
+                                  'worth it',
+                                  'sesuai harga',
+                                  'biaya wajar',
+                                  'tidak mahal',
+                                  'hemat biaya',
+                                  'value for money',
+                                  'cocok di kantong',
+                                  'harga bersahabat'],
+             'Paket Lengkap': ['paket lengkap',
+                               'paket komplit',
+                               'bundling lengkap',
+                               'all in one',
+                               'internet dan tv',
+                               'telepon dan internet',
+                               'banyak pilihan paket',
+                               'paket sesuai kebutuhan',
+                               'benefit lengkap',
+                               'layanan lengkap',
+                               'kuota lengkap'],
+             'Streaming Lancar': ['streaming lancar',
+                                  'netflix lancar',
+                                  'youtube lancar',
+                                  'nonton tanpa buffering',
+                                  'video mulus',
+                                  'disney plus lancar',
+                                  'vidio lancar',
+                                  'streaming stabil',
+                                  'nonton 4k lancar',
+                                  'tidak buffering',
+                                  'live streaming lancar'],
+             'Gaming Tanpa Lag': ['gaming lancar',
+                                  'main game lancar',
+                                  'tanpa lag',
+                                  'ping rendah',
+                                  'low ping',
+                                  'anti lag',
+                                  'game stabil',
+                                  'mabar lancar',
+                                  'fps lancar',
+                                  'latency rendah',
+                                  'tidak ngelag'],
+             'Respons Cepat Gangguan': ['cepat ditangani',
+                                        'langsung beres',
+                                        'gangguan cepat selesai',
+                                        'teknisi cepat datang',
+                                        'laporan cepat diproses',
+                                        'problem solved',
+                                        'cepat normal',
+                                        'langsung diperbaiki',
+                                        'respons gangguan cepat',
+                                        'keluhan cepat beres'],
+             'Pelayanan Profesional': ['profesional',
+                                       'pelayanan profesional',
+                                       'kerja rapi',
+                                       'petugas sopan',
+                                       'teknisi profesional',
+                                       'memuaskan',
+                                       'pelayanan bagus',
+                                       'layanan prima',
+                                       'proses jelas',
+                                       'kompeten',
+                                       'service excellent'],
+             'Sinyal Merata': ['sinyal merata',
+                               'stabil di mana mana',
+                               'sinyal konsisten',
+                               'jaringan merata',
+                               'sinyal kuat',
+                               'full bar',
+                               'sinyal bagus',
+                               'koneksi merata',
+                               'stabil di berbagai daerah',
+                               'jaringan konsisten'],
+             'Koneksi WFH Andal': ['wfh lancar',
+                                   'kerja dari rumah lancar',
+                                   'zoom lancar',
+                                   'meeting lancar',
+                                   'video conference lancar',
+                                   'kerja online stabil',
+                                   'upload kerja cepat',
+                                   'vpn lancar',
+                                   'kelas online lancar',
+                                   'koneksi andal',
+                                   'remote work lancar'],
+             'Upgrade Mudah': ['mudah upgrade',
+                               'gampang upgrade',
+                               'upgrade cepat',
+                               'ganti paket mudah',
+                               'naik paket mudah',
+                               'proses upgrade lancar',
+                               'upgrade tanpa ribet',
+                               'pindah paket gampang',
+                               'tambah kecepatan mudah',
+                               'upgrade langsung aktif'],
+             'Fitur Tambahan Bagus': ['fitur bagus',
+                                      'bonus menarik',
+                                      'fitur tambahan',
+                                      'value lebih',
+                                      'add on berguna',
+                                      'parental control bagus',
+                                      'benefit ekstra',
+                                      'bonus channel',
+                                      'layanan tambahan bagus',
+                                      'fitur lengkap',
+                                      'ekstra kuota'],
+             'Aplikasi Mudah Digunakan': ['aplikasi mudah',
+                                          'app mudah',
+                                          'mytelkomsel mudah',
+                                          'aplikasi lancar',
+                                          'ui mudah',
+                                          'gampang dipakai',
+                                          'navigasi jelas',
+                                          'transaksi mudah',
+                                          'bayar lewat aplikasi mudah',
+                                          'aplikasi praktis',
+                                          'user friendly']},
+ 'Netral': {'Pertanyaan Paket': ['tanya paket',
+                                 'paket apa',
+                                 'ada paket',
+                                 'info paket',
+                                 'paket internet apa',
+                                 'pilihan paket',
+                                 'rekomendasi paket',
+                                 'paket tersedia',
+                                 'paket bulanan',
+                                 'paket harian',
+                                 'min paket'],
+            'Cek Tagihan': ['cek tagihan',
+                            'tagihan bulan ini',
+                            'bayar berapa',
+                            'jumlah tagihan',
+                            'invoice bulan ini',
+                            'tagihan saya',
+                            'cek billing',
+                            'rincian tagihan',
+                            'jatuh tempo kapan',
+                            'nominal tagihan',
+                            'tagihan terbaru'],
+            'Laporan Gangguan': ['mau lapor',
+                                 'lapor gangguan',
+                                 'ada gangguan',
+                                 'laporan jaringan',
+                                 'lapor internet',
+                                 'koneksi bermasalah',
+                                 'gangguan di area',
+                                 'laporan wifi',
+                                 'saya melapor',
+                                 'tiket gangguan',
+                                 'gangguan hari ini'],
+            'Permintaan Bantuan': ['tolong bantu',
+                                   'minta bantuan',
+                                   'bantu dong',
+                                   'mohon bantuan',
+                                   'butuh bantuan',
+                                   'admin bantu',
+                                   'cs bantu',
+                                   'help me',
+                                   'perlu dibantu',
+                                   'bisa bantu',
+                                   'tolong cek'],
+            'Info Promo': ['ada promo',
+                           'promo apa',
+                           'info promo',
+                           'diskon gak',
+                           'promo terbaru',
+                           'promo bulan ini',
+                           'cek promo',
+                           'promo masih ada',
+                           'cashback apa',
+                           'bonus apa',
+                           'penawaran terbaru'],
+            'Pengumuman Maintenance': ['maintenance',
+                                       'pemeliharaan',
+                                       'jadwal maintenance',
+                                       'perbaikan jaringan',
+                                       'maintenance terjadwal',
+                                       'sedang pemeliharaan',
+                                       'jadwal perbaikan',
+                                       'network maintenance',
+                                       'downtime terjadwal',
+                                       'pemberitahuan gangguan',
+                                       'upgrade jaringan'],
+            'Tanya Cara Daftar': ['cara daftar',
+                                  'gimana daftar',
+                                  'mau daftar',
+                                  'pendaftaran',
+                                  'daftar indihome',
+                                  'daftar indibiz',
+                                  'daftar telkomsel',
+                                  'registrasi layanan',
+                                  'syarat daftar',
+                                  'daftar online',
+                                  'prosedur daftar'],
+            'Tanya Lokasi Bayar': ['bayar di mana',
+                                   'tempat bayar',
+                                   'lokasi pembayaran',
+                                   'kantor pembayaran',
+                                   'bayar lewat apa',
+                                   'channel pembayaran',
+                                   'gerai terdekat',
+                                   'plasa telkom',
+                                   'bayar via bank',
+                                   'bayar via aplikasi',
+                                   'metode pembayaran'],
+            'Cek Status Pengaduan': ['status pengaduan',
+                                     'sudah diproses',
+                                     'cek laporan',
+                                     'nomor tiket',
+                                     'status tiket',
+                                     'laporan saya',
+                                     'progres pengaduan',
+                                     'tindak lanjut laporan',
+                                     'sudah ditangani belum',
+                                     'cek keluhan',
+                                     'update tiket'],
+            'Tanya Kecepatan Paket': ['kecepatan berapa',
+                                      'speed berapa',
+                                      'berapa mbps',
+                                      'paket 20 mbps',
+                                      'paket 50 mbps',
+                                      'upload berapa',
+                                      'download berapa',
+                                      'kecepatan paket',
+                                      'speed paket',
+                                      'bandwidth berapa',
+                                      'ping berapa'],
+            'Perbandingan Paket': ['bandingkan paket',
+                                   'lebih baik mana',
+                                   'pilih yang mana',
+                                   'beda paket',
+                                   'perbedaan paket',
+                                   'paket a atau b',
+                                   'paket terbaik mana',
+                                   'compare paket',
+                                   'cocok mana',
+                                   'mending paket',
+                                   'opsi paket'],
+            'Tanya Coverage Area': ['cek coverage',
+                                    'daerah saya',
+                                    'tersedia gak',
+                                    'ada jaringan di',
+                                    'coverage area',
+                                    'jangkauan daerah',
+                                    'lokasi saya terjangkau',
+                                    'cek ketersediaan',
+                                    'bisa pasang di',
+                                    'sinyal di daerah',
+                                    'area layanan'],
+            'Request Upgrade': ['mau upgrade',
+                                'request upgrade',
+                                'ganti paket',
+                                'pindah ke paket',
+                                'tambah kecepatan',
+                                'naik paket',
+                                'upgrade layanan',
+                                'upgrade internet',
+                                'ubah paket',
+                                'migrasi paket',
+                                'tambah mbps'],
+            'Feedback Netral': ['biasa aja',
+                                'lumayan',
+                                'standar',
+                                'oke sih',
+                                'cukup',
+                                'normal',
+                                'so so',
+                                'tidak buruk',
+                                'masih oke',
+                                'sesuai standar',
+                                'ya begitu'],
+            'Konfirmasi Pembayaran': ['sudah bayar',
+                                      'konfirmasi pembayaran',
+                                      'bukti bayar',
+                                      'pembayaran berhasil',
+                                      'sudah transfer',
+                                      'cek pembayaran',
+                                      'lunas',
+                                      'pembayaran masuk',
+                                      'kirim bukti',
+                                      'bayar tadi',
+                                      'status pembayaran'],
+            'Tanya Instalasi': ['kapan dipasang',
+                                'jadwal pasang',
+                                'proses instalasi',
+                                'berapa lama pasang',
+                                'teknisi kapan datang',
+                                'cek jadwal teknisi',
+                                'pemasangan kapan',
+                                'survey kapan',
+                                'status instalasi',
+                                'pasang baru',
+                                'waktu pemasangan'],
+            'Tanya Router dan Perangkat': ['router apa',
+                                           'modem apa',
+                                           'tipe router',
+                                           'cara restart router',
+                                           'lampu modem',
+                                           'ganti modem',
+                                           'perangkat bawaan',
+                                           'stb apa',
+                                           'setting wifi',
+                                           'password wifi',
+                                           'router tersedia'],
+            'Tanya Kuota dan Masa Aktif': ['sisa kuota',
+                                           'cek kuota',
+                                           'masa aktif',
+                                           'kuota berapa',
+                                           'kuota utama',
+                                           'kuota lokal',
+                                           'masa berlaku',
+                                           'cek pulsa',
+                                           'kuota belum masuk',
+                                           'perpanjang masa aktif',
+                                           'detail kuota']},
+ 'Negatif': {'Gangguan Jaringan': ['gangguan',
+                                   'jaringan putus',
+                                   'internet putus',
+                                   'sering putus',
+                                   'koneksi terputus',
+                                   'jaringan error',
+                                   'internet error',
+                                   'jaringan down',
+                                   'tidak bisa internet',
+                                   'koneksi bermasalah',
+                                   'gangguan terus',
+                                   'putus nyambung'],
+             'Kecepatan Lambat': ['lemot',
+                                  'lambat',
+                                  'buffering',
+                                  'loading lama',
+                                  'lelet',
+                                  'ngelag',
+                                  'speed turun',
+                                  'internet pelan',
+                                  'koneksi lamban',
+                                  'download lama',
+                                  'upload lama',
+                                  'ping tinggi'],
+             'Tagihan Salah/Bengkak': ['tagihan bengkak',
+                                       'tagihan salah',
+                                       'tagihan lebih',
+                                       'overcharge',
+                                       'billing salah',
+                                       'biaya membengkak',
+                                       'nominal tidak sesuai',
+                                       'tagihan dobel',
+                                       'kena biaya tambahan',
+                                       'invoice salah',
+                                       'bayar lebih'],
+             'CS Lambat/Tidak Responsif': ['cs lambat',
+                                           'tidak responsif',
+                                           'lama respons',
+                                           'tidak ditanggapi',
+                                           'admin diam',
+                                           'cs tidak jawab',
+                                           'slow response',
+                                           'susah dihubungi',
+                                           'keluhan diabaikan',
+                                           'balas lama',
+                                           'customer service buruk'],
+             'Pemadaman Berulang': ['mati lagi',
+                                    'padam lagi',
+                                    'berulang',
+                                    'sering down',
+                                    'mati terus',
+                                    'gangguan berulang',
+                                    'internet mati lagi',
+                                    'jaringan padam',
+                                    'tiap hari mati',
+                                    'putus terus',
+                                    'down berkali kali'],
+             'Harga Mahal': ['mahal',
+                             'kemahalan',
+                             'terlalu mahal',
+                             'harga tinggi',
+                             'tidak sebanding',
+                             'bayar banyak',
+                             'tarif mahal',
+                             'biaya mahal',
+                             'harga tidak masuk akal',
+                             'boros biaya',
+                             'mencekik'],
+             'Instalasi Lama': ['pasang lama',
+                                'instalasi lama',
+                                'tunggu teknisi',
+                                'teknisi tidak datang',
+                                'janji tidak ditepati',
+                                'pemasangan molor',
+                                'survey lama',
+                                'aktivasi lama',
+                                'belum dipasang',
+                                'jadwal mundur',
+                                'proses berhari hari'],
+             'Paket Tidak Sesuai': ['tidak sesuai iklan',
+                                    'paket tidak sesuai',
+                                    'beda iklan',
+                                    'benefit tidak masuk',
+                                    'kecepatan tidak sesuai paket',
+                                    'paket mengecewakan',
+                                    'layanan tidak sesuai',
+                                    'janji paket palsu',
+                                    'kuota tidak sesuai',
+                                    'spesifikasi beda',
+                                    'paket zonk'],
+             'Sinyal Hilang': ['sinyal hilang',
+                               'no signal',
+                               'blank',
+                               'tidak ada jaringan',
+                               'sinyal kosong',
+                               'hilang sinyal',
+                               'emergency calls only',
+                               'bar sinyal hilang',
+                               'sinyal mati',
+                               'jaringan tidak muncul',
+                               'searching terus'],
+             'Router Bermasalah': ['router rusak',
+                                   'modem rusak',
+                                   'router error',
+                                   'modem mati',
+                                   'restart terus',
+                                   'mati sendiri',
+                                   'lampu los merah',
+                                   'wifi tidak muncul',
+                                   'router panas',
+                                   'perangkat bermasalah',
+                                   'ont error'],
+             'Pemblokiran Layanan': ['diblokir',
+                                     'terblokir',
+                                     'suspend',
+                                     'suspended',
+                                     'blocked',
+                                     'layanan diputus',
+                                     'internet diisolir',
+                                     'nomor diblokir',
+                                     'akun terkunci',
+                                     'akses ditutup',
+                                     'pemutusan sepihak'],
+             'Migrasi Rumit': ['migrasi rumit',
+                               'pindah paket susah',
+                               'upgrade susah',
+                               'downgrade susah',
+                               'proses migrasi lama',
+                               'ganti paket ribet',
+                               'dilempar lempar',
+                               'syarat rumit',
+                               'migrasi gagal',
+                               'upgrade gagal',
+                               'pindah layanan susah'],
+             'Refund Tidak Jelas': ['refund',
+                                    'uang kembali',
+                                    'tidak dikembalikan',
+                                    'pengembalian dana',
+                                    'refund lama',
+                                    'refund belum masuk',
+                                    'kompensasi tidak jelas',
+                                    'uang nyangkut',
+                                    'refund ditolak',
+                                    'proses refund',
+                                    'dana belum kembali'],
+             'Kuota Cepat Habis': ['cepat habis',
+                                   'kuota boros',
+                                   'kuota hilang',
+                                   'kuota tersedot',
+                                   'kuota berkurang sendiri',
+                                   'paket data cepat habis',
+                                   'pemakaian tidak wajar',
+                                   'kuota lenyap',
+                                   'baru beli sudah habis',
+                                   'sedot kuota',
+                                   'kuota bocor'],
+             'Tidak Ada Sinyal Daerah': ['blank spot',
+                                         'pelosok tidak ada sinyal',
+                                         'daerah tidak terjangkau',
+                                         'pinggiran tidak ada jaringan',
+                                         'sinyal di desa hilang',
+                                         'coverage buruk',
+                                         'area tanpa sinyal',
+                                         'jaringan tidak masuk',
+                                         'susah sinyal di daerah',
+                                         'lokasi tidak tercover'],
+             'Aplikasi Bermasalah': ['aplikasi error',
+                                     'app error',
+                                     'mytelkomsel error',
+                                     'aplikasi crash',
+                                     'tidak bisa login',
+                                     'otp tidak masuk',
+                                     'transaksi gagal',
+                                     'aplikasi lemot',
+                                     'aplikasi blank',
+                                     'server error',
+                                     'fitur tidak jalan'],
+             'Streaming dan Gaming Terganggu': ['streaming buffering',
+                                                'netflix buffering',
+                                                'youtube putus',
+                                                'game lag',
+                                                'ping merah',
+                                                'gaming terganggu',
+                                                'mabar putus',
+                                                'video macet',
+                                                'live streaming patah',
+                                                'latency tinggi',
+                                                'packet loss'],
+             'Teknisi Tidak Tuntas': ['teknisi tidak beres',
+                                      'perbaikan tidak tuntas',
+                                      'teknisi asal',
+                                      'selesai tapi rusak lagi',
+                                      'petugas tidak profesional',
+                                      'teknisi tidak datang',
+                                      'masalah belum selesai',
+                                      'perbaikan gagal',
+                                      'kabel berantakan',
+                                      'teknisi tidak membantu',
+                                      'kunjungan sia sia']}}
+
+
 SENTIMENT_KEYS = {
     "positive": "positive",
     "positif": "positive",
@@ -25,547 +600,387 @@ SENTIMENT_KEYS = {
     "label_2": "negative",
 }
 
-# --- Kamus topik: 12 topik per sentimen, masing-masing 15–20 kata kunci ---
-TOPICS: dict[str, dict[str, list[str]]] = {
-    "positive": {
-        "Apresiasi Kecepatan Internet": [
-            "cepat", "kencang", "ngebut", "kilat", "gesit", "laju", "deras",
-            "speed", "kecepatan", "mbps", "download", "upload", "internet cepat",
-            "koneksi cepat", "ngebut banget", "mantap cepat", "kenceng", "ngebut",
-            "responsif", "lancar jaya",
-        ],
-        "Koneksi Stabil dan Handal": [
-            "stabil", "stabil banget", "handal", "konsisten", "lancar", "mulus",
-            "tidak putus", "anti putus", "solid", "mantap", "oke", "bagus",
-            "koneksi stabil", "internet stabil", "wifi stabil", "sinyal stabil",
-            "reliable", "terjamin", "aman", "nyaman",
-        ],
-        "Kepuasan Layanan CS": [
-            "cs", "customer service", "layanan pelanggan", "responsif", "ramah",
-            "solutif", "membantu", "tanggap", "cepat respon", "helpful",
-            "pelayanan bagus", "cs bagus", "cs ramah", "cs cepat", "ditangani",
-            "terima kasih cs", "puas cs", "admin ramah", "adm ramah", "cs mantap",
-        ],
-        "Teknisi Cepat dan Profesional": [
-            "teknisi", "tukang pasang", "petugas", "teknisi cepat", "teknisi ramah",
-            "profesional", "tepat waktu", "datang cepat", "instalasi rapi",
-            "pemasangan rapi", "kerja rapi", "sopan", "sigap", "handal",
-            "teknisi bagus", "teknisi profesional", "petugas ramah", "pasang cepat",
-            "teknisi tanggap", "teknisi mantap",
-        ],
-        "Pemasangan Baru Lancar": [
-            "pemasangan", "instalasi", "pasang baru", "pasang indihome", "aktivasi",
-            "aktif", "terpasang", "berhasil pasang", "lancar pasang", "mudah pasang",
-            "proses cepat", "pasang lancar", "instalasi lancar", "pasang wifi",
-            "pasang inet", "pasang internet", "baru pasang", "sudah terpasang",
-            "aktivasi lancar", "pemasangan lancar",
-        ],
-        "Harga Sesuai Kualitas": [
-            "worth it", "sebanding", "sesuai", "worth", "value", "murah worth",
-            "harga oke", "harga pas", "harga wajar", "sesuai kualitas",
-            "murah bagus", "terjangkau", "hemat", "puas harga", "reasonable",
-            "harga masuk akal", "murah meriah", "murah kualitas bagus",
-            "harga cocok", "value for money",
-        ],
-        "Promo dan Paket Menarik": [
-            "promo", "diskon", "paket", "penawaran", "bundling", "gratis",
-            "hemat", "murah", "deal", "paket menarik", "promo menarik",
-            "promo bagus", "ada promo", "paket bagus", "paket oke",
-            "penawaran menarik", "promo mantap", "paket hemat", "promo hemat",
-            "paket worth",
-        ],
-        "Aplikasi MyIndiHome Mudah Digunakan": [
-            "myindihome", "aplikasi", "apps", "app", "mudah", "user friendly",
-            "gampang", "praktis", "simple", "intuitif", "fitur lengkap",
-            "aplikasi bagus", "app bagus", "my indihome", "aplikasi mudah",
-            "apps mudah", "login mudah", "aplikasi lancar", "app lancar",
-            "myindihome bagus",
-        ],
-        "Sinyal dan Coverage Bagus": [
-            "sinyal", "coverage", "jangkauan", "sinyal bagus", "sinyal kuat",
-            "sinyal stabil", "jangkauan luas", "area luas", "sinyal oke",
-            "sinyal mantap", "coverage bagus", "sinyal full", "sinyal jernih",
-            "sinyal terbaik", "sinyal mantul", "wifi kuat", "sinyal kuat banget",
-            "jangkauan bagus", "sinyal memuaskan", "coverage mantap",
-        ],
-        "Masalah Cepat Diselesaikan": [
-            "cepat selesai", "cepat ditangani", "cepat pulih", "cepat normal",
-            "cepat diperbaiki", "sudah normal", "sudah pulih", "sudah oke",
-            "masalah selesai", "gangguan selesai", "fixed", "teratasi",
-            "beres", "solved", "cepat beres", "langsung normal", "cepat fix",
-            "ditangani cepat", "perbaikan cepat", "recovery cepat",
-        ],
-        "Rekomendasi ke Orang Lain": [
-            "rekomendasi", "rekomend", "recommended", "saranin", "saran",
-            "cobain", "coba", "pake indihome", "pakai indihome", "worth dicoba",
-            "bagus banget", "mantap banget", "keren banget", "the best",
-            "terbaik", "juara", "top", "rekom banget", "saranin indihome",
-            "wajib coba",
-        ],
-        "Layanan Memuaskan Secara Umum": [
-            "puas", "memuaskan", "bagus", "mantap", "keren", "sakti", "terbaik",
-            "oke banget", "mantul", "recommended", "love", "suka", "senang",
-            "puas banget", "layanan bagus", "indihome bagus", "puas indihome",
-            "puas layanan", "memuaskan banget", "overall bagus",
-        ],
-    },
-    "neutral": {
-        "Pertanyaan Info Paket / Harga": [
-            "berapa harga", "harga", "paket", "info paket", "info harga",
-            "berapa", "biaya", "tarif", "harga paket", "paket murah",
-            "paket berapa", "harga berapa", "min harga", "min paket",
-            "berapa biaya", "info biaya", "daftar paket", "pilihan paket",
-            "paket tersedia", "harga promo",
-        ],
-        "Pertanyaan Cara Pemasangan Baru": [
-            "cara pasang", "cara daftar", "cara berlangganan", "cara pemasangan",
-            "bagaimana pasang", "gimana pasang", "syarat pasang", "prosedur",
-            "cara instalasi", "daftar indihome", "pasang baru", "langganan baru",
-            "cara apply", "cara order", "cara subscribe", "info pemasangan",
-            "proses pasang", "cara aktifasi", "cara aktivasi", "cara pasang wifi",
-        ],
-        "Konfirmasi Gangguan di Area Tertentu": [
-            "gangguan", "area", "wilayah", "lokasi", "daerah", "cek gangguan",
-            "info gangguan", "status gangguan", "gangguan area", "maintenance",
-            "pemeliharaan", "gangguan jaringan", "internet down area",
-            "gangguan di", "wilayah saya", "daerah saya", "lokasi saya",
-            "gangguan bandung", "gangguan jakarta", "konfirmasi gangguan",
-        ],
-        "Pertanyaan Fitur Aplikasi MyIndiHome": [
-            "myindihome", "aplikasi", "app", "fitur", "cara pakai", "cara login",
-            "cara bayar", "fitur aplikasi", "my indihome", "apps indihome",
-            "cara cek tagihan", "cara cek", "fitur myindihome", "tutorial app",
-            "cara setting", "cara ubah", "cara ganti", "fitur baru",
-            "update aplikasi", "aplikasi error netral",
-        ],
-        "Laporan Gangguan (tanpa emosi kuat)": [
-            "lapor gangguan", "laporan gangguan", "internet mati", "internet down",
-            "tidak bisa akses", "gabisa akses", "koneksi putus", "gangguan jaringan",
-            "wifi mati", "inet mati", "lapor masalah", "ada gangguan",
-            "mengalami gangguan", "kendala jaringan", "kendala internet",
-            "internet tidak jalan", "wifi tidak jalan", "lapor kendala",
-            "signal hilang", "sinyal hilang",
-        ],
-        "Permintaan Bantuan ke Admin/CS": [
-            "tolong", "bantu", "bantuan", "admin", "adm", "min", "mimin",
-            "cs", "customer service", "hubungi", "contact", "dm", "inbox",
-            "minta bantuan", "butuh bantuan", "tolong bantu", "min tolong",
-            "adm tolong", "cs tolong", "bantu cek", "bantu proses",
-        ],
-        "Info Perpanjangan atau Pembayaran": [
-            "tagihan", "bayar", "pembayaran", "perpanjang", "perpanjangan",
-            "jatuh tempo", "due date", "invoice", "billing", "cek tagihan",
-            "bayar tagihan", "cara bayar", "metode bayar", "transfer",
-            "virtual account", "va", "autodebet", "perpanjang paket",
-            "renewal", "renew",
-        ],
-        "Perbandingan Paket / Provider Lain": [
-            "perbandingan", "banding", "vs", "dibanding", "provider lain",
-            "starlink", "first media", "biznet", "iconnet", "myrepublic",
-            "oxigen", "indihome vs", "lebih bagus", "lebih murah",
-            "alternatif", "kompetitor", "pindah provider", "ganti provider",
-            "provider mana", "bandingkan paket",
-        ],
-        "Pertanyaan Upgrade Kecepatan": [
-            "upgrade", "naikkan", "tambah kecepatan", "upgrade paket",
-            "upgrade speed", "naik paket", "paket lebih cepat", "upgrade mbps",
-            "tambah mbps", "speed up", "naik speed", "upgrade indihome",
-            "ganti paket", "ubah paket", "upgrade ke", "naik kecepatan",
-            "tambah bandwidth", "upgrade bandwidth", "paket upgrade",
-            "info upgrade",
-        ],
-        "Feedback Netral tentang Layanan": [
-            "feedback", "masukan", "saran", "komentar", "pendapat", "review",
-            "ulasan", "sharing", "pengalaman", "cerita", "pengalaman pakai",
-            "sudah pakai", "baru pakai", "lumayan", "cukup", "standar",
-            "biasa aja", "oke aja", "netral", "secara umum", "overall",
-        ],
-        "Pertanyaan Teknis Umum": [
-            "cara setting", "cara reset", "cara restart", "modem", "router",
-            "wifi", "password", "ssid", "ip address", "dns", "port",
-            "kabel", "lan", "ont", "stb", "set top box", "teknis",
-            "konfigurasi", "troubleshoot", "cara atur",
-        ],
-        "Menunggu Respon / Follow Up": [
-            "menunggu", "nunggu", "belum ada respon", "belum dibalas",
-            "belum ditanggapi", "follow up", "fu", "tindak lanjut", "update",
-            "kapan respon", "kapan dibalas", "sudah lama", "berapa lama",
-            "masih menunggu", "tolong respon", "mohon respon", "cepat respon",
-            "belum selesai", "masih proses", "status permintaan",
-        ],
-    },
-    "negative": {
-        "Keluhan Internet Lemot / Ngelag": [
-            "lemot", "lelet", "lambat", "lamban", "lemban", "ngelag", "lag",
-            "lambat banget", "lemot banget", "lelet banget", "internet lemot",
-            "wifi lemot", "inet lemot", "koneksi lambat", "speed lambat",
-            "mbps rendah", "kecepatan lambat", "loading lama", "buffering",
-            "pelan",
-        ],
-        "Koneksi Putus-putus / Tidak Stabil": [
-            "putus", "putus putus", "putus-putus", "tidak stabil", "gak stabil",
-            "ga stabil", "nggak stabil", "fluctuate", "on off", "on-off",
-            "kadang mati", "sering putus", "koneksi putus", "wifi putus",
-            "internet putus", "drop", "disconnect", "hilang sinyal", "sinyal ilang",
-            "intermittent",
-        ],
-        "Gangguan Total / Internet Mati": [
-            "mati", "down", "internet mati", "wifi mati", "inet mati",
-            "gabisa", "gak bisa", "ga bisa", "nggak bisa", "tidak bisa",
-            "no internet", "offline", "mati total", "mati dari", "down dari",
-            "gangguan total", "mati semua", "internet down", "wifi down",
-            "mati berjam",
-        ],
-        "Harga Mahal Tidak Sesuai Kualitas": [
-            "mahal", "mahal banget", "kemahalan", "tidak sebanding", "ga sebanding",
-            "gak sebanding", "nggak sebanding", "mahal tapi", "harga mahal",
-            "mahal untuk", "overprice", "tidak worth", "ga worth", "gak worth",
-            "mahal lemot", "mahal lambat", "mahal jelek", "byar pet", "bayar mahal",
-            "tagihan mahal",
-        ],
-        "Teknisi Lambat / Tidak Kunjung Datang": [
-            "teknisi lambat", "teknisi lelet", "teknisi tidak datang",
-            "teknisi gak datang", "teknisi ga datang", "tidak kunjung",
-            "belum datang", "lama datang", "janji tidak datang", "petugas lambat",
-            "tukang lambat", "teknisi lama", "nunggu teknisi", "teknisi telat",
-            "teknisi tidak kunjung", "petugas tidak datang", "teknisi ilang",
-            "teknisi tidak responsif", "teknisi jelek", "teknisi parah",
-        ],
-        "CS Tidak Responsif / Tidak Membantu": [
-            "cs lambat", "cs tidak responsif", "cs gak responsif", "cs ga responsif",
-            "cs tidak membantu", "cs gak membantu", "cs jelek", "cs parah",
-            "customer service lambat", "layanan lambat", "tidak ditanggapi",
-            "tidak dibalas", "cs cuek", "cs tidak ramah", "cs tidak solutif",
-            "cs tidak tanggap", "cs buruk", "pelayanan buruk", "cs tidak ada",
-            "cs tidak membantu sama sekali",
-        ],
-        "Pemasangan Baru Lama / Bermasalah": [
-            "pemasangan lama", "instalasi lama", "pasang lama", "proses lama",
-            "belum terpasang", "belum pasang", "pemasangan bermasalah",
-            "instalasi bermasalah", "pasang bermasalah", "aktivasi lama",
-            "aktivasi gagal", "pasang gagal", "pemasangan gagal", "tunggu lama",
-            "antri lama", "proses berbulan", "belum aktif", "belum jalan",
-            "pasang tidak selesai", "instalasi tidak selesai",
-        ],
-        "Tagihan Bermasalah / Salah Tagih": [
-            "tagihan salah", "salah tagih", "tagihan aneh", "tagihan membengkak",
-            "tagihan tidak sesuai", "double tagihan", "tagihan dobel",
-            "tagihan mahal", "tagihan tidak wajar", "billing salah",
-            "invoice salah", "kena tagihan", "tagihan tidak jelas",
-            "tagihan bermasalah", "tagihan error", "overcharge", "kelebihan tagih",
-            "tagihan membohongi", "tagihan tidak masuk akal", "tagihan parah",
-        ],
-        "Aplikasi MyIndiHome Error": [
-            "aplikasi error", "app error", "myindihome error", "aplikasi bug",
-            "app bug", "aplikasi crash", "app crash", "aplikasi lemot",
-            "aplikasi tidak bisa", "app tidak bisa", "login gagal",
-            "aplikasi hang", "aplikasi force close", "myindihome bug",
-            "aplikasi bermasalah", "app bermasalah", "aplikasi jelek",
-            "myindihome tidak bisa", "aplikasi down", "app down",
-        ],
-        "Keluhan Tidak Ditanggapi / Diabaikan": [
-            "tidak ditanggapi", "gak ditanggapi", "ga ditanggapi", "diabaikan",
-            "tidak dibalas", "gak dibalas", "ga dibalas", "tidak ada respon",
-            "gak ada respon", "ga ada respon", "komplain diabaikan",
-            "laporan diabaikan", "tidak ada tindak lanjut", "gak ada tindak lanjut",
-            "tidak diproses", "gak diproses", "diacuhkan", "tidak diurus",
-            "gak diurus", "tidak ditangani", "gak ditangani",
-        ],
-        "Niat Pindah Provider": [
-            "pindah provider", "ganti provider", "berhenti", "unsubscribe",
-            "cabut", "putus berlangganan", "stop langganan", "cancel",
-            "batal langganan", "pindah ke", "migrasi", "switch provider",
-            "ganti ke starlink", "ganti ke biznet", "ganti ke first media",
-            "tidak mau pakai lagi", "gak mau pakai lagi", "ga mau pakai lagi",
-            "capek indihome", "muak indihome",
-        ],
-        "Kecewa dengan Promo / Paket": [
-            "kecewa promo", "kecewa paket", "promo menipu", "promo palsu",
-            "janji palsu", "tidak sesuai promo", "paket mengecewakan",
-            "promo mengecewakan", "kecewa banget", "disappointed", "zonk",
-            "tipu daya", "promo zonk", "paket zonk", "promo tidak sesuai",
-            "janji tidak sesuai", "kecewa indihome", "kecewa layanan",
-            "promo parah", "paket parah",
-        ],
-    },
+SENTIMENT_LABELS_ID = {
+    "positive": "Positif",
+    "neutral": "Netral",
+    "negative": "Negatif",
 }
 
 DEFAULT_TOPIC = "Lainnya"
 
+# Alias ini dipertahankan agar halaman lama yang memakai TOPIC_KEYWORDS tetap berjalan.
+TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
+    topic_name: tuple(keywords)
+    for sentiment_topics in TOPICS.values()
+    for topic_name, keywords in sentiment_topics.items()
+}
 
-def _normalize_sentiment(sentiment: str) -> str:
-    """Ubah label sentimen ke kunci kanonik positive/neutral/negative."""
-    key = str(sentiment or "").lower().strip()
-    return SENTIMENT_KEYS.get(key, key)
-
-
-def _count_keyword_matches(text: str, keywords: list[str]) -> int:
-    """Hitung jumlah kata kunci yang cocok dalam teks."""
-    if not text:
-        return 0
-
-    count = 0
-    for keyword in keywords:
-        kw = str(keyword).lower().strip()
-        if not kw:
-            continue
-        # Kata pendek pakai word boundary agar tidak salah match
-        if len(kw) <= 3:
-            pattern = rf"(?<!\w){re.escape(kw)}(?!\w)"
-            if re.search(pattern, text):
-                count += 1
-        elif kw in text:
-            count += 1
-    return count
+_URL_MENTION_PATTERN = re.compile(r"https?://\S+|www\.\S+|@\w+", re.IGNORECASE)
+_NON_ALNUM_PATTERN = re.compile(r"[^a-z0-9\s]+")
+_WHITESPACE_PATTERN = re.compile(r"\s+")
 
 
-def classify_topic(text: str, sentiment: str) -> str:
-    """
-    Klasifikasikan teks ke topik dominan berdasarkan kata kunci dan sentimen.
-
-    Args:
-        text: Teks komentar (disarankan content_clean).
-        sentiment: Label sentimen (positive/neutral/negative atau label_0/1/2).
-
-    Returns:
-        Nama topik dengan match terbanyak, atau "Lainnya" jika tidak ada match.
-    """
+def normalize_sentiment(value: Any) -> str:
+    """Normalisasi label sentimen menjadi positive, neutral, atau negative."""
     try:
-        if not text or not str(text).strip():
+        key = str(value or "").strip().lower().lstrip("'")
+        return SENTIMENT_KEYS.get(key, "neutral")
+    except Exception:
+        return "neutral"
+
+
+def _resolve_sentiment_dictionary_key(value: Any) -> str | None:
+    """Ubah label sentimen menjadi nama kategori pada dictionary TOPICS."""
+    try:
+        raw_value = str(value or "").strip()
+        if not raw_value:
+            return None
+        normalized = normalize_sentiment(raw_value)
+        return SENTIMENT_LABELS_ID.get(normalized)
+    except Exception:
+        return None
+
+
+def _normalize_text(value: Any) -> str:
+    """Bersihkan teks agar pencocokan keyword konsisten dan aman."""
+    try:
+        text = str(value or "").lower()
+        text = _URL_MENTION_PATTERN.sub(" ", text)
+        text = _NON_ALNUM_PATTERN.sub(" ", text)
+        return _WHITESPACE_PATTERN.sub(" ", text).strip()
+    except Exception:
+        return ""
+
+
+@lru_cache(maxsize=4)
+def _normalized_topics(sentiment_key: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Siapkan keyword ternormalisasi untuk satu kategori sentimen."""
+    try:
+        sentiment_topics = TOPICS.get(sentiment_key, {})
+        result: list[tuple[str, tuple[str, ...]]] = []
+        for topic_name, keywords in sentiment_topics.items():
+            normalized_keywords = tuple(
+                keyword
+                for keyword in (_normalize_text(item) for item in keywords)
+                if keyword
+            )
+            result.append((topic_name, normalized_keywords))
+        return tuple(result)
+    except Exception:
+        return tuple()
+
+
+def _iter_candidate_topics(sentiment: Any) -> Iterable[tuple[str, tuple[str, ...]]]:
+    """Ambil kandidat topik sesuai sentimen atau seluruh sentimen jika kosong."""
+    try:
+        sentiment_key = _resolve_sentiment_dictionary_key(sentiment)
+        if sentiment_key:
+            return _normalized_topics(sentiment_key)
+
+        combined: list[tuple[str, tuple[str, ...]]] = []
+        for key in ("Positif", "Netral", "Negatif"):
+            combined.extend(_normalized_topics(key))
+        return tuple(combined)
+    except Exception:
+        return tuple()
+
+
+def _score_topic(normalized_text: str, keywords: tuple[str, ...]) -> tuple[int, int]:
+    """Hitung skor topik berdasarkan keyword tunggal dan frasa yang cocok."""
+    try:
+        if not normalized_text or not keywords:
+            return 0, 0
+
+        tokens = normalized_text.split()
+        token_counts = Counter(tokens)
+        padded_text = f" {normalized_text} "
+        total_score = 0
+        matched_keywords = 0
+
+        for keyword in keywords:
+            if " " in keyword:
+                occurrence = padded_text.count(f" {keyword} ")
+                if occurrence:
+                    word_count = len(keyword.split())
+                    total_score += occurrence * (word_count * 3 + 2)
+                    matched_keywords += 1
+            else:
+                occurrence = int(token_counts.get(keyword, 0))
+                if occurrence:
+                    total_score += occurrence
+                    matched_keywords += 1
+
+        return total_score, matched_keywords
+    except Exception:
+        return 0, 0
+
+
+@lru_cache(maxsize=50_000)
+def _classify_cached(text: str, sentiment: str) -> str:
+    """Klasifikasikan teks yang sama tanpa menghitung ulang pada rerun Streamlit."""
+    try:
+        normalized_text = _normalize_text(text)
+        if not normalized_text:
             return DEFAULT_TOPIC
 
-        sent_key = _normalize_sentiment(sentiment)
-        topic_map = TOPICS.get(sent_key, {})
-        if not topic_map:
-            return DEFAULT_TOPIC
-
-        text_lower = str(text).lower().strip()
         best_topic = DEFAULT_TOPIC
-        best_count = 0
+        best_score = 0
+        best_matches = 0
 
-        # Iterasi berurutan → tie-break: topik pertama di list menang
-        for topic_name, keywords in topic_map.items():
-            match_count = _count_keyword_matches(text_lower, keywords)
-            if match_count > best_count:
-                best_count = match_count
+        for topic_name, keywords in _iter_candidate_topics(sentiment):
+            score, matches = _score_topic(normalized_text, keywords)
+            if score > best_score or (score == best_score and matches > best_matches):
                 best_topic = topic_name
+                best_score = score
+                best_matches = matches
 
-        return best_topic if best_count > 0 else DEFAULT_TOPIC
-
+        return best_topic if best_score > 0 else DEFAULT_TOPIC
     except Exception:
         return DEFAULT_TOPIC
 
 
-def apply_topics(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Terapkan klasifikasi topik ke seluruh baris DataFrame.
-
-    Args:
-        df: DataFrame dengan kolom content_clean dan predicted_sentiment.
-
-    Returns:
-        DataFrame dengan kolom baru 'topic'.
-    """
+def classify_topic(text: str, sentiment: str) -> str:
+    """Tentukan nama topik paling cocok berdasarkan teks dan sentimennya."""
     try:
-        if df is None or df.empty:
-            return df.copy() if df is not None else pd.DataFrame()
+        return _classify_cached(str(text or ""), str(sentiment or ""))
+    except Exception:
+        return DEFAULT_TOPIC
+
+
+def get_all_topics(sentiment: str) -> list[str]:
+    """Ambil semua nama topik yang tersedia untuk satu kategori sentimen."""
+    try:
+        sentiment_key = _resolve_sentiment_dictionary_key(sentiment)
+        if not sentiment_key:
+            return []
+        return list(TOPICS.get(sentiment_key, {}).keys())
+    except Exception:
+        return []
+
+
+def get_topic_keywords(
+    topic_name: str,
+    sentiment: str | int | None = None,
+    limit: int | None = None,
+) -> list[str]:
+    """Ambil daftar keyword sebuah topik untuk pengecekan dan debugging."""
+    try:
+        # Kompatibilitas dengan pemanggilan lama get_topic_keywords(topik, 5).
+        if isinstance(sentiment, int) and limit is None:
+            limit = sentiment
+            sentiment = None
+
+        sentiment_key = _resolve_sentiment_dictionary_key(sentiment)
+        if sentiment_key:
+            keywords = list(TOPICS.get(sentiment_key, {}).get(str(topic_name), []))
+        else:
+            keywords = []
+            for category in ("Positif", "Netral", "Negatif"):
+                if str(topic_name) in TOPICS.get(category, {}):
+                    keywords = list(TOPICS[category][str(topic_name)])
+                    break
+
+        if limit is None:
+            return keywords
+        return keywords[: max(0, int(limit))]
+    except Exception:
+        return []
+
+
+def classify_topics_fast(
+    texts: list[Any],
+    sentiments: list[Any] | None = None,
+) -> list[str]:
+    """Klasifikasikan banyak komentar dengan tetap memakai cache internal."""
+    try:
+        safe_texts = list(texts or [])
+        if sentiments is None:
+            safe_sentiments = [""] * len(safe_texts)
+        else:
+            safe_sentiments = list(sentiments)
+            if len(safe_sentiments) < len(safe_texts):
+                safe_sentiments.extend([""] * (len(safe_texts) - len(safe_sentiments)))
+
+        return [
+            _classify_cached(str(text or ""), str(safe_sentiments[index] or ""))
+            for index, text in enumerate(safe_texts)
+        ]
+    except Exception:
+        return [DEFAULT_TOPIC] * len(texts or [])
+
+
+def apply_topics(
+    df: pd.DataFrame,
+    text_col: str | None = None,
+    sentiment_col: str = "predicted_sentiment",
+) -> pd.DataFrame:
+    """Tambahkan kolom topic pada DataFrame tanpa membuat dashboard crash."""
+    try:
+        if df is None:
+            return pd.DataFrame()
+        if df.empty:
+            return df.copy()
 
         result = df.copy()
-        required = ("content_clean", "predicted_sentiment")
-        missing = [col for col in required if col not in result.columns]
-        if missing:
-            raise ValueError(f"Kolom wajib tidak ditemukan: {', '.join(missing)}")
-
-        result["topic"] = result.apply(
-            lambda row: classify_topic(
-                row.get("content_clean", ""),
-                row.get("predicted_sentiment", ""),
-            ),
-            axis=1,
+        selected_text_col = text_col or (
+            "content_clean" if "content_clean" in result.columns else "content"
         )
+        if selected_text_col not in result.columns:
+            result["topic"] = DEFAULT_TOPIC
+            return result
+
+        if sentiment_col not in result.columns:
+            result[sentiment_col] = ""
+
+        texts = result[selected_text_col].fillna("").astype(str).tolist()
+        sentiments = result[sentiment_col].fillna("").astype(str).tolist()
+        result["topic"] = classify_topics_fast(texts, sentiments)
         return result
-
-    except Exception as exc:
-        raise RuntimeError(f"Gagal menerapkan klasifikasi topik: {exc}") from exc
-
-
-def get_top_topics(
-    df: pd.DataFrame,
-    sentimen: str,
-    top_n: int = 5,
-) -> pd.DataFrame:
-    """
-    Ambil topik teratas berdasarkan jumlah komentar untuk satu sentimen.
-
-    Args:
-        df: DataFrame dengan kolom topic, predicted_sentiment, content/content_clean.
-        sentimen: Sentimen yang difilter (positive/neutral/negative).
-        top_n: Jumlah topik teratas yang dikembalikan.
-
-    Returns:
-        DataFrame kolom: topik, jumlah_komentar, pct, contoh_komentar.
-    """
-    try:
-        empty_cols = ["topik", "jumlah_komentar", "pct", "contoh_komentar"]
-        if df is None or df.empty:
-            return pd.DataFrame(columns=empty_cols)
-
-        work = df.copy()
-        if "topic" not in work.columns:
-            work = apply_topics(work)
-
-        sent_key = _normalize_sentiment(sentimen)
-        work = work[
-            work["predicted_sentiment"]
-            .astype(str)
-            .str.lower()
-            .str.strip()
-            .map(lambda x: SENTIMENT_KEYS.get(x, x)) == sent_key
-        ]
-
-        if work.empty:
-            return pd.DataFrame(columns=empty_cols)
-
-        content_col = "content" if "content" in work.columns else "content_clean"
-        total = len(work)
-
-        rows = []
-        grouped = work.groupby("topic", sort=False)
-        for topic_name, group in grouped:
-            count = len(group)
-            pct = round(count / total * 100, 1) if total else 0.0
-            sample = ""
-            if content_col in group.columns and not group.empty:
-                sample = str(group[content_col].iloc[0])
-            rows.append({
-                "topik": topic_name,
-                "jumlah_komentar": count,
-                "pct": pct,
-                "contoh_komentar": sample,
-            })
-
-        result = (
-            pd.DataFrame(rows)
-            .sort_values("jumlah_komentar", ascending=False)
-            .head(top_n)
-            .reset_index(drop=True)
-        )
-        return result
-
-    except Exception as exc:
-        raise RuntimeError(f"Gagal mengambil topik teratas: {exc}") from exc
+    except Exception:
+        fallback = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+        fallback["topic"] = DEFAULT_TOPIC
+        return fallback
 
 
 def get_dominant_keywords(
     df: pd.DataFrame,
     topic: str,
-    sentimen: str,
+    sentimen: str | None = None,
+    limit: int = 5,
 ) -> list[str]:
-    """
-    Kembalikan kata kunci dominan yang benar-benar muncul di komentar suatu topik.
-
-    Args:
-        df: DataFrame dengan kolom topic, predicted_sentiment, content_clean.
-        topic: Nama topik yang ingin dianalisis.
-        sentimen: Sentimen terkait topik tersebut.
-
-    Returns:
-        Daftar maksimal 5 kata kunci dominan (urut frekuensi tertinggi).
-    """
+    """Ambil keyword referensi topik untuk kartu ringkasan dashboard."""
     try:
-        if df is None or df.empty or not topic:
-            return []
-
-        work = df.copy()
-        if "topic" not in work.columns:
-            work = apply_topics(work)
-
-        sent_key = _normalize_sentiment(sentimen)
-        subset = work[
-            (work["topic"] == topic)
-            & (
-                work["predicted_sentiment"]
-                .astype(str)
-                .str.lower()
-                .str.strip()
-                .map(lambda x: SENTIMENT_KEYS.get(x, x)) == sent_key
-            )
-        ]
-
-        if subset.empty or "content_clean" not in subset.columns:
-            return []
-
-        corpus = " ".join(subset["content_clean"].astype(str).tolist()).lower()
-        keywords = TOPICS.get(sent_key, {}).get(topic, [])
-        if not keywords:
-            return []
-
-        freq: Counter[str] = Counter()
-        for kw in keywords:
-            kw_lower = str(kw).lower().strip()
-            if not kw_lower:
-                continue
-            if len(kw_lower) <= 3:
-                pattern = rf"(?<!\w){re.escape(kw_lower)}(?!\w)"
-                matches = len(re.findall(pattern, corpus))
-            else:
-                matches = corpus.count(kw_lower)
-            if matches > 0:
-                freq[kw_lower] = matches
-
-        return [word for word, _ in freq.most_common(5)]
-
+        del df
+        return get_topic_keywords(topic, sentimen, limit=limit)
     except Exception:
         return []
 
 
-if __name__ == "__main__":
-    # --- Contoh penggunaan modul ---
-    import sys
-    from pathlib import Path
+def _dominant_sentiment(series: pd.Series) -> str:
+    """Tentukan sentimen dominan dengan urutan tie-break yang konsisten."""
+    try:
+        normalized = series.map(normalize_sentiment)
+        counts = normalized.value_counts()
+        if counts.empty:
+            return "neutral"
+        priority = {"negative": 2, "positive": 1, "neutral": 0}
+        return max(
+            counts.index,
+            key=lambda item: (int(counts[item]), priority.get(item, -1)),
+        )
+    except Exception:
+        return "neutral"
 
-    # Agar import utils.* berfungsi saat dijalankan langsung
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-    from utils.dummy_data import get_dummy_sentiment_data
-    from utils.preprocessor import clean_text
+def summarize_topics(df: pd.DataFrame, top_n: int = 5) -> pd.DataFrame:
+    """Ringkas jumlah komentar, persentase, dan contoh komentar per topik."""
+    columns = [
+        "topik",
+        "jumlah_komentar",
+        "persentase",
+        "sentimen_dominan",
+        "contoh_komentar",
+        "kata_kunci",
+    ]
+    try:
+        if df is None or df.empty:
+            return pd.DataFrame(columns=columns)
 
-    print("=" * 60)
-    print("DEMO: utils/topic_classifier.py")
-    print("=" * 60)
+        work = df if "topic" in df.columns else apply_topics(df)
+        content_col = "content" if "content" in work.columns else "content_clean"
+        if content_col not in work.columns:
+            work = work.copy()
+            work["content"] = ""
+            content_col = "content"
+        if "predicted_sentiment" not in work.columns:
+            work = work.copy()
+            work["predicted_sentiment"] = "neutral"
 
-    # Muat data dummy dan bersihkan teks
-    df_demo = get_dummy_sentiment_data("IndiHome")
-    df_demo["content_clean"] = df_demo["content"].apply(clean_text)
+        total = max(len(work), 1)
+        rows: list[dict[str, Any]] = []
 
-    # Klasifikasi topik per baris
-    df_demo = apply_topics(df_demo)
-    print(f"\nTotal baris: {len(df_demo)}")
-    print(f"Kolom topic ditambahkan: {'topic' in df_demo.columns}")
-    print("\nContoh 5 baris pertama:")
-    print(df_demo[["content", "predicted_sentiment", "topic"]].head().to_string(index=False))
+        for topic_name, group in work.groupby("topic", sort=False, dropna=False):
+            topic_label = str(topic_name or DEFAULT_TOPIC)
+            count = int(len(group))
+            dominant = _dominant_sentiment(group["predicted_sentiment"])
 
-    # Topik teratas per sentimen
-    for sent in ("positive", "neutral", "negative"):
-        top = get_top_topics(df_demo, sent, top_n=3)
-        print(f"\n--- Top 3 Topik ({sent}) ---")
-        if top.empty:
-            print("  (tidak ada data)")
-        else:
-            print(top.to_string(index=False))
+            non_empty = group[content_col].fillna("").astype(str)
+            non_empty = non_empty[non_empty.str.strip().ne("")]
+            if non_empty.empty:
+                example = "—"
+            else:
+                example = str(non_empty.loc[non_empty.str.len().idxmax()]).strip()
+                if len(example) > 220:
+                    example = example[:217].rstrip() + "..."
 
-    # Kata kunci dominan untuk satu topik
-    if not df_demo.empty:
-        sample_topic = df_demo["topic"].iloc[0]
-        sample_sent = df_demo["predicted_sentiment"].iloc[0]
-        kws = get_dominant_keywords(df_demo, sample_topic, sample_sent)
-        print(f"\nKata kunci dominan topik '{sample_topic}':")
-        print(f"  {kws if kws else '(tidak ada match)'}")
+            keywords = get_topic_keywords(
+                topic_label,
+                SENTIMENT_LABELS_ID.get(dominant),
+                limit=4,
+            )
+            rows.append(
+                {
+                    "topik": topic_label,
+                    "jumlah_komentar": count,
+                    "persentase": round(count / total * 100, 1),
+                    "sentimen_dominan": dominant,
+                    "contoh_komentar": example,
+                    "kata_kunci": ", ".join(keywords) if keywords else "—",
+                }
+            )
 
-    # Uji classify_topic langsung
-    contoh = classify_topic(
-        "wifi indihome lemot banget sering ngelag",
-        "negative",
-    )
-    print(f"\nclassify_topic contoh: '{contoh}'")
-    print("\nDemo selesai.")
+        return (
+            pd.DataFrame(rows, columns=columns)
+            .sort_values(["jumlah_komentar", "topik"], ascending=[False, True])
+            .head(max(1, int(top_n)))
+            .reset_index(drop=True)
+        )
+    except Exception:
+        return pd.DataFrame(columns=columns)
+
+
+def get_top_topics(
+    df: pd.DataFrame,
+    sentimen: str = "Semua",
+    top_n: int = 5,
+) -> pd.DataFrame:
+    """Pertahankan API lama untuk mengambil topik teratas pada dashboard."""
+    try:
+        work = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+        if not work.empty and str(sentimen).lower() not in {"semua", "all", ""}:
+            target = normalize_sentiment(sentimen)
+            if "predicted_sentiment" in work.columns:
+                work = work[
+                    work["predicted_sentiment"].map(normalize_sentiment) == target
+                ]
+
+        result = summarize_topics(work, top_n=top_n)
+        if result.empty:
+            return pd.DataFrame(
+                columns=["topik", "jumlah_komentar", "pct", "contoh_komentar"]
+            )
+        return result.rename(columns={"persentase": "pct"})
+    except Exception:
+        return pd.DataFrame(
+            columns=["topik", "jumlah_komentar", "pct", "contoh_komentar"]
+        )
+
+
+def build_topic_platform_matrix(df: pd.DataFrame) -> pd.DataFrame:
+    """Buat matriks jumlah komentar per platform dan topik untuk heatmap."""
+    try:
+        if df is None or df.empty:
+            return pd.DataFrame()
+
+        work = df if "topic" in df.columns else apply_topics(df)
+        if "platform" not in work.columns:
+            return pd.DataFrame()
+
+        matrix = pd.crosstab(work["platform"], work["topic"])
+        platform_order = [
+            item for item in ["twitter", "instagram", "tiktok"] if item in matrix.index
+        ]
+        remaining = [item for item in matrix.index if item not in platform_order]
+        return matrix.reindex(platform_order + remaining).fillna(0).astype(int)
+    except Exception:
+        return pd.DataFrame()

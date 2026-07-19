@@ -12,9 +12,13 @@ from wordcloud import WordCloud
 
 from utils.chart_builder import SENTIMENT_LABELS, bar_chart_top_words
 from utils.css_loader import render_coming_soon_card, render_data_badge, render_page_header
-from utils.data_loader import get_data_source_label, get_platform_filter, load_sentiment_data
+from utils.data_loader import (
+    get_data_source_label,
+    get_platform_filter,
+    get_sentiment_file_signature,
+    load_topic_data,
+)
 from utils.dummy_data import get_dummy_top_words
-from utils.export_utils import export_wordcloud_to_png
 from utils.preprocessor import clean_text, prepare_for_wordcloud
 from utils.topic_classifier import apply_topics, get_dominant_keywords, get_top_topics
 
@@ -40,20 +44,27 @@ def _is_service_ready(layanan: str) -> bool:
     return layanan in _READY_SERVICES
 
 
-def _prepare_dataframe(layanan: str) -> pd.DataFrame:
-    """Muat DataFrame sentimen dan lengkapi kolom topic."""
-    try:
-        df = load_sentiment_data(layanan).copy()
-        if df.empty:
-            return df
-
-        if "content_clean" not in df.columns and "content" in df.columns:
-            df["content_clean"] = df["content"].astype(str).apply(clean_text)
-
-        if "topic" not in df.columns:
-            df = apply_topics(df)
-
+@st.cache_data(show_spinner=False, persist="disk", max_entries=6)
+def _prepare_dataframe_cached(layanan: str, file_signature: str) -> pd.DataFrame:
+    """Muat subset ringan dan klasifikasikan topik satu kali per versi file."""
+    del file_signature  # Menjadi cache key saat file sumber berubah.
+    df = load_topic_data(layanan).copy()
+    if df.empty:
         return df
+
+    if "content_clean" not in df.columns and "content" in df.columns:
+        df["content_clean"] = df["content"].astype(str).apply(clean_text)
+
+    if "topic" not in df.columns:
+        df = apply_topics(df)
+    return df
+
+
+def _prepare_dataframe(layanan: str) -> pd.DataFrame:
+    """Muat DataFrame WordCloud dengan cache berdasarkan versi file sumber."""
+    try:
+        signature = get_sentiment_file_signature(layanan)
+        return _prepare_dataframe_cached(layanan, signature)
     except Exception as exc:
         st.error(f"Gagal menyiapkan data WordCloud: {exc}")
         return pd.DataFrame()
@@ -70,27 +81,34 @@ def _filter_brand_words(text: str, show_brand: bool) -> str:
         return text
 
 
+@st.cache_data(show_spinner=False, max_entries=36)
+def _count_word_frequencies_cached(
+    texts: tuple[str, ...],
+    show_brand: bool,
+) -> Counter:
+    """Hitung frekuensi kata dari corpus immutable agar cache stabil."""
+    counter: Counter = Counter()
+    for raw in texts:
+        cleaned = prepare_for_wordcloud(raw)
+        cleaned = _filter_brand_words(cleaned, show_brand)
+        counter.update(word for word in cleaned.split() if word)
+    return counter
+
+
 def _compute_word_frequencies(
     df: pd.DataFrame,
     sentiment: str,
     show_brand: bool,
 ) -> Counter:
-    """Hitung frekuensi kata per sentimen setelah prepare_for_wordcloud."""
+    """Hitung frekuensi kata per sentimen dengan cache berbasis corpus."""
     try:
-        counter: Counter = Counter()
         if df.empty or "predicted_sentiment" not in df.columns:
-            return counter
+            return Counter()
 
         subset = df[df["predicted_sentiment"].astype(str).str.lower() == sentiment]
         content_col = "content" if "content" in subset.columns else "content_clean"
-
-        for raw in subset[content_col].astype(str):
-            cleaned = prepare_for_wordcloud(raw)
-            cleaned = _filter_brand_words(cleaned, show_brand)
-            for word in cleaned.split():
-                if word:
-                    counter[word] += 1
-        return counter
+        texts = tuple(subset[content_col].fillna("").astype(str).tolist())
+        return _count_word_frequencies_cached(texts, show_brand)
     except Exception as exc:
         st.error(f"Gagal menghitung frekuensi kata ({sentiment}): {exc}")
         return Counter()
@@ -116,59 +134,78 @@ def _get_top_words_list(
         return []
 
 
-def _create_wordcloud_figure(
-    word_freq: dict[str, int],
+def _frequencies_to_corpus(word_freq: dict[str, int]) -> str:
+    """Buat signature corpus ringkas dan deterministik untuk cache WordCloud."""
+    try:
+        return "|".join(
+            f"{str(word)}:{max(0, int(count))}"
+            for word, count in sorted(word_freq.items())
+            if str(word).strip() and int(count) > 0
+        )
+    except Exception:
+        return ""
+
+
+@st.cache_data(
+    show_spinner="Memproses WordCloud, mohon tunggu...",
+    max_entries=24,
+)
+def _create_wordcloud_png(
+    corpus: str,
+    word_frequencies: tuple[tuple[str, int], ...],
     colormap: str,
     bg_color: str,
     max_words: int,
-) -> plt.Figure:
-    """Buat figure Matplotlib berisi WordCloud."""
+) -> bytes:
+    """Buat PNG WordCloud dengan signature corpus sebagai cache key utama."""
+    fig, ax = plt.subplots(figsize=(8, 4))
     try:
-        fig, ax = plt.subplots(figsize=(8, 4))
         fig.patch.set_facecolor(bg_color)
+        ax.set_facecolor(bg_color)
+        frequencies = {
+            str(word): max(0, int(count))
+            for word, count in word_frequencies
+            if str(word).strip() and int(count) > 0
+        }
 
-        if not word_freq:
-            ax.set_facecolor(bg_color)
+        if not corpus.strip() or not frequencies:
             ax.text(
-                0.5, 0.5, "Tidak ada data",
-                ha="center", va="center", fontsize=14, color="#888888",
+                0.5,
+                0.5,
+                "Tidak ada data",
+                ha="center",
+                va="center",
+                fontsize=14,
+                color="#888888",
             )
             ax.axis("off")
-            return fig
+        else:
+            wc = WordCloud(
+                width=800,
+                height=400,
+                background_color=bg_color,
+                colormap=colormap,
+                max_words=max_words,
+                prefer_horizontal=0.7,
+                collocations=False,
+                min_font_size=10,
+            ).generate_from_frequencies(frequencies)
+            ax.imshow(wc, interpolation="bilinear")
+            ax.axis("off")
 
-        wc = WordCloud(
-            width=800,
-            height=400,
-            background_color=bg_color,
-            colormap=colormap,
-            max_words=max_words,
-            prefer_horizontal=0.7,
-            collocations=False,
-            min_font_size=10,
-        )
-        wc.generate_from_frequencies(word_freq)
-
-        ax.imshow(wc, interpolation="bilinear")
-        ax.set_facecolor(bg_color)
-        ax.axis("off")
         plt.tight_layout(pad=0)
-        return fig
-    except Exception as exc:
-        st.error(f"Gagal membuat WordCloud: {exc}")
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.axis("off")
-        return fig
-
-
-def _figure_to_png_bytes(fig: plt.Figure) -> bytes:
-    """Konversi Matplotlib figure ke bytes PNG."""
-    try:
         buffer = BytesIO()
-        fig.savefig(buffer, format="png", bbox_inches="tight", facecolor=fig.get_facecolor())
+        fig.savefig(
+            buffer,
+            format="png",
+            bbox_inches="tight",
+            facecolor=fig.get_facecolor(),
+            dpi=120,
+        )
         buffer.seek(0)
         return buffer.getvalue()
-    except Exception:
-        return export_wordcloud_to_png(fig)
+    finally:
+        plt.close(fig)
 
 
 def _render_sidebar_filters() -> tuple[str, list[str], int, bool]:
@@ -240,20 +277,20 @@ def _render_tab_wordcloud(
             with cols[idx]:
                 st.markdown(f"### {style['icon']} {label}")
 
-                # Batasi frekuensi sesuai max_words sebelum generate
+                # Corpus menjadi cache key sehingga WordCloud tidak dihitung ulang
+                # ketika pengguna kembali ke filter yang sama.
                 limited_freq = dict(freqs.most_common(max_words))
-                fig = _create_wordcloud_figure(
-                    limited_freq,
+                corpus = _frequencies_to_corpus(limited_freq)
+                png_bytes = _create_wordcloud_png(
+                    corpus,
+                    tuple(sorted(limited_freq.items())),
                     colormap=style["colormap"],
                     bg_color=style["background"],
                     max_words=max_words,
                 )
 
-                st.pyplot(fig, use_container_width=True)
+                st.image(png_bytes, width="stretch")
                 st.caption(f"📊 {comment_count:,} komentar")
-
-                png_bytes = _figure_to_png_bytes(fig)
-                plt.close(fig)
 
                 st.download_button(
                     label="⬇️ Download PNG",
