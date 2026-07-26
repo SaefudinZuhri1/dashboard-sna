@@ -1,0 +1,26 @@
+# Konfigurasi Streamlit Dashboard Telkom Group — Deployment Final
+# Nilai visual dipertahankan dari baseline UI/UX yang telah dikunci.
+
+[theme]
+base = "dark"
+primaryColor = "#E53935"
+backgroundColor = "#0D0D0D"
+secondaryBackgroundColor = "#111111"
+textColor = "#FFFFFF"
+font = "sans serif"
+
+[server]
+maxUploadSize = 50
+# Mode lokal: false agar `streamlit run app.py` dapat membuka browser.
+# Streamlit Community Cloud dapat menimpa opsi server sesuai lingkungannya.
+headless = false
+enableStaticServing = false
+
+[client]
+showSidebarNavigation = false
+
+[browser]
+serverAddress = "localhost"
+gatherUsageStats = false
+
+# Jangan menambahkan enableCORS = false.

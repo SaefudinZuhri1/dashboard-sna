@@ -1,0 +1,43 @@
+{
+  "imported_at": "2026-07-21T23:59:17",
+  "source": "C:\\Users\\Zuhri\\Downloads\\INDIHOME_DASHBOARD_OUTPUT",
+  "project_root": "G:\\skripsi_aul",
+  "manifest": {
+    "service": "IndiHome",
+    "generated_at_utc": "2026-07-21T16:48:02.242490+00:00",
+    "model_name": "mdhugol/indonesia-bert-sentiment-classification",
+    "label_mapping": {
+      "LABEL_0": "positive",
+      "LABEL_1": "neutral",
+      "LABEL_2": "negative"
+    },
+    "raw_data_source": "/content/drive/MyDrive/Data Skripsi/Indihome November-Desember 2025 Gabungan.csv",
+    "sna_source": "/content/drive/MyDrive/Data Skripsi/SNA Indihome November-Desember 2025 Gabungan.csv",
+    "run_id": "4bf14f84e135",
+    "max_rows": null,
+    "sentiment_rows": 59730,
+    "platform_counts": {
+      "twitter": 39820,
+      "instagram": 18036,
+      "tiktok": 1874
+    },
+    "sentiment_counts": {
+      "neutral": 29063,
+      "negative": 26619,
+      "positive": 4048
+    },
+    "confidence_mean": 0.919371,
+    "sna_rows": 58747,
+    "network_nodes": 34167,
+    "network_edges": 39524,
+    "network_density": 3.38578913029458e-05,
+    "quality_status": "LULUS",
+    "files": {
+      "sentiment": "indihome_sentiment.csv",
+      "sna": "indihome_sna.csv",
+      "influencer_ranking": "indihome_influencer_ranking.csv",
+      "sentiment_summary": "indihome_sentiment_summary.csv",
+      "data_quality_report": "indihome_data_quality_report.csv"
+    }
+  }
+}

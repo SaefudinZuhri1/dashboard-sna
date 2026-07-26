@@ -1,0 +1,13 @@
+HASIL GOOGLE COLAB INDIHOME UNTUK DASHBOARD STREAMLIT
+
+File wajib dashboard:
+1. indihome_sentiment.csv -> salin ke folder data proyek sebagai data/indihome_sentiment.csv
+2. indihome_sna.csv -> impor memakai tool patch atau simpan sebagai data/SNA Indihome November-Desember 2025 Gabungan.csv
+
+File audit:
+- indihome_influencer_ranking.csv
+- indihome_sentiment_summary.csv
+- indihome_data_quality_report.csv
+- indihome_manifest.json
+
+Setelah mengganti data pada proyek, hentikan Streamlit dan jalankan: streamlit cache clear

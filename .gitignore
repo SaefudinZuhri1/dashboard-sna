@@ -1,0 +1,66 @@
+# Path: .gitignore
+
+# Rahasia dan konfigurasi lokal
+.env
+.env.*
+!.env.example
+!.env.template
+.streamlit/secrets.toml
+.streamlit/secrets.toml.backup*
+.streamlit/secrets.toml.bak*
+
+# Python cache dan artefak build
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Model besar lokal dan file model biner
+models/
+*.pkl
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# Dataset penelitian tidak dipublikasikan ke GitHub
+data/*.csv
+data/**/*.csv
+!data/.gitkeep
+
+# Database lokal pengguna
+database/users.db
+
+# Editor dan sistem operasi
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Log, file sementara, dan backup
+*.log
+*.tmp
+*.temp
+*.bak
+
+# Artefak backup lokal proyek
+.fase20_backup/
+PATCH_BACKUP_FASE20/
+backup_tahap5_fase11/
+venv*/
+.venv*/
+venv_lama_error_torch/

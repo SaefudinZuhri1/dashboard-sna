@@ -1,0 +1,1732 @@
+"""Halaman Beranda Fase 5 untuk ringkasan analisis Telkom Group."""
+
+from __future__ import annotations
+
+from html import escape
+from typing import Any
+
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+
+from utils.data_loader import (
+    load_sentiment_data,
+    load_sna_data,
+    sentiment_file_exists,
+    sna_file_exists,
+)
+from utils.dummy_data import get_dummy_sentiment_data, get_dummy_sna_data
+
+PLATFORM_ORDER = ["twitter", "instagram", "tiktok"]
+PLATFORM_LABELS = {
+    "twitter": "Twitter/X",
+    "instagram": "Instagram",
+    "tiktok": "TikTok",
+}
+SENTIMENT_ORDER = ["positive", "neutral", "negative"]
+SENTIMENT_LABELS = {
+    "positive": "Positif",
+    "neutral": "Netral",
+    "negative": "Negatif",
+}
+SENTIMENT_COLORS = {
+    "positive": "#4CAF50",
+    "neutral": "#FF9800",
+    "negative": "#F44336",
+}
+BRAND_ALIASES = {
+    "indihome",
+    "indihomecare",
+    "myindihome",
+    "indibiz",
+    "indibizid",
+    "telkomsel",
+    "telkomselcare",
+    "telkomindonesia",
+    "telkom",
+}
+
+
+def _is_dark_mode() -> bool:
+    """Ambil status tema dari session state secara aman."""
+    try:
+        return bool(st.session_state.get("dark_mode", True))
+    except Exception:
+        return True
+
+
+def _chart_text_color() -> str:
+    """Tentukan warna teks chart agar terbaca pada kedua tema."""
+    return "#FFFFFF" if _is_dark_mode() else "#1F2937"
+
+
+def _inject_home_css() -> None:
+    """Sisipkan CSS khusus halaman Beranda dengan prefix home-v5-."""
+    try:
+        st.markdown(
+            """
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+                .home-v5-page {
+                    color: var(--app-text);
+                }
+
+                .home-v5-hero {
+                    background: transparent;
+                    border-bottom: 2px solid var(--app-primary);
+                    padding: 0.25rem 0 1rem 0;
+                    margin-bottom: 1rem;
+                }
+
+                .home-v5-hero h1 {
+                    color: var(--app-text);
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: clamp(1.75rem, 3vw, 1.875rem);
+                    font-weight: 800;
+                    line-height: 1.2;
+                    margin: 0;
+                }
+
+                .home-v5-hero p {
+                    color: var(--app-muted);
+                    font-family: 'Inter', sans-serif;
+                    font-size: 1rem;
+                    margin: 0.35rem 0 0.85rem 0;
+                }
+
+                .home-v5-badges,
+                .home-v5-source-row {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+
+                .home-v5-badge {
+                    border-radius: 999px;
+                    color: #FFFFFF;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.3rem;
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    letter-spacing: 0.02em;
+                    line-height: 1;
+                    padding: 0.42rem 0.68rem;
+                    white-space: nowrap;
+                }
+
+                .home-v5-badge-active { background: #4CAF50; }
+                .home-v5-badge-soon { background: #424242; }
+                .home-v5-badge-real { background: rgba(76, 175, 80, 0.18); color: #4CAF50; border: 1px solid rgba(76, 175, 80, 0.45); }
+                .home-v5-badge-dummy { background: rgba(255, 152, 0, 0.18); color: #FF9800; border: 1px solid rgba(255, 152, 0, 0.45); }
+
+                .home-v5-section-title {
+                    color: var(--app-text);
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: 1.05rem;
+                    font-weight: 700;
+                    margin: 1.2rem 0 0.75rem 0;
+                }
+
+                .home-v5-metric-card {
+                    background: var(--app-card);
+                    border: 1px solid var(--app-border);
+                    border-left: 3px solid var(--app-primary);
+                    border-radius: 10px;
+                    box-sizing: border-box;
+                    min-height: 142px;
+                    padding: 1rem;
+                    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+                }
+
+                .home-v5-metric-card:hover {
+                    border-color: rgba(229, 57, 53, 0.68);
+                    box-shadow: 0 0 22px rgba(229, 57, 53, 0.18);
+                    transform: translateY(-2px);
+                }
+
+                .home-v5-metric-label {
+                    color: var(--app-muted);
+                    font-size: 0.82rem;
+                    font-weight: 600;
+                    margin-bottom: 0.5rem;
+                }
+
+                .home-v5-metric-value {
+                    color: var(--home-v5-value-color, var(--app-text));
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: clamp(1.7rem, 3vw, 2rem);
+                    font-weight: 800;
+                    line-height: 1.1;
+                    overflow-wrap: anywhere;
+                }
+
+                .home-v5-metric-subtext {
+                    color: var(--app-muted);
+                    font-size: 0.78rem;
+                    margin-top: 0.5rem;
+                }
+
+                .home-v5-service-section-head {
+                    align-items: flex-end;
+                    display: flex;
+                    gap: 1rem;
+                    justify-content: space-between;
+                    margin: 1.35rem 0 0.8rem 0;
+                }
+
+                .home-v5-service-section-kicker {
+                    align-items: center;
+                    color: var(--app-primary);
+                    display: inline-flex;
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.68rem;
+                    font-weight: 800;
+                    gap: 0.38rem;
+                    letter-spacing: 0.11em;
+                    margin-bottom: 0.28rem;
+                    text-transform: uppercase;
+                }
+
+                .home-v5-service-section-kicker::before {
+                    background: var(--app-primary);
+                    border-radius: 999px;
+                    content: '';
+                    height: 6px;
+                    width: 6px;
+                }
+
+                .home-v5-service-section-title {
+                    color: var(--app-text);
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: clamp(1.2rem, 2vw, 1.45rem);
+                    font-weight: 800;
+                    letter-spacing: -0.03em;
+                    line-height: 1.2;
+                    margin: 0;
+                }
+
+                .home-v5-service-section-copy {
+                    color: var(--app-muted);
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.77rem;
+                    line-height: 1.45;
+                    max-width: 360px;
+                    text-align: right;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card-marker) {
+                    background:
+                        radial-gradient(circle at 92% 4%, rgba(229, 57, 53, 0.10), transparent 28%),
+                        linear-gradient(155deg, color-mix(in srgb, var(--app-card) 96%, white 4%), var(--app-card));
+                    border: 1px solid var(--app-border) !important;
+                    border-radius: 18px !important;
+                    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.12);
+                    min-height: 590px;
+                    overflow: hidden;
+                    padding: 1rem !important;
+                    position: relative;
+                    transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card-marker)::before {
+                    background: linear-gradient(90deg, var(--home-v5-service-accent, #E53935), transparent 72%);
+                    content: '';
+                    height: 3px;
+                    left: 0;
+                    position: absolute;
+                    right: 0;
+                    top: 0;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card-marker):hover {
+                    border-color: color-mix(in srgb, var(--home-v5-service-accent, #E53935) 50%, var(--app-border)) !important;
+                    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18), 0 0 0 1px color-mix(in srgb, var(--home-v5-service-accent, #E53935) 16%, transparent);
+                    transform: translateY(-3px);
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card--indihome) {
+                    --home-v5-service-accent: #E53935;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card--indibiz) {
+                    --home-v5-service-accent: #EF8354;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card--telkomsel) {
+                    --home-v5-service-accent: #D71920;
+                }
+
+                .home-v5-service-card-marker {
+                    display: none;
+                }
+
+                .home-v5-service-head {
+                    align-items: center;
+                    display: flex;
+                    gap: 0.8rem;
+                    justify-content: space-between;
+                    margin-bottom: 0.82rem;
+                }
+
+                .home-v5-service-identity {
+                    align-items: center;
+                    display: flex;
+                    gap: 0.7rem;
+                    min-width: 0;
+                }
+
+                .home-v5-service-logo {
+                    align-items: center;
+                    background: color-mix(in srgb, var(--home-v5-logo-color, #E53935) 13%, transparent);
+                    border: 1px solid color-mix(in srgb, var(--home-v5-logo-color, #E53935) 32%, transparent);
+                    border-radius: 13px;
+                    color: var(--home-v5-logo-color, #E53935);
+                    display: inline-flex;
+                    flex: 0 0 auto;
+                    height: 44px;
+                    justify-content: center;
+                    width: 44px;
+                }
+
+                .home-v5-service-logo svg {
+                    height: 22px;
+                    width: 22px;
+                }
+
+                .home-v5-service-name {
+                    color: var(--app-text);
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: 1rem;
+                    font-weight: 800;
+                    letter-spacing: -0.02em;
+                    line-height: 1.2;
+                }
+
+                .home-v5-service-type {
+                    color: var(--app-muted);
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.69rem;
+                    line-height: 1.35;
+                    margin-top: 0.14rem;
+                }
+
+                .home-v5-service-status {
+                    align-items: center;
+                    border-radius: 999px;
+                    display: inline-flex;
+                    flex: 0 0 auto;
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.64rem;
+                    font-weight: 800;
+                    gap: 0.35rem;
+                    letter-spacing: 0.04em;
+                    padding: 0.42rem 0.62rem;
+                    text-transform: uppercase;
+                }
+
+                .home-v5-service-status::before {
+                    border-radius: 999px;
+                    content: '';
+                    height: 6px;
+                    width: 6px;
+                }
+
+                .home-v5-service-status--active {
+                    background: rgba(76, 175, 80, 0.13);
+                    border: 1px solid rgba(76, 175, 80, 0.38);
+                    color: #62CF68;
+                }
+
+                .home-v5-service-status--active::before {
+                    background: #4CAF50;
+                    box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.12);
+                }
+
+                .home-v5-service-status--soon {
+                    background: color-mix(in srgb, var(--app-muted) 11%, transparent);
+                    border: 1px solid color-mix(in srgb, var(--app-muted) 26%, transparent);
+                    color: var(--app-muted);
+                }
+
+                .home-v5-service-status--soon::before {
+                    background: var(--app-muted);
+                }
+
+                .home-v5-service-summary {
+                    --home-v5-hover-accent: #E53935;
+                    align-items: center;
+                    background: color-mix(in srgb, var(--app-secondary) 76%, transparent);
+                    border: 1px solid var(--app-border);
+                    border-radius: 12px;
+                    color: var(--app-muted);
+                    display: flex;
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.72rem;
+                    gap: 0.5rem;
+                    justify-content: space-between;
+                    margin-bottom: 0.72rem;
+                    overflow: hidden;
+                    padding: 0.62rem 0.72rem;
+                    position: relative;
+                    transition: background 0.26s ease, border-color 0.26s ease, box-shadow 0.26s ease, transform 0.26s ease;
+                    will-change: transform;
+                }
+
+                .home-v5-service-summary::after {
+                    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--home-v5-hover-accent) 72%, white 8%), transparent);
+                    bottom: 0;
+                    content: '';
+                    height: 2px;
+                    left: -35%;
+                    opacity: 0;
+                    position: absolute;
+                    transition: left 0.38s ease, opacity 0.26s ease;
+                    width: 58%;
+                }
+
+                .home-v5-service-summary:hover {
+                    background: color-mix(in srgb, var(--app-secondary) 84%, var(--home-v5-hover-accent) 6%);
+                    border-color: color-mix(in srgb, var(--home-v5-hover-accent) 52%, var(--app-border));
+                    box-shadow:
+                        0 12px 28px color-mix(in srgb, var(--home-v5-hover-accent) 17%, transparent),
+                        0 0 0 1px color-mix(in srgb, var(--home-v5-hover-accent) 12%, transparent);
+                    transform: translateY(-2px);
+                }
+
+                .home-v5-service-summary:hover::after {
+                    left: 78%;
+                    opacity: 1;
+                }
+
+                .home-v5-service-summary strong {
+                    color: var(--app-text);
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    transition: color 0.26s ease;
+                }
+
+                .home-v5-service-summary:hover strong {
+                    color: color-mix(in srgb, var(--home-v5-hover-accent) 74%, var(--app-text));
+                }
+
+                .home-v5-service-stats {
+                    display: grid;
+                    gap: 0.58rem;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    margin: 0 0 0.72rem 0;
+                }
+
+                .home-v5-service-stat {
+                    --home-v5-stat-accent: #E53935;
+                    background: linear-gradient(145deg, color-mix(in srgb, var(--app-secondary) 90%, white 10%), var(--app-secondary));
+                    border: 1px solid var(--app-border);
+                    border-radius: 13px;
+                    overflow: hidden;
+                    padding: 0.72rem;
+                    position: relative;
+                    transition: background 0.26s ease, border-color 0.26s ease, box-shadow 0.26s ease, transform 0.26s ease;
+                    will-change: transform;
+                }
+
+                .home-v5-service-stat::after {
+                    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--home-v5-stat-accent) 75%, white 8%), transparent);
+                    content: '';
+                    height: 2px;
+                    left: -42%;
+                    opacity: 0;
+                    position: absolute;
+                    right: auto;
+                    top: 0;
+                    transition: left 0.38s ease, opacity 0.26s ease;
+                    width: 62%;
+                }
+
+                .home-v5-service-stat--data {
+                    --home-v5-stat-accent: #42A5F5;
+                }
+
+                .home-v5-service-stat--influencer {
+                    --home-v5-stat-accent: #FFB300;
+                }
+
+                .home-v5-service-stat:hover {
+                    background: linear-gradient(
+                        145deg,
+                        color-mix(in srgb, var(--app-secondary) 87%, var(--home-v5-stat-accent) 13%),
+                        color-mix(in srgb, var(--app-secondary) 95%, var(--home-v5-stat-accent) 5%)
+                    );
+                    border-color: color-mix(in srgb, var(--home-v5-stat-accent) 54%, var(--app-border));
+                    box-shadow:
+                        0 13px 30px color-mix(in srgb, var(--home-v5-stat-accent) 18%, transparent),
+                        0 0 0 1px color-mix(in srgb, var(--home-v5-stat-accent) 12%, transparent);
+                    transform: translateY(-3px);
+                }
+
+                .home-v5-service-stat:hover::after {
+                    left: 76%;
+                    opacity: 1;
+                }
+
+                .home-v5-service-stat-label {
+                    align-items: center;
+                    color: var(--app-muted);
+                    display: flex;
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.67rem;
+                    gap: 0.34rem;
+                    margin-bottom: 0.34rem;
+                }
+
+                .home-v5-service-stat-label svg {
+                    height: 13px;
+                    width: 13px;
+                }
+
+                .home-v5-service-stat strong {
+                    color: var(--app-text);
+                    display: block;
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: 1.05rem;
+                    font-variant-numeric: tabular-nums;
+                    font-weight: 800;
+                    letter-spacing: -0.03em;
+                    line-height: 1.15;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card--indihome) div[data-testid="stPlotlyChart"] {
+                    background: color-mix(in srgb, var(--app-secondary) 56%, transparent);
+                    border: 1px solid var(--app-border);
+                    border-radius: 14px;
+                    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+                    overflow: hidden;
+                    position: relative;
+                    transition: background 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease, transform 0.28s ease;
+                    will-change: transform;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card--indihome) div[data-testid="stPlotlyChart"]:hover {
+                    background: color-mix(in srgb, var(--app-secondary) 86%, #E53935 5%);
+                    border-color: color-mix(in srgb, #E53935 48%, var(--app-border));
+                    box-shadow:
+                        0 16px 36px rgba(229, 57, 53, 0.18),
+                        0 0 0 1px rgba(229, 57, 53, 0.12);
+                    transform: translateY(-3px);
+                }
+
+                .home-v5-service-chart-title {
+                    align-items: center;
+                    color: var(--app-text);
+                    display: flex;
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: 0.78rem;
+                    font-weight: 700;
+                    justify-content: space-between;
+                    margin: 0.08rem 0 -0.2rem 0;
+                }
+
+                .home-v5-service-chart-title span {
+                    color: var(--app-muted);
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.63rem;
+                    font-weight: 500;
+                }
+
+                .home-v5-sentiment-legend {
+                    display: grid;
+                    gap: 0.4rem;
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                    margin: -0.38rem 0 0.75rem 0;
+                }
+
+                .home-v5-sentiment-item {
+                    align-items: center;
+                    background: color-mix(in srgb, var(--app-secondary) 70%, transparent);
+                    border: 1px solid var(--app-border);
+                    border-radius: 10px;
+                    display: flex;
+                    gap: 0.38rem;
+                    min-width: 0;
+                    padding: 0.45rem 0.48rem;
+                }
+
+                .home-v5-sentiment-dot {
+                    background: var(--home-v5-dot-color);
+                    border-radius: 999px;
+                    flex: 0 0 auto;
+                    height: 7px;
+                    width: 7px;
+                }
+
+                .home-v5-sentiment-item span {
+                    color: var(--app-muted);
+                    display: block;
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.58rem;
+                    line-height: 1.15;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                .home-v5-sentiment-item strong {
+                    color: var(--app-text);
+                    display: block;
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: 0.68rem;
+                    font-variant-numeric: tabular-nums;
+                    font-weight: 800;
+                    line-height: 1.2;
+                }
+
+                .home-v5-coming-panel {
+                    align-items: center;
+                    background:
+                        radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--home-v5-service-accent) 13%, transparent), transparent 45%),
+                        color-mix(in srgb, var(--app-secondary) 58%, transparent);
+                    border: 1px dashed color-mix(in srgb, var(--app-muted) 30%, transparent);
+                    border-radius: 15px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    min-height: 292px;
+                    padding: 1rem;
+                    text-align: center;
+                }
+
+                .home-v5-coming-icon {
+                    align-items: center;
+                    background: color-mix(in srgb, var(--home-v5-service-accent) 13%, transparent);
+                    border: 1px solid color-mix(in srgb, var(--home-v5-service-accent) 28%, transparent);
+                    border-radius: 18px;
+                    color: var(--home-v5-service-accent);
+                    display: flex;
+                    height: 58px;
+                    justify-content: center;
+                    margin-bottom: 0.82rem;
+                    width: 58px;
+                }
+
+                .home-v5-coming-icon svg {
+                    height: 27px;
+                    width: 27px;
+                }
+
+                .home-v5-coming-title {
+                    color: var(--app-text);
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: 0.9rem;
+                    font-weight: 800;
+                    line-height: 1.35;
+                    margin-bottom: 0.36rem;
+                }
+
+                .home-v5-service-copy {
+                    color: var(--app-muted);
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.72rem;
+                    line-height: 1.55;
+                    max-width: 245px;
+                }
+
+                .home-v5-coming-features {
+                    display: grid;
+                    gap: 0.42rem;
+                    grid-template-columns: 1fr;
+                    margin: 0.7rem 0 0.78rem 0;
+                }
+
+                .home-v5-coming-feature {
+                    align-items: center;
+                    background: color-mix(in srgb, var(--app-secondary) 70%, transparent);
+                    border: 1px solid var(--app-border);
+                    border-radius: 10px;
+                    color: var(--app-muted);
+                    display: flex;
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.66rem;
+                    gap: 0.46rem;
+                    padding: 0.48rem 0.58rem;
+                }
+
+                .home-v5-coming-feature svg {
+                    color: var(--home-v5-service-accent);
+                    flex: 0 0 auto;
+                    height: 14px;
+                    width: 14px;
+                }
+
+                .home-v5-coming-roadmap {
+                    align-items: center;
+                    color: var(--app-muted);
+                    display: flex;
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.62rem;
+                    gap: 0.42rem;
+                    margin: 0.15rem 0 0.72rem 0;
+                }
+
+                .home-v5-coming-roadmap::before {
+                    background: var(--home-v5-service-accent);
+                    border-radius: 999px;
+                    content: '';
+                    height: 5px;
+                    width: 5px;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card-marker) .stButton button {
+                    border-radius: 11px;
+                    font-family: 'Inter', sans-serif;
+                    font-size: 0.74rem;
+                    font-weight: 750;
+                    min-height: 42px;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card--indihome) .stButton button {
+                    background: linear-gradient(120deg, #B71C1C, #E53935, #F05A56);
+                    border: 0;
+                    box-shadow: 0 9px 22px rgba(229, 57, 53, 0.22);
+                    color: #FFFFFF;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card--indihome) .stButton button:hover {
+                    box-shadow: 0 12px 28px rgba(229, 57, 53, 0.31);
+                    transform: translateY(-1px);
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card-marker) .stButton button:disabled {
+                    background: color-mix(in srgb, var(--app-secondary) 88%, transparent);
+                    border: 1px solid var(--app-border);
+                    color: var(--app-muted);
+                    opacity: 0.72;
+                }
+
+                .home-v5-card-title {
+                    color: var(--app-text);
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: 1rem;
+                    font-weight: 700;
+                    margin-bottom: 0.45rem;
+                }
+
+                .home-v5-table-wrap {
+                    border: 1px solid var(--app-border);
+                    border-radius: 10px;
+                    overflow-x: auto;
+                    width: 100%;
+                }
+
+                .home-v5-table {
+                    border-collapse: collapse;
+                    min-width: 620px;
+                    width: 100%;
+                }
+
+                .home-v5-table th {
+                    background: var(--app-secondary);
+                    border-bottom: 1px solid var(--app-border);
+                    color: var(--app-text);
+                    font-size: 0.76rem;
+                    font-weight: 700;
+                    padding: 0.72rem 0.65rem;
+                    text-align: left;
+                }
+
+                .home-v5-table td {
+                    border-bottom: 1px solid var(--app-border);
+                    color: var(--app-text);
+                    font-size: 0.78rem;
+                    padding: 0.72rem 0.65rem;
+                    vertical-align: middle;
+                }
+
+                .home-v5-table tbody tr:nth-child(even) {
+                    background: color-mix(in srgb, var(--app-card) 88%, var(--app-text) 12%);
+                }
+
+                .home-v5-table tbody tr:nth-child(odd) {
+                    background: var(--app-card);
+                }
+
+                .home-v5-table tbody tr:last-child td {
+                    border-bottom: 0;
+                }
+
+                .home-v5-platform-pill {
+                    background: var(--app-secondary);
+                    border: 1px solid var(--app-border);
+                    border-radius: 999px;
+                    color: var(--app-text);
+                    display: inline-block;
+                    font-size: 0.69rem;
+                    padding: 0.25rem 0.48rem;
+                    white-space: nowrap;
+                }
+
+                .home-v5-info-card {
+                    background: var(--app-card);
+                    border: 1px solid var(--app-border);
+                    border-radius: 10px;
+                    margin-top: 0.5rem;
+                    padding: 1.5rem;
+                }
+
+                .home-v5-info-title {
+                    color: var(--app-text);
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+                    font-size: 1.05rem;
+                    font-weight: 700;
+                    line-height: 1.45;
+                    margin-bottom: 1rem;
+                }
+
+                .home-v5-info-grid {
+                    display: grid;
+                    gap: 0.75rem 1.25rem;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+
+                .home-v5-info-item span {
+                    color: var(--app-muted);
+                    display: block;
+                    font-size: 0.72rem;
+                    font-weight: 600;
+                    margin-bottom: 0.15rem;
+                    text-transform: uppercase;
+                }
+
+                .home-v5-info-item strong,
+                .home-v5-info-item div {
+                    color: var(--app-text);
+                    font-size: 0.82rem;
+                    font-weight: 500;
+                    line-height: 1.5;
+                }
+
+                @media (max-width: 760px) {
+                    .home-v5-info-grid { grid-template-columns: 1fr; }
+                    .home-v5-metric-card { min-height: 126px; }
+                    .home-v5-service-section-head {
+                        align-items: flex-start;
+                        flex-direction: column;
+                        gap: 0.32rem;
+                    }
+                    .home-v5-service-section-copy {
+                        max-width: none;
+                        text-align: left;
+                    }
+                    .home-v5-service-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                    .home-v5-sentiment-legend { grid-template-columns: 1fr; }
+                    div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-service-card-marker) {
+                        min-height: auto;
+                    }
+                }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        st.error("Gaya halaman Beranda belum dapat dimuat.")
+
+
+def _normalize_platform(value: Any) -> str:
+    """Normalisasi variasi nama platform ke tiga platform penelitian."""
+    try:
+        raw = str(value or "").strip().lower().lstrip("'")
+        aliases = {
+            "x": "twitter",
+            "twitter/x": "twitter",
+            "twitter": "twitter",
+            "ig": "instagram",
+            "instagram": "instagram",
+            "tik tok": "tiktok",
+            "tiktok": "tiktok",
+        }
+        return aliases.get(raw, raw)
+    except Exception:
+        return ""
+
+
+def _normalize_sentiment(value: Any) -> str:
+    """Normalisasi label sentimen Indonesia, Inggris, dan label model."""
+    try:
+        raw = str(value or "").strip().lower().lstrip("'")
+        aliases = {
+            "label_0": "positive",
+            "positive": "positive",
+            "positif": "positive",
+            "label_1": "neutral",
+            "neutral": "neutral",
+            "netral": "neutral",
+            "label_2": "negative",
+            "negative": "negative",
+            "negatif": "negative",
+        }
+        return aliases.get(raw, "neutral")
+    except Exception:
+        return "neutral"
+
+
+def _find_column(df: pd.DataFrame, aliases: list[str]) -> str | None:
+    """Cari nama kolom pertama yang cocok tanpa membedakan kapitalisasi."""
+    try:
+        columns = {str(column).strip().lower(): str(column) for column in df.columns}
+        for alias in aliases:
+            if alias.lower() in columns:
+                return columns[alias.lower()]
+        return None
+    except Exception:
+        return None
+
+
+@st.cache_data(show_spinner=False)
+def _prepare_sentiment_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Validasi dan normalisasi DataFrame sentimen untuk Beranda."""
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        raise ValueError("Dataset sentimen kosong atau tidak valid.")
+
+    platform_col = _find_column(
+        df,
+        ["platform", "specific_resource_type", "source_platform"],
+    )
+    sentiment_col = _find_column(
+        df,
+        ["predicted_sentiment", "sentiment", "label", "final_sentiment"],
+    )
+    if platform_col is None:
+        raise ValueError("Kolom platform tidak ditemukan.")
+    if sentiment_col is None:
+        raise ValueError("Kolom sentimen tidak ditemukan.")
+
+    result = pd.DataFrame(
+        {
+            "platform": df[platform_col].apply(_normalize_platform),
+            "sentiment": df[sentiment_col].apply(_normalize_sentiment),
+        }
+    )
+    result = result[result["platform"].isin(PLATFORM_ORDER)].copy()
+    if result.empty:
+        raise ValueError("Tidak ada data untuk Twitter/X, Instagram, atau TikTok.")
+    return result.reset_index(drop=True)
+
+
+def _load_home_sentiment_data() -> tuple[pd.DataFrame, bool, str]:
+    """Muat sentimen IndiHome dan gunakan dummy jika data aktual gagal."""
+    try:
+        loaded = load_sentiment_data("IndiHome")
+        is_real = bool(sentiment_file_exists("IndiHome"))
+        if not is_real:
+            loaded = get_dummy_sentiment_data("IndiHome").head(30).copy()
+        prepared = _prepare_sentiment_dataframe(loaded)
+        status = "Data Aktual" if is_real else "Data Dummy"
+        return prepared, is_real, status
+    except Exception:
+        st.error(
+            "Data sentimen IndiHome belum dapat dimuat. "
+            "Beranda menggunakan data dummy."
+        )
+        try:
+            dummy_source = get_dummy_sentiment_data("IndiHome").head(30).copy()
+            dummy = _prepare_sentiment_dataframe(dummy_source)
+            return dummy, False, "Data Dummy"
+        except Exception:
+            return pd.DataFrame(columns=["platform", "sentiment"]), False, "Data Dummy"
+
+
+def _normalize_username(value: Any) -> str:
+    """Bersihkan username dari apostrof, spasi, dan awalan @."""
+    try:
+        return str(value or "").strip().lstrip("'").strip().lstrip("@").strip()
+    except Exception:
+        return ""
+
+
+def _is_brand_account(username: str) -> bool:
+    """Tentukan apakah username merupakan akun brand penelitian."""
+    try:
+        normalized = "".join(character for character in username.lower() if character.isalnum())
+        return normalized in BRAND_ALIASES
+    except Exception:
+        return False
+
+
+@st.cache_data(show_spinner=False)
+def _prepare_influencer_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Hitung degree, interaksi, followers, dan kategori influencer dari edge list."""
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        raise ValueError("Dataset SNA kosong atau tidak valid.")
+
+    required = {
+        "source": _find_column(df, ["source", "vertex1", "from_username", "user_from"]),
+        "target": _find_column(df, ["target", "vertex2", "to_username", "user_to"]),
+        "platform": _find_column(df, ["platform", "specific_resource_type"]),
+        "followers": _find_column(df, ["followers", "follower_count", "followers_count"]),
+    }
+    missing = [name for name, column in required.items() if column is None]
+    if missing:
+        raise ValueError(f"Kolom SNA belum lengkap: {', '.join(missing)}.")
+
+    work = pd.DataFrame(
+        {
+            "source": df[required["source"]].apply(_normalize_username),
+            "target": df[required["target"]].apply(_normalize_username),
+            "platform": df[required["platform"]].apply(_normalize_platform),
+            "followers": pd.to_numeric(df[required["followers"]], errors="coerce").fillna(0),
+        }
+    )
+    invalid = {"", "nan", "none", "null"}
+    work = work[
+        ~work["source"].str.lower().isin(invalid)
+        & ~work["target"].str.lower().isin(invalid)
+        & work["platform"].isin(PLATFORM_ORDER)
+    ].copy()
+    if work.empty:
+        raise ValueError("Edge SNA yang valid tidak tersedia.")
+
+    source_stats = (
+        work.groupby("source", as_index=False)
+        .agg(
+            out_degree=("target", "nunique"),
+            outgoing_interactions=("target", "size"),
+            followers=("followers", "max"),
+            platform=("platform", "first"),
+        )
+        .rename(columns={"source": "username"})
+    )
+    target_stats = (
+        work.groupby("target", as_index=False)
+        .agg(
+            in_degree=("source", "nunique"),
+            incoming_interactions=("source", "size"),
+            target_platform=("platform", "first"),
+        )
+        .rename(columns={"target": "username"})
+    )
+    nodes = source_stats.merge(target_stats, on="username", how="outer")
+    nodes["platform"] = nodes["platform"].fillna(nodes["target_platform"])
+    nodes["followers"] = pd.to_numeric(nodes["followers"], errors="coerce").fillna(0).clip(lower=0)
+    nodes["out_degree"] = pd.to_numeric(nodes["out_degree"], errors="coerce").fillna(0).astype(int)
+    nodes["in_degree"] = pd.to_numeric(nodes["in_degree"], errors="coerce").fillna(0).astype(int)
+    nodes["outgoing_interactions"] = (
+        pd.to_numeric(nodes["outgoing_interactions"], errors="coerce").fillna(0).astype(int)
+    )
+    nodes["incoming_interactions"] = (
+        pd.to_numeric(nodes["incoming_interactions"], errors="coerce").fillna(0).astype(int)
+    )
+    nodes["degree"] = nodes["out_degree"] + nodes["in_degree"]
+    nodes["interaksi"] = nodes["outgoing_interactions"] + nodes["incoming_interactions"]
+    nodes["followers"] = nodes["followers"].astype(int)
+    nodes = nodes[
+        nodes["platform"].isin(PLATFORM_ORDER)
+        & ~nodes["username"].apply(_is_brand_account)
+    ].copy()
+    nodes["kategori"] = "Akun Partisipan"
+
+    for platform in PLATFORM_ORDER:
+        mask = nodes["platform"] == platform
+        subset = nodes.loc[mask]
+        if subset.empty:
+            continue
+        if platform == "twitter":
+            threshold = float(subset["degree"].mean())
+            nodes.loc[mask & (nodes["degree"] > threshold), "kategori"] = (
+                "Structural Influencer"
+            )
+        else:
+            threshold = float(subset["followers"].mean())
+            nodes.loc[mask & (nodes["followers"] > threshold), "kategori"] = (
+                "Reach Influencer"
+            )
+
+    nodes["teridentifikasi"] = nodes["kategori"].isin(
+        ["Structural Influencer", "Reach Influencer"]
+    )
+    nodes = nodes.sort_values(
+        ["teridentifikasi", "interaksi", "followers", "username"],
+        ascending=[False, False, False, True],
+    )
+    return nodes[
+        [
+            "username",
+            "platform",
+            "followers",
+            "interaksi",
+            "degree",
+            "in_degree",
+            "out_degree",
+            "kategori",
+            "teridentifikasi",
+        ]
+    ].reset_index(drop=True)
+
+
+def _load_home_influencer_data() -> tuple[pd.DataFrame, bool, str]:
+    """Muat dan olah data SNA, lalu gunakan dummy bila proses gagal."""
+    try:
+        loaded = load_sna_data()
+        prepared = _prepare_influencer_dataframe(loaded)
+        is_real = bool(sna_file_exists())
+        status = "Data Aktual" if is_real else "Data Dummy"
+        return prepared, is_real, status
+    except Exception:
+        st.error(
+            "Data influencer belum dapat dimuat. "
+            "Beranda menggunakan data dummy."
+        )
+        try:
+            dummy = _prepare_influencer_dataframe(get_dummy_sna_data())
+            return dummy, False, "Data Dummy"
+        except Exception:
+            columns = [
+                "username",
+                "platform",
+                "followers",
+                "interaksi",
+                "degree",
+                "in_degree",
+                "out_degree",
+                "kategori",
+                "teridentifikasi",
+            ]
+            return pd.DataFrame(columns=columns), False, "Data Dummy"
+
+
+def _format_number(value: Any) -> str:
+    """Format angka besar menjadi K atau M untuk tabel ringkas."""
+    try:
+        number = float(value)
+        if number >= 1_000_000:
+            formatted = f"{number / 1_000_000:.1f}M"
+        elif number >= 1_000:
+            formatted = f"{number / 1_000:.1f}K"
+        else:
+            formatted = f"{number:.0f}"
+        return formatted.replace(".0K", "K").replace(".0M", "M")
+    except Exception:
+        return "0"
+
+
+def _calculate_metrics(sentiment_df: pd.DataFrame, influencer_df: pd.DataFrame) -> dict[str, Any]:
+    """Hitung metrik Beranda dari data yang sudah dinormalisasi."""
+    try:
+        total = int(len(sentiment_df))
+        counts = sentiment_df["sentiment"].value_counts() if total else pd.Series(dtype=int)
+        positive = int(counts.get("positive", 0))
+        negative = int(counts.get("negative", 0))
+        influencer_count = (
+            int(influencer_df["teridentifikasi"].sum())
+            if not influencer_df.empty and "teridentifikasi" in influencer_df.columns
+            else 0
+        )
+        return {
+            "total_data": total,
+            "positive_pct": (positive / total * 100) if total else 0.0,
+            "negative_pct": (negative / total * 100) if total else 0.0,
+            "influencer_count": influencer_count,
+        }
+    except Exception:
+        st.error("Metrik ringkasan belum dapat dihitung.")
+        return {
+            "total_data": 0,
+            "positive_pct": 0.0,
+            "negative_pct": 0.0,
+            "influencer_count": 0,
+        }
+
+
+def _source_badge(label: str, is_real: bool) -> str:
+    """Bangun HTML badge status sumber data."""
+    css_class = "home-v5-badge-real" if is_real else "home-v5-badge-dummy"
+    icon = "●" if is_real else "▲"
+    return (
+        f'<span class="home-v5-badge {css_class}">'
+        f'{icon} {escape(label)}: {"Data Aktual" if is_real else "Data Dummy"}'
+        "</span>"
+    )
+
+
+def _render_hero(sentiment_real: bool, sna_real: bool) -> None:
+    """Render hero, status layanan, dan status sumber data."""
+    try:
+        source_badges = (
+            _source_badge("Sentimen", sentiment_real)
+            + _source_badge("SNA", sna_real)
+        )
+        st.markdown(
+            f"""
+            <div class="home-v5-page">
+                <section class="home-v5-hero">
+                    <h1>Dashboard Analisis Sentimen</h1>
+                    <p>Layanan Digital PT Telkom Indonesia</p>
+                    <div class="home-v5-badges">
+                        <span class="home-v5-badge home-v5-badge-active">IndiHome AKTIF</span>
+                        <span class="home-v5-badge home-v5-badge-soon">IndiBiz Coming Soon</span>
+                        <span class="home-v5-badge home-v5-badge-soon">Telkomsel Coming Soon</span>
+                    </div>
+                    <div class="home-v5-source-row" style="margin-top:0.7rem;">
+                        {source_badges}
+                    </div>
+                </section>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        st.error("Hero Beranda belum dapat ditampilkan.")
+
+
+def _render_metric_card(label: str, value: str, subtext: str, color: str | None = None) -> None:
+    """Render satu metric card dengan HTML yang aman dan konsisten."""
+    try:
+        safe_color = color if color in {"#4CAF50", "#F44336"} else "var(--app-text)"
+        st.markdown(
+            f"""
+            <div class="home-v5-metric-card" style="--home-v5-value-color:{safe_color};">
+                <div class="home-v5-metric-label">{escape(label)}</div>
+                <div class="home-v5-metric-value">{escape(value)}</div>
+                <div class="home-v5-metric-subtext">{escape(subtext)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        st.error("Kartu metrik belum dapat ditampilkan.")
+
+
+def _render_metrics(metrics: dict[str, Any]) -> None:
+    """Render empat metric card utama sesuai spesifikasi Fase 5."""
+    try:
+        st.markdown('<div class="home-v5-section-title">Ringkasan Utama</div>', unsafe_allow_html=True)
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            _render_metric_card(
+                "Total Data",
+                f"{int(metrics['total_data']):,}".replace(",", "."),
+                "Dari 3 Platform",
+            )
+        with col2:
+            _render_metric_card(
+                "Sentimen Positif",
+                f"{float(metrics['positive_pct']):.1f}%".replace(".", ","),
+                "IndiHome",
+                "#4CAF50",
+            )
+        with col3:
+            _render_metric_card(
+                "Sentimen Negatif",
+                f"{float(metrics['negative_pct']):.1f}%".replace(".", ","),
+                "IndiHome",
+                "#F44336",
+            )
+        with col4:
+            _render_metric_card(
+                "Top Influencer",
+                f"{int(metrics['influencer_count']):,}".replace(",", "."),
+                "Teridentifikasi",
+            )
+    except Exception:
+        st.error("Ringkasan utama belum dapat ditampilkan.")
+
+
+def _sentiment_counts(sentiment_df: pd.DataFrame) -> list[int]:
+    """Ambil jumlah sentimen sesuai urutan warna chart."""
+    try:
+        counts = sentiment_df["sentiment"].value_counts()
+        return [int(counts.get(item, 0)) for item in SENTIMENT_ORDER]
+    except Exception:
+        return [0, 0, 0]
+
+
+def _build_donut_chart(sentiment_df: pd.DataFrame) -> go.Figure:
+    """Buat donut ringkas tanpa label bertumpuk untuk card IndiHome."""
+    values = _sentiment_counts(sentiment_df)
+    total = int(sum(values))
+    figure = go.Figure(
+        data=[
+            go.Pie(
+                labels=[SENTIMENT_LABELS[item] for item in SENTIMENT_ORDER],
+                values=values,
+                hole=0.72,
+                sort=False,
+                direction="clockwise",
+                marker={
+                    "colors": [SENTIMENT_COLORS[item] for item in SENTIMENT_ORDER],
+                    "line": {"color": "rgba(0,0,0,0)", "width": 0},
+                },
+                textinfo="none",
+                hovertemplate="<b>%{label}</b><br>%{value:,} komentar · %{percent}<extra></extra>",
+            )
+        ]
+    )
+    figure.update_layout(
+        height=190,
+        margin={"l": 2, "r": 2, "t": 2, "b": 2},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        showlegend=False,
+        font={"family": "Inter, sans-serif", "color": _chart_text_color(), "size": 11},
+        hoverlabel={
+            "bgcolor": "#111827" if _is_dark_mode() else "#FFFFFF",
+            "bordercolor": "#334155" if _is_dark_mode() else "#E5E7EB",
+            "font": {"color": "#FFFFFF" if _is_dark_mode() else "#1F2937", "family": "Inter, sans-serif"},
+        },
+        annotations=[
+            {
+                "text": f"<b>{total:,}</b><br><span style='font-size:10px'>Percakapan</span>",
+                "x": 0.5,
+                "y": 0.5,
+                "showarrow": False,
+                "font": {"family": "Plus Jakarta Sans, sans-serif", "color": _chart_text_color(), "size": 15},
+            }
+        ],
+    )
+    return figure
+
+
+def _render_service_cards(
+    sentiment_df: pd.DataFrame,
+    metrics: dict[str, Any],
+) -> None:
+    """Render portfolio layanan dengan card aktif dan roadmap Coming Soon."""
+    try:
+        counts = dict(zip(SENTIMENT_ORDER, _sentiment_counts(sentiment_df)))
+        total = max(int(sum(counts.values())), 1)
+        percentages = {
+            key: (int(value) / total * 100) if total else 0.0
+            for key, value in counts.items()
+        }
+
+        st.markdown(
+            """
+            <div class="home-v5-service-section-head">
+                <div>
+                    <div class="home-v5-service-section-kicker">Portfolio Layanan</div>
+                    <h2 class="home-v5-service-section-title">Status Layanan</h2>
+                </div>
+                <div class="home-v5-service-section-copy">
+                    Pantau kesiapan modul analitik untuk setiap layanan digital Telkom Group.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        indihome_col, indibiz_col, telkomsel_col = st.columns(3, gap="medium")
+
+        with indihome_col:
+            with st.container(border=True, key="home_v5_service_indihome"):
+                st.markdown(
+                    f"""
+                    <div class="home-v5-service-card-marker home-v5-service-card--indihome"></div>
+                    <div class="home-v5-service-head" style="--home-v5-logo-color:#E53935;">
+                        <div class="home-v5-service-identity">
+                            <div class="home-v5-service-logo" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 11.2 12 4l9 7.2"></path>
+                                    <path d="M5.5 10.3V20h13v-9.7"></path>
+                                    <path d="M9.2 20v-5.8h5.6V20"></path>
+                                    <path d="M17.5 6.5V4.7h2v3.4"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="home-v5-service-name">IndiHome</div>
+                                <div class="home-v5-service-type">Internet Rumah & Digital</div>
+                            </div>
+                        </div>
+                        <span class="home-v5-service-status home-v5-service-status--active">Aktif</span>
+                    </div>
+                    <div class="home-v5-service-summary">
+                        <span>Cakupan analisis</span>
+                        <strong>Twitter/X · Instagram · TikTok</strong>
+                    </div>
+                    <div class="home-v5-service-stats">
+                        <div class="home-v5-service-stat home-v5-service-stat--data">
+                            <div class="home-v5-service-stat-label">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"></path></svg>
+                                Jumlah Data
+                            </div>
+                            <strong>{int(metrics['total_data']):,}</strong>
+                        </div>
+                        <div class="home-v5-service-stat home-v5-service-stat--influencer">
+                            <div class="home-v5-service-stat-label">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19c.5-3.4 2.3-5 5.5-5s5 1.6 5.5 5"></path><path d="M16 8h5M18.5 5.5v5"></path></svg>
+                                Influencer
+                            </div>
+                            <strong>{int(metrics['influencer_count']):,}</strong>
+                        </div>
+                    </div>
+                    <div class="home-v5-service-chart-title">
+                        Komposisi Sentimen
+                        <span>IndiHome</span>
+                    </div>
+                    """.replace(",", "."),
+                    unsafe_allow_html=True,
+                )
+
+                try:
+                    st.plotly_chart(
+                        _build_donut_chart(sentiment_df),
+                        width="stretch",
+                        config={"displayModeBar": False, "responsive": True},
+                        key="home_v5_donut_indihome",
+                    )
+                except Exception:
+                    st.error("Donut sentimen belum dapat ditampilkan.")
+                    fallback = pd.DataFrame(
+                        {
+                            "Sentimen": [SENTIMENT_LABELS[item] for item in SENTIMENT_ORDER],
+                            "Jumlah": _sentiment_counts(sentiment_df),
+                        }
+                    )
+                    st.dataframe(fallback, hide_index=True, width="stretch")
+
+                st.markdown(
+                    f"""
+                    <div class="home-v5-sentiment-legend">
+                        <div class="home-v5-sentiment-item" style="--home-v5-dot-color:#4CAF50;">
+                            <span class="home-v5-sentiment-dot"></span>
+                            <div><span>Positif</span><strong>{percentages['positive']:.1f}%</strong></div>
+                        </div>
+                        <div class="home-v5-sentiment-item" style="--home-v5-dot-color:#FF9800;">
+                            <span class="home-v5-sentiment-dot"></span>
+                            <div><span>Netral</span><strong>{percentages['neutral']:.1f}%</strong></div>
+                        </div>
+                        <div class="home-v5-sentiment-item" style="--home-v5-dot-color:#F44336;">
+                            <span class="home-v5-sentiment-dot"></span>
+                            <div><span>Negatif</span><strong>{percentages['negative']:.1f}%</strong></div>
+                        </div>
+                    </div>
+                    """.replace(".", ","),
+                    unsafe_allow_html=True,
+                )
+
+                if st.button(
+                    "Buka Analisis IndiHome",
+                    key="home_v5_open_sentiment",
+                    width="stretch",
+                    type="primary",
+                ):
+                    try:
+                        st.session_state["selected_page"] = "Analisis Sentimen"
+                        st.rerun()
+                    except Exception:
+                        st.error("Halaman Analisis Sentimen belum dapat dibuka.")
+
+        with indibiz_col:
+            with st.container(border=True, key="home_v5_service_indibiz"):
+                st.markdown(
+                    """
+                    <div class="home-v5-service-card-marker home-v5-service-card--indibiz"></div>
+                    <div class="home-v5-service-head" style="--home-v5-logo-color:#EF8354;">
+                        <div class="home-v5-service-identity">
+                            <div class="home-v5-service-logo" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="7" width="18" height="13" rx="2"></rect>
+                                    <path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7"></path>
+                                    <path d="M3 12.5c5.2 2.2 12.8 2.2 18 0"></path>
+                                    <path d="M10 13h4"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="home-v5-service-name">IndiBiz</div>
+                                <div class="home-v5-service-type">Solusi Digital Bisnis</div>
+                            </div>
+                        </div>
+                        <span class="home-v5-service-status home-v5-service-status--soon">Coming Soon</span>
+                    </div>
+                    <div class="home-v5-coming-panel">
+                        <div class="home-v5-coming-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="5" y="10" width="14" height="10" rx="2"></rect>
+                                <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+                                <path d="M12 14v2.5"></path>
+                            </svg>
+                        </div>
+                        <div class="home-v5-coming-title">Modul analitik sedang disiapkan</div>
+                        <div class="home-v5-service-copy">Integrasi data, model sentimen, dan pemetaan jaringan IndiBiz akan tersedia pada fase berikutnya.</div>
+                    </div>
+                    <div class="home-v5-coming-features">
+                        <div class="home-v5-coming-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"></path></svg>Analisis sentimen tiga kelas</div>
+                        <div class="home-v5-coming-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="12" r="2"></circle><circle cx="18" cy="6" r="2"></circle><circle cx="18" cy="18" r="2"></circle><path d="m8 11 8-4M8 13l8 4"></path></svg>Social Network Analysis</div>
+                        <div class="home-v5-coming-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19c.5-3.4 2.3-5 5.5-5s5 1.6 5.5 5"></path><path d="m17 12 1.2 2.4L21 15l-2 1.9.5 2.8L17 18.4l-2.5 1.3.5-2.8-2-1.9 2.8-.6z"></path></svg>Identifikasi influencer</div>
+                    </div>
+                    <div class="home-v5-coming-roadmap">Terjadwal pada roadmap pengembangan</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.button(
+                    "Segera Hadir",
+                    key="home_v5_indibiz_disabled",
+                    disabled=True,
+                    width="stretch",
+                )
+
+        with telkomsel_col:
+            with st.container(border=True, key="home_v5_service_telkomsel"):
+                st.markdown(
+                    """
+                    <div class="home-v5-service-card-marker home-v5-service-card--telkomsel"></div>
+                    <div class="home-v5-service-head" style="--home-v5-logo-color:#D71920;">
+                        <div class="home-v5-service-identity">
+                            <div class="home-v5-service-logo" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="7" y="2.5" width="10" height="19" rx="2"></rect>
+                                    <path d="M10 5h4M11 18.5h2"></path>
+                                    <path d="M9.5 9.5h5M9.5 12h5M9.5 14.5h3"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="home-v5-service-name">Telkomsel</div>
+                                <div class="home-v5-service-type">Seluler & Layanan Digital</div>
+                            </div>
+                        </div>
+                        <span class="home-v5-service-status home-v5-service-status--soon">Coming Soon</span>
+                    </div>
+                    <div class="home-v5-coming-panel">
+                        <div class="home-v5-coming-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="5" y="10" width="14" height="10" rx="2"></rect>
+                                <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+                                <path d="M12 14v2.5"></path>
+                            </svg>
+                        </div>
+                        <div class="home-v5-coming-title">Modul analitik sedang disiapkan</div>
+                        <div class="home-v5-service-copy">Pemrosesan dataset dan model analitik Telkomsel sedang diselaraskan dengan arsitektur dashboard.</div>
+                    </div>
+                    <div class="home-v5-coming-features">
+                        <div class="home-v5-coming-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"></path></svg>Analisis sentimen tiga kelas</div>
+                        <div class="home-v5-coming-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="12" r="2"></circle><circle cx="18" cy="6" r="2"></circle><circle cx="18" cy="18" r="2"></circle><path d="m8 11 8-4M8 13l8 4"></path></svg>Social Network Analysis</div>
+                        <div class="home-v5-coming-feature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19c.5-3.4 2.3-5 5.5-5s5 1.6 5.5 5"></path><path d="m17 12 1.2 2.4L21 15l-2 1.9.5 2.8L17 18.4l-2.5 1.3.5-2.8-2-1.9 2.8-.6z"></path></svg>Identifikasi influencer</div>
+                    </div>
+                    <div class="home-v5-coming-roadmap">Terjadwal pada roadmap pengembangan</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.button(
+                    "Segera Hadir",
+                    key="home_v5_telkomsel_disabled",
+                    disabled=True,
+                    width="stretch",
+                )
+    except Exception:
+        st.error("Status layanan belum dapat ditampilkan.")
+
+
+def _build_platform_chart(sentiment_df: pd.DataFrame) -> go.Figure:
+    """Buat horizontal grouped bar distribusi sentimen per platform."""
+    grouped = (
+        sentiment_df.groupby(["platform", "sentiment"])
+        .size()
+        .unstack(fill_value=0)
+        .reindex(index=PLATFORM_ORDER, columns=SENTIMENT_ORDER, fill_value=0)
+    )
+    figure = go.Figure()
+    for sentiment in SENTIMENT_ORDER:
+        figure.add_trace(
+            go.Bar(
+                name=SENTIMENT_LABELS[sentiment],
+                y=[PLATFORM_LABELS[item] for item in PLATFORM_ORDER],
+                x=grouped[sentiment].astype(int).tolist(),
+                orientation="h",
+                marker_color=SENTIMENT_COLORS[sentiment],
+                hovertemplate=(
+                    f"{SENTIMENT_LABELS[sentiment]}<br>"
+                    "%{y}: %{x:,} komentar<extra></extra>"
+                ),
+            )
+        )
+    figure.update_layout(
+        barmode="group",
+        height=390,
+        margin={"l": 18, "r": 18, "t": 20, "b": 55},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font={"color": _chart_text_color(), "size": 11},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0},
+        xaxis={
+            "title": "Jumlah Komentar",
+            "gridcolor": "rgba(128,128,128,0.18)",
+            "zeroline": False,
+            "rangemode": "tozero",
+        },
+        yaxis={"title": "Platform", "categoryorder": "array", "categoryarray": [PLATFORM_LABELS[item] for item in reversed(PLATFORM_ORDER)]},
+        hoverlabel={"namelength": -1},
+    )
+    return figure
+
+
+def _render_platform_fallback(sentiment_df: pd.DataFrame) -> None:
+    """Tampilkan tabel ringkas jika chart platform gagal dirender."""
+    try:
+        fallback = (
+            sentiment_df.groupby(["platform", "sentiment"])
+            .size()
+            .unstack(fill_value=0)
+            .reindex(index=PLATFORM_ORDER, columns=SENTIMENT_ORDER, fill_value=0)
+            .reset_index()
+        )
+        fallback["platform"] = fallback["platform"].map(PLATFORM_LABELS)
+        fallback = fallback.rename(
+            columns={
+                "platform": "Platform",
+                "positive": "Positif",
+                "neutral": "Netral",
+                "negative": "Negatif",
+            }
+        )
+        st.dataframe(fallback, hide_index=True, use_container_width=True)
+    except Exception:
+        st.error("Ringkasan distribusi platform belum dapat ditampilkan.")
+
+
+def _render_influencer_table(influencer_df: pd.DataFrame, is_real: bool) -> None:
+    """Render Top 5 influencer sebagai tabel HTML yang sudah disanitasi."""
+    try:
+        identified = influencer_df[influencer_df["teridentifikasi"]].copy()
+        if identified.empty:
+            identified = influencer_df.copy()
+        top_five = identified.sort_values(
+            ["interaksi", "followers", "username"],
+            ascending=[False, False, True],
+        ).head(5)
+        if top_five.empty:
+            st.info("Data influencer belum tersedia.")
+            return
+
+        rows = []
+        for rank, row in enumerate(top_five.itertuples(index=False), start=1):
+            username = escape(str(row.username))
+            platform = escape(PLATFORM_LABELS.get(str(row.platform), str(row.platform).title()))
+            followers = escape(_format_number(row.followers))
+            interactions = escape(_format_number(row.interaksi))
+            rows.append(
+                "<tr>"
+                f"<td>{rank}</td>"
+                f"<td>@{username}</td>"
+                f'<td><span class="home-v5-platform-pill">{platform}</span></td>'
+                f"<td>{followers}</td>"
+                f"<td>{interactions}</td>"
+                "</tr>"
+            )
+
+        source_class = "home-v5-badge-real" if is_real else "home-v5-badge-dummy"
+        source_label = "Data Aktual" if is_real else "Data Dummy"
+        st.markdown(
+            f"""
+            <div style="margin-bottom:0.55rem;">
+                <span class="home-v5-badge {source_class}">{source_label}</span>
+            </div>
+            <div class="home-v5-table-wrap">
+                <table class="home-v5-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Username</th>
+                            <th>Platform</th>
+                            <th>Followers</th>
+                            <th>Interaksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>{''.join(rows)}</tbody>
+                </table>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        st.error("Tabel Top 5 Influencer belum dapat ditampilkan.")
+
+
+def _render_overview(
+    sentiment_df: pd.DataFrame,
+    influencer_df: pd.DataFrame,
+    influencer_real: bool,
+) -> None:
+    """Render overview dua kolom: chart platform dan tabel influencer."""
+    try:
+        st.markdown('<div class="home-v5-section-title">Overview Data</div>', unsafe_allow_html=True)
+        chart_col, table_col = st.columns([1.15, 0.85])
+        with chart_col:
+            st.markdown('<div class="home-v5-card-title">Distribusi Sentimen per Platform</div>', unsafe_allow_html=True)
+            try:
+                st.plotly_chart(
+                    _build_platform_chart(sentiment_df),
+                    use_container_width=True,
+                    config={"displayModeBar": False, "responsive": True},
+                    key="home_v5_platform_sentiment",
+                )
+            except Exception:
+                st.error("Chart distribusi sentimen belum dapat ditampilkan.")
+                _render_platform_fallback(sentiment_df)
+
+        with table_col:
+            st.markdown('<div class="home-v5-card-title">Top 5 Influencer</div>', unsafe_allow_html=True)
+            _render_influencer_table(influencer_df, influencer_real)
+    except Exception:
+        st.error("Overview data belum dapat ditampilkan.")
+
+
+def _render_research_information() -> None:
+    """Render card informasi penelitian sesuai data kanonik proyek."""
+    try:
+        st.markdown('<div class="home-v5-section-title">Informasi Penelitian</div>', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <section class="home-v5-info-card">
+                <div class="home-v5-info-title">
+                    Analisis Jaringan dan Sentimen Publik terhadap Layanan Digital Telkom Group
+                </div>
+                <div class="home-v5-info-grid">
+                    <div class="home-v5-info-item">
+                        <span>Peneliti</span>
+                        <strong>Aulia Rahmadiva Wardana</strong>
+                    </div>
+                    <div class="home-v5-info-item">
+                        <span>NPM</span>
+                        <strong>184220019</strong>
+                    </div>
+                    <div class="home-v5-info-item">
+                        <span>Pembimbing</span>
+                        <div>Woro Isti Rahayu, S.T., M.T.</div>
+                    </div>
+                    <div class="home-v5-info-item">
+                        <span>Metode</span>
+                        <div>Social Network Analysis (SNA) dan IndoBERT</div>
+                    </div>
+                    <div class="home-v5-info-item">
+                        <span>Institusi</span>
+                        <div>Program Studi S1 Sains Data<br>Universitas Logistik dan Bisnis Internasional<br>Bandung, 2026</div>
+                    </div>
+                    <div class="home-v5-info-item">
+                        <span>Periode Data</span>
+                        <div>November–Desember 2025</div>
+                    </div>
+                </div>
+            </section>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        st.error("Informasi penelitian belum dapat ditampilkan.")
+
+
+def render_home() -> None:
+    """Render halaman Beranda Minimalist with Deep Fase 5."""
+    try:
+        _inject_home_css()
+        sentiment_df, sentiment_real, _ = _load_home_sentiment_data()
+        influencer_df, influencer_real, _ = _load_home_influencer_data()
+        metrics = _calculate_metrics(sentiment_df, influencer_df)
+
+        _render_hero(sentiment_real, influencer_real)
+        _render_metrics(metrics)
+        _render_service_cards(sentiment_df, metrics)
+        _render_overview(sentiment_df, influencer_df, influencer_real)
+        _render_research_information()
+    except Exception:
+        st.error(
+            "Halaman Beranda belum dapat dimuat sepenuhnya. "
+            "Silakan muat ulang aplikasi."
+        )

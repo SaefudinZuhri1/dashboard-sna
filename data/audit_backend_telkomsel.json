@@ -1,0 +1,49 @@
+{
+  "edge_rows": 67219,
+  "node_rows": 36047,
+  "graph_nodes": 36047,
+  "graph_edges": 67088,
+  "density": 5.163196339371373e-05,
+  "pagerank_sum": 0.9999999999999625,
+  "edge_platform_counts": {
+    "twitter": 58127,
+    "instagram": 6803,
+    "tiktok": 2289
+  },
+  "edge_sentiment_counts": {
+    "neutral": 45092,
+    "negative": 20403,
+    "positive": 1724
+  },
+  "self_loops": 0,
+  "duplicate_edges": 0,
+  "source_files": {
+    "SNA Telkomsel.csv": "ebe6a928f871d779b7223339f632f3b4",
+    "Telkomsel-NovemberDesember.csv": "f0f4db2c89d9532138a460e6028e2007",
+    "uploaded_telkomsel_sentiment.csv": "a8d76ded61e8ba4fa65f5b1082588976",
+    "uploaded_sna_data.csv": "af297d13001975768918a9287bb0286a"
+  },
+  "uploaded_file_findings": {
+    "telkomsel_sentiment_columns": [
+      "text",
+      "cleaned_text",
+      "label",
+      "score",
+      "platform",
+      "date",
+      "username",
+      "topic"
+    ],
+    "telkomsel_sentiment_rows": 48483,
+    "telkomsel_sentiment_label_non_null": 0,
+    "sna_data_columns": [
+      "source",
+      "target",
+      "relationship",
+      "followers",
+      "platform"
+    ],
+    "sna_data_rows": 39615,
+    "sna_data_is_exact_indihome_source": true
+  }
+}

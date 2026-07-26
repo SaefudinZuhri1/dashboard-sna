@@ -1,0 +1,94 @@
+{
+  "user_id:1": [
+    {
+      "id": "20260726153431887634",
+      "Waktu": "26-07-2026 15:34:31",
+      "Teks": "parah sih",
+      "Sentimen": "Negatif",
+      "SentimentKey": "negative",
+      "ConfidenceValue": 0.9979983859840341,
+      "Confidence": "99.8%"
+    },
+    {
+      "id": "20260723010501880266",
+      "Waktu": "23-07-2026 01:05:01",
+      "Teks": "bagus banget",
+      "Sentimen": "Positif",
+      "SentimentKey": "positive",
+      "ConfidenceValue": 0.9969387008019783,
+      "Confidence": "99.7%"
+    },
+    {
+      "id": "20260723010200019432",
+      "Waktu": "23-07-2026 01:02:00",
+      "Teks": "jelek",
+      "Sentimen": "Negatif",
+      "SentimentKey": "negative",
+      "ConfidenceValue": 0.9980999443944332,
+      "Confidence": "99.8%"
+    },
+    {
+      "id": "20260719165252622347",
+      "Waktu": "19-07-2026 16:52:52",
+      "Teks": "internet sering putus dan gangguan terus.",
+      "Sentimen": "Negatif",
+      "SentimentKey": "negative",
+      "ConfidenceValue": 0.994328398605661,
+      "Confidence": "99.4%"
+    },
+    {
+      "id": "20260716014830235372",
+      "Waktu": "16-07-2026 01:48:30",
+      "Teks": "RTO mulu",
+      "Sentimen": "Negatif",
+      "SentimentKey": "negative",
+      "ConfidenceValue": 0.9972171966871616,
+      "Confidence": "99.7%"
+    },
+    {
+      "id": "20260716013233655622",
+      "Waktu": "16-07-2026 01:32:33",
+      "Teks": "bagus banget",
+      "Sentimen": "Positif",
+      "SentimentKey": "positive",
+      "ConfidenceValue": 0.9969387017304498,
+      "Confidence": "99.7%"
+    },
+    {
+      "id": "20260715201650863204",
+      "Waktu": "15-07-2026 20:16:50",
+      "Teks": "murah meriah",
+      "Sentimen": "Positif",
+      "SentimentKey": "positive",
+      "ConfidenceValue": 0.9973659014543523,
+      "Confidence": "99.7%"
+    },
+    {
+      "id": "20260713235223662108",
+      "Waktu": "13-07-2026 23:52:23",
+      "Teks": "jelek",
+      "Sentimen": "Negatif",
+      "SentimentKey": "negative",
+      "ConfidenceValue": 0.9980999443944332,
+      "Confidence": "99.8%"
+    },
+    {
+      "id": "20260708033233352533",
+      "Waktu": "08-07-2026 03:32:33",
+      "Teks": "Apa itu indibiz?",
+      "Sentimen": "Netral",
+      "SentimentKey": "neutral",
+      "ConfidenceValue": 0.943307102909384,
+      "Confidence": "94.3%"
+    },
+    {
+      "id": "20260702031715677965",
+      "Waktu": "02-07-2026 03:17:15",
+      "Teks": "Wifi lemot banget!!!",
+      "Sentimen": "Negatif",
+      "SentimentKey": "negative",
+      "ConfidenceValue": 0.9980995406433664,
+      "Confidence": "99.8%"
+    }
+  ]
+}
