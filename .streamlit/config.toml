@@ -13,7 +13,8 @@ font = "sans serif"
 maxUploadSize = 50
 # Mode lokal: false agar `streamlit run app.py` dapat membuka browser.
 # Streamlit Community Cloud dapat menimpa opsi server sesuai lingkungannya.
-headless = false
+headless = true
+showEmailPrompt = false
 enableStaticServing = false
 
 [client]
