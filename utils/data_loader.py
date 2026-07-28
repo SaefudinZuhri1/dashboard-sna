@@ -92,6 +92,7 @@ SENTIMENT_SOURCE_CANDIDATES = {
     "IndiBiz": list(INDIBIZ_SENTIMENT_CANDIDATES),
     "Telkomsel": [
         "telkomsel_sentiment.csv",
+        "telkomsel_sentiment.csv.gz",
         "output_sentiment.csv",
         "telkomsel_output_sentiment.csv",
         "Telkomsel Sentiment.csv",
@@ -102,7 +103,7 @@ SENTIMENT_SOURCE_CANDIDATES = {
     ],
 }
 
-SUPPORTED_SENTIMENT_EXTENSIONS = {".csv", ".xlsx", ".xls", ".zip"}
+SUPPORTED_SENTIMENT_EXTENSIONS = {".csv", ".gz", ".xlsx", ".xls", ".zip"}
 
 # Kandidat sumber SNA aktual per layanan. File spesifik layanan ikut dibaca
 # agar SNA IndiBiz/Telkomsel tidak harus digabung manual ke data/sna_data.csv.
@@ -110,6 +111,7 @@ SNA_SOURCE_CANDIDATES = {
     "IndiHome": [
         "sna_data.csv",
         "SNA Indihome November-Desember 2025 Gabungan.csv",
+        "SNA Indihome November-Desember 2025 Gabungan.csv.gz",
         "SNA IndiHome November-Desember 2025 Gabungan.csv",
         "SNA Indihome.csv",
     ],
@@ -124,11 +126,12 @@ SNA_SOURCE_CANDIDATES = {
         "telkomsel_sna.csv",
         "sna_telkomsel.csv",
         "SNA Telkomsel.csv",
+        "SNA Telkomsel.csv.gz",
         "SNA Telkomsel NovemberDesember.csv",
     ],
 }
 
-SUPPORTED_SNA_EXTENSIONS = {".csv", ".xlsx", ".xls", ".zip"}
+SUPPORTED_SNA_EXTENSIONS = {".csv", ".gz", ".xlsx", ".xls", ".zip"}
 
 REQUIRED_SENTIMENT_COLS = [
     "date", "platform", "username", "followers", "content",
@@ -458,6 +461,15 @@ def _find_source_columns(
         return {}, []
 
 
+def _is_compressed_csv_path(path: str | Path) -> bool:
+    """Kembalikan True untuk file CSV biasa maupun CSV terkompresi gzip."""
+    try:
+        name = Path(path).name.casefold()
+        return name.endswith(".csv") or name.endswith(".csv.gz")
+    except Exception:
+        return False
+
+
 def _read_csv_flexible(path: str, schema: str = "sentiment") -> pd.DataFrame | None:
     """Baca CSV secara defensif dan hanya ambil kolom yang dipakai dashboard."""
     attempts = [
@@ -564,7 +576,7 @@ def _read_sentiment_source_flexible(path: str) -> pd.DataFrame | None:
     source = Path(path)
     suffix = source.suffix.lower()
 
-    if suffix == ".csv":
+    if _is_compressed_csv_path(source):
         return _read_csv_flexible(str(source), schema="sentiment")
 
     if suffix in {".xlsx", ".xls"}:
@@ -604,7 +616,7 @@ def _read_followers_source_flexible(path: str) -> pd.DataFrame | None:
     source = Path(path)
     suffix = source.suffix.lower()
 
-    if suffix == ".csv":
+    if _is_compressed_csv_path(source):
         frame = _read_csv_flexible(str(source), schema="followers")
         if frame is not None and not frame.empty:
             return frame
@@ -1391,7 +1403,7 @@ def _filter_sna_by_service_loader(df: pd.DataFrame, layanan: str | None) -> pd.D
 def _read_sna_source_frame(path: Path) -> pd.DataFrame | None:
     """Baca satu file SNA aktual dengan fallback CSV/Excel/ZIP."""
     suffix = path.suffix.lower()
-    if suffix == ".csv":
+    if _is_compressed_csv_path(path):
         return _read_csv_flexible(str(path), schema="sna")
     if suffix in {".xlsx", ".xls"}:
         return _read_excel_flexible(path, schema="sna")
@@ -2519,7 +2531,7 @@ def _resolve_indibiz_output_path(
 
 
 def _baca_csv_indibiz(file_path: str | Path) -> pd.DataFrame:
-    """Baca CSV IndiBiz secara defensif dan pastikan hasil tidak kosong."""
+    """Baca output IndiBiz dari CSV/CSV.GZ/Excel tanpa mengubah file sumber."""
     path = Path(file_path)
     if not path.is_absolute():
         path = _project_root() / path
@@ -2527,10 +2539,25 @@ def _baca_csv_indibiz(file_path: str | Path) -> pd.DataFrame:
     if not path.is_file():
         raise FileNotFoundError(f"File tidak ditemukan: {path}")
 
+    if path.suffix.casefold() in {".xlsx", ".xls"}:
+        try:
+            dataframe = pd.read_excel(path)
+            if dataframe.empty:
+                raise ValueError(f"File Excel kosong: {path.name}")
+            return dataframe
+        except Exception as error:
+            raise ValueError(f"Excel {path.name} tidak dapat dibaca: {error}") from error
+
     errors: list[str] = []
     for encoding in ("utf-8-sig", "utf-8", "latin-1"):
         try:
-            dataframe = pd.read_csv(path, encoding=encoding, sep=None, engine="python")
+            dataframe = pd.read_csv(
+                path,
+                encoding=encoding,
+                sep=None,
+                engine="python",
+                compression="infer",
+            )
             if dataframe.empty:
                 raise ValueError(f"File CSV kosong: {path.name}")
             return dataframe
@@ -2596,7 +2623,10 @@ def load_indibiz_sentiment(
         resolved = _resolve_indibiz_output_path(
             file_path,
             INDIBIZ_OUTPUT_SENTIMENT_PATH,
-            legacy_relative_paths=("data/indibiz_sentiment.csv",),
+            legacy_relative_paths=(
+                "data/indibiz_sentiment.csv",
+                "data/indibiz_sentiment.xlsx",
+            ),
         )
         dataframe = _baca_csv_indibiz(resolved)
         return _indibiz_dashboard_columns(dataframe)
