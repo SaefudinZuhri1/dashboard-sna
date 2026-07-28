@@ -30,13 +30,21 @@ venv*/
 .venv*/
 venv_lama_error_torch/
 
-# Model besar lokal dan file model biner
-models/
+# Model files — terlalu besar untuk GitHub
+models/indihome/*.bin
+models/indihome/*.safetensors
+models/indibiz/*.bin
+models/indibiz/*.safetensors
+models/telkomsel/*.bin
+models/telkomsel/*.safetensors
 *.pkl
 *.bin
 *.safetensors
 *.pt
 *.pth
+
+# Cache HuggingFace lokal
+.cache/
 
 # Folder data TIDAK diabaikan agar file dataset dapat di-push ke branch cloud.
 # Jangan memasukkan data sensitif atau file di atas batas GitHub.

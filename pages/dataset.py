@@ -1,4 +1,5 @@
 # pages/dataset.py
+# TAHAP 5 FASE 12 - MODEL INDOBERT HUGGINGFACE HUB TANPA BOBOT LOKAL.
 """Halaman eksplorasi dataset penelitian media sosial Telkom Group."""
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from utils.loading_screen import (
     selesaikan_layar_loading,
     selesaikan_loading_aksi,
 )
+from utils.model_loader import load_indobert, predict_sentiment_batch
 
 LOGGER = logging.getLogger(__name__)
 
@@ -3908,116 +3910,63 @@ def _deteksi_kolom_sentimen_upload(data: pd.DataFrame) -> str | None:
         return None
 
 
-def _folder_model_upload_lengkap(folder: Path) -> bool:
-    """Validasi file minimum model Transformers lokal untuk analisis upload."""
-    try:
-        if not folder.is_dir():
-            return False
-        nama_file = {item.name for item in folder.iterdir() if item.is_file()}
-        ada_konfigurasi = "config.json" in nama_file
-        ada_bobot = any(
-            nama in nama_file
-            for nama in ("pytorch_model.bin", "model.safetensors")
-        ) or any(
-            nama.startswith("model-") and nama.endswith(".safetensors")
-            for nama in nama_file
-        )
-        ada_tokenizer = any(
-            nama in nama_file
-            for nama in (
-                "tokenizer.json",
-                "tokenizer_config.json",
-                "vocab.txt",
-                "sentencepiece.bpe.model",
-            )
-        )
-        return bool(ada_konfigurasi and ada_bobot and ada_tokenizer)
-    except Exception:
-        return False
-
-
 @st.cache_resource(show_spinner=False)
 def _muat_model_sentimen_upload() -> dict[str, Any]:
-    """Muat IndoBERT sekali untuk klasifikasi sentimen dataset upload."""
+    """Muat runtime IndoBERT terpusat untuk klasifikasi dataset upload."""
     try:
-        import torch
-        from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-        repo_id = "mdhugol/indonesia-bert-sentiment-classification"
-        folder_lokal = _root_proyek() / "models" / "indihome"
-
-        if _folder_model_upload_lengkap(folder_lokal):
-            tokenizer = AutoTokenizer.from_pretrained(
-                str(folder_lokal),
-                local_files_only=True,
-                use_fast=True,
+        tokenizer, model, perangkat = load_indobert()
+        if tokenizer is None or model is None or perangkat is None:
+            raise RuntimeError(
+                "Model IndoBERT tidak tersedia dari HuggingFace Hub."
             )
-            model = AutoModelForSequenceClassification.from_pretrained(
-                str(folder_lokal),
-                local_files_only=True,
-            )
-        else:
-            tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
-            model = AutoModelForSequenceClassification.from_pretrained(repo_id)
-
-        perangkat = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model.to(perangkat)
-        model.eval()
         return {
             "tokenizer": tokenizer,
             "model": model,
-            "torch": torch,
             "device": perangkat,
         }
     except Exception as exc:
         raise RuntimeError(
-            "Model IndoBERT tidak dapat dimuat. Pastikan transformers dan torch "
-            "sudah terpasang serta internet aktif saat model pertama kali diunduh. "
+            "Model IndoBERT tidak dapat dimuat. Pastikan internet aktif saat "
+            "pemuatan pertama serta transformers dan torch sudah terpasang. "
             f"Detail: {exc}"
         ) from exc
 
 
-def _prediksi_sentimen_batch_upload(teks: list[str], ukuran_batch: int = 32) -> list[str]:
-    """Prediksi banyak teks menggunakan IndoBERT dengan batch yang aman untuk CPU."""
+def _prediksi_sentimen_batch_upload(
+    teks: list[str],
+    ukuran_batch: int = 32,
+) -> list[str]:
+    """Prediksi banyak teks upload melalui loader IndoBERT terpusat."""
     try:
-        runtime = _muat_model_sentimen_upload()
-        tokenizer = runtime["tokenizer"]
-        model = runtime["model"]
-        torch = runtime["torch"]
-        perangkat = runtime["device"]
-        id2label = getattr(model.config, "id2label", {}) or {}
+        daftar_teks = [str(item or "").strip() for item in teks]
+        if not daftar_teks:
+            return []
+
+        _muat_model_sentimen_upload()
+        hasil_model = predict_sentiment_batch(
+            daftar_teks,
+            batch_size=max(1, int(ukuran_batch)),
+        )
+        if len(hasil_model) != len(daftar_teks):
+            raise RuntimeError(
+                "Jumlah hasil prediksi tidak sesuai dengan jumlah teks upload."
+            )
 
         hasil: list[str] = []
-        daftar_teks = [str(item or "").strip() for item in teks]
-        for awal in range(0, len(daftar_teks), max(1, int(ukuran_batch))):
-            batch = daftar_teks[awal : awal + max(1, int(ukuran_batch))]
-            batch_aman = [item if item else "teks kosong" for item in batch]
-            encoded = tokenizer(
-                batch_aman,
-                return_tensors="pt",
-                truncation=True,
-                max_length=128,
-                padding=True,
-            )
-            encoded = {kunci: nilai.to(perangkat) for kunci, nilai in encoded.items()}
-            with torch.inference_mode():
-                logits = model(**encoded).logits
-                indeks = logits.argmax(dim=-1).detach().cpu().tolist()
+        for teks_asli, prediksi in zip(daftar_teks, hasil_model):
+            if not teks_asli:
+                hasil.append("neutral")
+                continue
 
-            for posisi, nomor_label in enumerate(indeks):
-                if not batch[posisi]:
-                    hasil.append("neutral")
-                    continue
-                label_mentah = id2label.get(
-                    nomor_label,
-                    id2label.get(str(nomor_label), f"LABEL_{nomor_label}"),
+            label = str(prediksi.get("sentiment", "unknown")).strip().lower()
+            if label not in {"positive", "neutral", "negative"}:
+                raise RuntimeError(
+                    "Model tidak mengembalikan label sentimen yang valid."
                 )
-                label_ui = _normalisasi_label_sentimen(label_mentah)
-                hasil.append(_LABEL_SENTIMEN_INGGRIS.get(label_ui, "neutral"))
+            hasil.append(label)
         return hasil
     except Exception as exc:
         raise RuntimeError(f"Klasifikasi sentimen upload gagal: {exc}") from exc
-
 
 def _siapkan_hasil_analisis_upload(
     data: pd.DataFrame,

@@ -1,4 +1,5 @@
 # pages/sentiment.py
+# TAHAP 5 FASE 12 - MODEL INDOBERT HUGGINGFACE HUB TANPA BOBOT LOKAL.
 # TAHAP 5 FASE 7 - OPTIMASI PERFORMA: cache PNG WordCloud dan indikator proses pemuatan data.
 # PATCH FASE 7 v4.0: pulihkan visualisasi utama IndiBiz beserta filter dan chart Fase 17
 # PATCH FASE 7 v3.9: tambahkan gap nyata antara tabel riwayat dan batas bawah wrapper
@@ -70,7 +71,6 @@ from utils.data_loader import (
     load_indibiz_sentiment,
     load_indihome_sentiment,
     load_telkomsel_sentiment,
-    resolve_model_folder_for_service,
 )
 from utils.dummy_data import (
     get_demo_prediction,
@@ -78,6 +78,7 @@ from utils.dummy_data import (
     get_dummy_sentiment_data,
 )
 from utils.loading_screen import mulai_loading_aksi, selesaikan_loading_aksi
+from utils.model_loader import load_indobert, predict_sentiment_batch
 from utils.preprocessor import clean_text
 
 # -----------------------------------------------------------------------------
@@ -5447,144 +5448,19 @@ def _render_telkomsel_wordclouds(df: pd.DataFrame) -> None:
 # -----------------------------------------------------------------------------
 # Model IndoBERT dan prediksi manual
 # -----------------------------------------------------------------------------
-def _local_model_is_complete(model_dir: Path) -> bool:
-    """Periksa apakah folder model lokal berisi file minimum yang diperlukan."""
-    try:
-        if not model_dir.is_dir():
-            return False
-        ignored = {".gitkeep", ".DS_Store"}
-        filenames = {item.name for item in model_dir.iterdir() if item.is_file() and item.name not in ignored}
-        has_config = "config.json" in filenames
-        has_weights = any(
-            filename in filenames
-            for filename in (
-                "pytorch_model.bin",
-                "model.safetensors",
-                "tf_model.h5",
-            )
-        ) or any(name.startswith("model-") and name.endswith(".safetensors") for name in filenames)
-        has_tokenizer = any(
-            filename in filenames
-            for filename in (
-                "tokenizer.json",
-                "tokenizer_config.json",
-                "vocab.txt",
-                "sentencepiece.bpe.model",
-            )
-        )
-        return bool(has_config and has_weights and has_tokenizer)
-    except Exception:
-        return False
-
-
-def _service_model_dir(layanan: str) -> tuple[Path, str]:
-    """Tentukan folder model lokal yang siap dipakai untuk layanan terpilih.
-
-    IndiBiz terlebih dahulu memakai foldernya sendiri. Jika folder tersebut belum
-    lengkap, gunakan model Telkomsel atau IndiHome yang sudah tersedia. Ketiga
-    layanan memakai repository IndoBERT yang sama, sehingga fallback ini tidak
-    mengubah model klasifikasi atau pemetaan label sentimen.
-    """
-    layanan_label = str(layanan or "IndiHome").strip() or "IndiHome"
-    model_dir, state = resolve_model_folder_for_service(layanan_label)
-    model_dir = Path(model_dir)
-
-    if _local_model_is_complete(model_dir):
-        return model_dir, "ready"
-
-    if layanan_label == "IndiBiz":
-        models_root = _project_root() / "models"
-        for nama_folder, status_fallback in (
-            ("telkomsel", "fallback_telkomsel"),
-            ("indihome", "fallback_indihome"),
-        ):
-            kandidat = models_root / nama_folder
-            if _local_model_is_complete(kandidat):
-                return kandidat, status_fallback
-
-    return model_dir, str(state)
-
-
 @st.cache_resource(show_spinner=False)
 def load_service_model(layanan: str) -> tuple[Any | None, str]:
-    """
-    Muat IndoBERT untuk layanan terpilih.
-
-    Model prediksi manual tersedia untuk IndiHome, IndiBiz, dan Telkomsel.
-    Setiap layanan memakai folder model lokalnya sendiri.
-    """
+    """Muat runtime IndoBERT terpusat dari HuggingFace Hub."""
     try:
         layanan_label = str(layanan or "IndiHome").strip() or "IndiHome"
         if layanan_label not in _READY_SERVICES:
             return None, f"Model {layanan_label} segera hadir"
 
+        tokenizer, model, device = load_indobert()
+        if tokenizer is None or model is None or device is None:
+            return None, "Model gagal dimuat dari HuggingFace Hub"
+
         import torch
-        from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-        model_dir, state = _service_model_dir(layanan_label)
-        model_dir.mkdir(parents=True, exist_ok=True)
-
-        # Hapus alias lama kalau sebelumnya pernah dipasang patch shared model.
-        alias_file = model_dir / "model_alias.json"
-        if alias_file.exists():
-            try:
-                alias_file.unlink()
-            except Exception:
-                pass
-
-        source_file = model_dir / "model_source.json"
-        repo_id = _MODEL_HF_NAME
-        if source_file.is_file():
-            try:
-                source_payload = json.loads(source_file.read_text(encoding="utf-8"))
-                repo_id = str(source_payload.get("repo_id") or source_payload.get("model_id") or _MODEL_HF_NAME).strip()
-            except Exception:
-                repo_id = _MODEL_HF_NAME
-
-        if not _local_model_is_complete(model_dir):
-            # Download dari Hugging Face ke cache, lalu simpan ulang sebagai
-            # pytorch_model.bin di folder layanan masing-masing.
-            tokenizer = AutoTokenizer.from_pretrained(repo_id, use_fast=True)
-            model = AutoModelForSequenceClassification.from_pretrained(repo_id)
-            model.save_pretrained(str(model_dir), safe_serialization=False)
-            tokenizer.save_pretrained(str(model_dir))
-
-            gitkeep = model_dir / ".gitkeep"
-            if gitkeep.exists():
-                gitkeep.unlink()
-            source_file.write_text(
-                json.dumps(
-                    {
-                        "repo_id": repo_id,
-                        "save_mode": "pytorch_per_service",
-                        "catatan": "Model disimpan fisik di folder layanan ini, bukan alias/shared.",
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-            source_label = f"Model IndoBERT lokal — {layanan_label} · diunduh dari Hugging Face"
-        else:
-            tokenizer = AutoTokenizer.from_pretrained(
-                str(model_dir),
-                local_files_only=True,
-                use_fast=True,
-            )
-            model = AutoModelForSequenceClassification.from_pretrained(
-                str(model_dir),
-                local_files_only=True,
-            )
-            if state == "fallback_telkomsel":
-                source_label = "Model IndoBERT lokal — IndiBiz · memakai runtime Telkomsel"
-            elif state == "fallback_indihome":
-                source_label = "Model IndoBERT lokal — IndiBiz · memakai runtime IndiHome"
-            else:
-                source_label = f"Model IndoBERT lokal — {layanan_label} · folder sendiri"
-
-        model.eval()
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model.to(device)
 
         runtime = {
             "tokenizer": tokenizer,
@@ -5593,16 +5469,17 @@ def load_service_model(layanan: str) -> tuple[Any | None, str]:
             "device": device,
             "layanan": layanan_label,
         }
+        source_label = (
+            f"Model IndoBERT HuggingFace Hub — {layanan_label} · cache runtime"
+        )
         return runtime, source_label
     except Exception as exc:
         st.error(
-            "Model IndoBERT belum dapat dimuat. Untuk mode model masing-masing, "
-            "jalankan dulu: python models/download_indobert_each_service.py. "
-            "Pastikan internet aktif saat download pertama dan ruang disk mencukupi. "
+            "Model IndoBERT belum dapat dimuat dari HuggingFace Hub. "
+            "Pastikan internet aktif saat pemuatan pertama. "
             f"Detail: {exc}"
         )
         return None, "Model gagal dimuat"
-
 
 def load_indihome_model() -> tuple[Any | None, str]:
     """Kompatibilitas lama: muat model untuk IndiHome."""

@@ -1,4 +1,5 @@
 # utils/data_loader.py
+# TAHAP 5 FASE 12 - STATUS MODEL BERBASIS HUGGINGFACE HUB.
 # TAHAP 5 FASE 7 - OPTIMASI PERFORMA: cache boundary loader publik tanpa mengubah parser atau fallback.
 """Pemuat, normalisasi, dan filter data CSV sentimen serta SNA."""
 
@@ -2346,57 +2347,34 @@ def _model_folder_has_download_source(folder: Path) -> bool:
 
 
 def resolve_model_folder_for_service(layanan: str) -> tuple[Path, str]:
+    """Kembalikan path kompatibilitas dan status model berbasis HuggingFace Hub.
+
+    Path dipertahankan agar pemanggil lama tidak mengalami error. Runtime model
+    tidak membaca atau menulis bobot ke path tersebut.
     """
-    Tentukan folder model yang dipakai sebuah layanan.
-
-    Versi ini sengaja TIDAK memakai model shared/alias. Setiap layanan diarahkan
-    ke foldernya sendiri agar file weight benar-benar tersimpan masing-masing:
-    - models/indihome/
-    - models/indibiz/
-    - models/telkomsel/
-
-    Status:
-    - ready: folder layanan sudah berisi config + tokenizer + weight.
-    - downloadable: folder layanan belum lengkap, tetapi punya model_source.json.
-    - coming_soon: belum ada model lengkap dan belum ada sumber download.
-    """
-    service = str(layanan or "").strip().lower()
-    service = {
-        "indihome": "indihome",
-        "indibiz": "indibiz",
-        "telkomsel": "telkomsel",
-    }.get(service, service)
-
-    models_root = _project_root() / "models"
-    own_folder = models_root / service
-
-    if _model_folder_is_complete(own_folder):
-        return own_folder, "ready"
-    if _model_folder_has_download_source(own_folder):
-        return own_folder, "downloadable"
-    return own_folder, "coming_soon"
+    try:
+        service = str(layanan or "").strip().lower()
+        normalized = {
+            "indihome": "indihome",
+            "indibiz": "indibiz",
+            "telkomsel": "telkomsel",
+        }.get(service, service)
+        model_path = _project_root() / "models" / normalized
+        state = "ready" if normalized in MODEL_SERVICES else "coming_soon"
+        return model_path, state
+    except Exception as exc:
+        st.error(f"Gagal menentukan status model {layanan}: {exc}")
+        return _project_root() / "models" / "unknown", "coming_soon"
 
 
 @st.cache_data(show_spinner=False, ttl=60, max_entries=4)
 def load_model_status() -> dict:
-    """
-    Cek status model per layanan.
-
-    Status:
-    - ready: model layanan sudah tersedia secara fisik di foldernya sendiri.
-    - downloadable: model bisa diunduh ke folder layanan masing-masing dari Hugging Face.
-    - coming_soon: belum ada model dan belum ada sumber download.
-    """
+    """Kembalikan status model runtime yang tersedia melalui HuggingFace Hub."""
     try:
-        status = {}
-        for service in MODEL_SERVICES:
-            _, state = resolve_model_folder_for_service(service)
-            status[service] = state
-        return status
-    except Exception as e:
-        st.error(f"Gagal memeriksa status model: {e}")
+        return {service: "ready" for service in MODEL_SERVICES}
+    except Exception as exc:
+        st.error(f"Gagal memeriksa status model: {exc}")
         return {service: "coming_soon" for service in MODEL_SERVICES}
-
 
 def get_data_source_label(layanan: str) -> str:
     """Kembalikan label sumber data real atau dummy untuk layanan tertentu."""
