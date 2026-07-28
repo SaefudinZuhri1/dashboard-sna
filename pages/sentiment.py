@@ -5257,9 +5257,14 @@ def _wordcloud_viewer_html(png_bytes: bytes, title: str, unique_id: str) -> str:
     """
 
 
-def _render_telkomsel_wordclouds(df: pd.DataFrame) -> None:
-    """Render WordCloud Telkomsel dengan tampilan lebih kaya dan interaktif."""
+def _render_service_wordclouds(df: pd.DataFrame, layanan: str) -> None:
+    """Render WordCloud per sentimen secara konsisten untuk seluruh layanan."""
     try:
+        layanan_label = str(layanan or "Layanan").strip() or "Layanan"
+        layanan_slug = "".join(
+            character.lower() if character.isalnum() else "_"
+            for character in layanan_label
+        ).strip("_") or "layanan"
         label_map = {
             "positive": ("Positif", "Nuansa hijau", "sent-v7-wordcloud-card--positive", "sent-v7-wordcloud-badge--positive", "sent-v7-wordcloud-chip--positive"),
             "neutral": ("Netral", "Nuansa biru", "sent-v7-wordcloud-card--neutral", "sent-v7-wordcloud-badge--neutral", "sent-v7-wordcloud-chip--neutral"),
@@ -5280,7 +5285,7 @@ def _render_telkomsel_wordclouds(df: pd.DataFrame) -> None:
                 </div>
                 <h3 class="sent-v7-wordcloud-hero-title">Jelajahi kata yang paling sering muncul pada tiap sentimen</h3>
                 <p class="sent-v7-wordcloud-hero-copy">
-                    WordCloud membantu membaca pola kata yang dominan dari komentar Telkomsel. Gunakan mode fokus
+                    WordCloud membantu membaca pola kata yang dominan dari komentar {escape(layanan_label)}. Gunakan mode fokus
                     untuk menyorot satu sentimen secara lebih jelas, atau biarkan tampilan semua kartu untuk membandingkan ketiganya sekaligus.
                 </p>
                 <div class="sent-v7-wordcloud-chip-row">
@@ -5294,9 +5299,9 @@ def _render_telkomsel_wordclouds(df: pd.DataFrame) -> None:
         )
 
         st.markdown(
-            """
+            f"""
             <div class="sent-v7-wordcloud-intro">
-                Ukuran kata menunjukkan frekuensi kemunculan pada komentar Telkomsel.
+                Ukuran kata menunjukkan frekuensi kemunculan pada komentar {escape(layanan_label)}.
                 WordCloud bersifat eksploratif dan tetap perlu dibaca bersama contoh
                 komentar serta konteks penelitian.
             </div>
@@ -5357,7 +5362,7 @@ def _render_telkomsel_wordclouds(df: pd.DataFrame) -> None:
                     _wordcloud_viewer_html(
                         png_bytes,
                         title,
-                        f"sent-v7-wc-{sentiment}",
+                        f"sent-v7-wc-{layanan_slug}-{sentiment}",
                     ),
                     unsafe_allow_html=True,
                 )
@@ -5365,9 +5370,9 @@ def _render_telkomsel_wordclouds(df: pd.DataFrame) -> None:
                 st.download_button(
                     label=f"⬇ Download PNG {title}",
                     data=png_bytes,
-                    file_name=f"telkomsel_wordcloud_{title.lower()}.png",
+                    file_name=f"{layanan_slug}_wordcloud_{title.lower()}.png",
                     mime="image/png",
-                    key=f"sent_v7_wordcloud_download_{sentiment}",
+                    key=f"sent_v7_wordcloud_download_{layanan_slug}_{sentiment}",
                     on_click=_queue_wordcloud_download_loading,
                     args=(title,),
                     use_container_width=True,
@@ -5425,7 +5430,7 @@ def _render_telkomsel_wordclouds(df: pd.DataFrame) -> None:
                 _wordcloud_viewer_html(
                     png_bytes,
                     f"Fokus {title}",
-                    f"sent-v7-wc-focus-{selected_sentiment}",
+                    f"sent-v7-wc-focus-{layanan_slug}-{selected_sentiment}",
                 ),
                 unsafe_allow_html=True,
             )
@@ -5433,16 +5438,16 @@ def _render_telkomsel_wordclouds(df: pd.DataFrame) -> None:
             st.download_button(
                 label=f"⬇ Download PNG {title}",
                 data=png_bytes,
-                file_name=f"telkomsel_wordcloud_fokus_{title.lower()}.png",
+                file_name=f"{layanan_slug}_wordcloud_fokus_{title.lower()}.png",
                 mime="image/png",
-                key=f"sent_v7_wordcloud_download_focus_{selected_sentiment}",
+                key=f"sent_v7_wordcloud_download_focus_{layanan_slug}_{selected_sentiment}",
                 on_click=_queue_wordcloud_download_loading,
                 args=(title,),
                 use_container_width=True,
             )
             st.markdown('<div class="sent-v7-wordcloud-focus-download-bottom-gap"></div>', unsafe_allow_html=True)
     except Exception as exc:
-        st.error(f"WordCloud Telkomsel gagal ditampilkan: {exc}")
+        st.error(f"WordCloud {layanan_label} gagal ditampilkan: {exc}")
 
 
 # -----------------------------------------------------------------------------
@@ -6157,13 +6162,6 @@ def render_sentiment() -> None:
                 "Maksimal lima komentar per sentimen pada Twitter/X, Instagram, dan TikTok.",
             )
             _render_telkomsel_top_comments_table(df)
-
-            _section_heading(
-                "07",
-                "WordCloud per Sentimen",
-                "Positif hijau, netral biru, dan negatif merah menggunakan Matplotlib WordCloud.",
-            )
-            _render_telkomsel_wordclouds(df)
         else:
             _section_heading(
                 "06",
@@ -6172,7 +6170,14 @@ def render_sentiment() -> None:
             )
             _render_comment_examples(df)
 
-        prediction_section_number = "08" if layanan == "Telkomsel" else "07"
+        _section_heading(
+            "07",
+            "WordCloud per Sentimen",
+            "Positif hijau, netral biru, dan negatif merah menggunakan Matplotlib WordCloud.",
+        )
+        _render_service_wordclouds(data_analisis, layanan)
+
+        prediction_section_number = "08"
         _section_heading(
             prediction_section_number,
             "Prediksi Sentimen Manual",
