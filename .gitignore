@@ -38,16 +38,8 @@ models/
 *.pt
 *.pth
 
-# Dataset penelitian: abaikan seluruh CSV kecuali enam file cloud kanonik
-data/*.csv
-data/**/*.csv
-!data/.gitkeep
-!data/indihome_sentiment.csv
-!data/indibiz_output_sentiment.csv
-!data/telkomsel_sentiment.csv
-!data/SNA Indihome November-Desember 2025 Gabungan.csv
-!data/indibiz_output_sna.csv
-!data/SNA Telkomsel.csv
+# Folder data TIDAK diabaikan agar file dataset dapat di-push ke branch cloud.
+# Jangan memasukkan data sensitif atau file di atas batas GitHub.
 
 # Database lokal pengguna
 database/users.db

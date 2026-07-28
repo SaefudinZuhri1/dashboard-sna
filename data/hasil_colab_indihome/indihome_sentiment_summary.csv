@@ -1,0 +1,10 @@
+﻿platform,predicted_sentiment,jumlah_komentar,persentase_dalam_platform
+instagram,negative,8600,47.68
+instagram,neutral,7729,42.85
+instagram,positive,1707,9.46
+tiktok,negative,1311,69.96
+tiktok,neutral,297,15.85
+tiktok,positive,266,14.19
+twitter,negative,16708,41.96
+twitter,neutral,21037,52.83
+twitter,positive,2075,5.21
