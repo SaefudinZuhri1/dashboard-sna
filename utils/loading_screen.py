@@ -177,7 +177,7 @@ def _buat_html_loading(judul: str, pesan: Iterable[str]) -> str:
     pesan_html = "".join(
         (
             '<span class="telkom-loading-message-item" '
-            f'style="--message-index:{index};">{escape(teks)}</span>'
+            f'style="animation-delay:{index * 1.1:.2f}s;">{escape(teks)}</span>'
         )
         for index, teks in enumerate(daftar_pesan)
     )
@@ -383,7 +383,7 @@ def _buat_html_loading(judul: str, pesan: Iterable[str]) -> str:
 
             .telkom-loading-message-item {{
                 animation: telkom-message-cycle {durasi_total:.2f}s linear infinite;
-                animation-delay: calc(var(--message-index) * 1.1s);
+                animation-delay: 0s;
                 color: #AAAAAA;
                 font-family: 'Inter', sans-serif;
                 font-size: .94rem;
