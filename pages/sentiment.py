@@ -1,4 +1,5 @@
 # pages/sentiment.py
+# PATCH TAHAP 5 FASE 12 v1.3: sejajarkan tinggi card, gambar, dan tombol WordCloud tiga sentimen
 # TAHAP 5 FASE 12 - MODEL INDOBERT HUGGINGFACE HUB TANPA BOBOT LOKAL.
 # TAHAP 5 FASE 7 - OPTIMASI PERFORMA: cache PNG WordCloud dan indikator proses pemuatan data.
 # PATCH FASE 7 v4.0: pulihkan visualisasi utama IndiBiz beserta filter dan chart Fase 17
@@ -2793,8 +2794,14 @@ def _inject_sentiment_css() -> None:
                     background: linear-gradient(180deg, rgba(24,24,24,0.98), rgba(17,17,17,0.98));
                     border: 1px solid #2A2A2A;
                     border-radius: 16px;
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    height: 10.35rem;
                     margin-bottom: 0.58rem;
+                    min-height: 10.35rem;
                     padding: 0.95rem 1rem 0.45rem;
+                    width: 100%;
                     transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
                 }
 
@@ -2848,13 +2855,19 @@ def _inject_sentiment_css() -> None:
                 .sent-v7-wordcloud-subtitle {
                     color: #8F8F8F;
                     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
+                    line-height: 1.5;
                     margin: 0.32rem 0 0;
+                    min-height: 3em;
                 }
 
                 .sent-v7-wordcloud-note {
+                    align-items: flex-end;
                     color: #9E9E9E;
+                    display: flex;
                     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
-                    margin-top: 0.45rem;
+                    line-height: 1.5;
+                    margin: auto 0 0;
+                    min-height: 3em;
                 }
 
                 .sent-v7-wordcloud-focus-wrap {
@@ -2972,6 +2985,11 @@ def _inject_sentiment_css() -> None:
 
                     .sent-v7-section-heading {
                         align-items: flex-start;
+                    }
+
+                    .sent-v7-wordcloud-card {
+                        height: auto;
+                        min-height: 10.35rem;
                     }
                 }
 
@@ -3097,11 +3115,15 @@ def _inject_sentiment_css() -> None:
 
                 /* Fase 7 v3.2 — viewer fullscreen WordCloud custom */
                 .sent-v7-wc-viewer {
+                    align-items: center;
+                    aspect-ratio: 2 / 1;
+                    background: #0E0E0E;
+                    border-radius: 14px;
+                    display: flex;
+                    justify-content: center;
+                    overflow: hidden;
                     position: relative;
                     width: 100%;
-                    border-radius: 14px;
-                    overflow: hidden;
-                    background: #0E0E0E;
                 }
 
                 .sent-v7-wc-viewer-toggle {
@@ -3112,10 +3134,10 @@ def _inject_sentiment_css() -> None:
 
                 .sent-v7-wc-inline-image {
                     display: block;
-                    width: 100%;
-                    height: auto;
-                    object-fit: contain;
+                    height: 100%;
                     margin: 0 auto;
+                    object-fit: contain;
+                    width: 100%;
                 }
 
                 .sent-v7-wc-fullscreen-trigger {
