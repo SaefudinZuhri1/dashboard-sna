@@ -1,5 +1,5 @@
 # pages/sentiment.py
-# PATCH TAHAP 5 FASE 12 v1.3: sejajarkan tinggi card, gambar, dan tombol WordCloud tiga sentimen
+# TAHAP 5 FASE 12 - WORDCLOUD DATA AKTUAL TANPA SAMPLING DAN TANPA DUMMY.
 # TAHAP 5 FASE 12 - MODEL INDOBERT HUGGINGFACE HUB TANPA BOBOT LOKAL.
 # TAHAP 5 FASE 7 - OPTIMASI PERFORMA: cache PNG WordCloud dan indikator proses pemuatan data.
 # PATCH FASE 7 v4.0: pulihkan visualisasi utama IndiBiz beserta filter dan chart Fase 17
@@ -80,7 +80,7 @@ from utils.dummy_data import (
 )
 from utils.loading_screen import mulai_loading_aksi, selesaikan_loading_aksi
 from utils.model_loader import load_indobert, predict_sentiment_batch
-from utils.preprocessor import clean_text
+from utils.preprocessor import STOPWORDS_ID, clean_text
 
 # -----------------------------------------------------------------------------
 # Konstanta halaman
@@ -117,6 +117,34 @@ _INDIBIZ_PLATFORM_OPTIONS = {
 }
 
 _SENTIMENT_ORDER = ["positive", "neutral", "negative"]
+
+# Istilah domain dipertahankan karena merupakan bagian penting dari konteks
+# layanan dan tidak boleh ikut terhapus sebagai stopword WordCloud.
+_WORDCLOUD_DOMAIN_TERMS = frozenset(
+    {
+        "admin",
+        "gangguan",
+        "harga",
+        "indibiz",
+        "indibizid",
+        "indihome",
+        "indihomecare",
+        "internet",
+        "jaringan",
+        "kuota",
+        "layanan",
+        "mytelkomsel",
+        "provider",
+        "sinyal",
+        "starlink",
+        "telkom",
+        "telkomsel",
+        "wifi",
+    }
+)
+_WORDCLOUD_STOPWORDS = frozenset(
+    set(STOPWORDS_ID).difference(_WORDCLOUD_DOMAIN_TERMS)
+)
 _SENTIMENT_ICONS = {
     "positive": "↗",
     "neutral": "●",
@@ -2794,14 +2822,8 @@ def _inject_sentiment_css() -> None:
                     background: linear-gradient(180deg, rgba(24,24,24,0.98), rgba(17,17,17,0.98));
                     border: 1px solid #2A2A2A;
                     border-radius: 16px;
-                    box-sizing: border-box;
-                    display: flex;
-                    flex-direction: column;
-                    height: 10.35rem;
                     margin-bottom: 0.58rem;
-                    min-height: 10.35rem;
                     padding: 0.95rem 1rem 0.45rem;
-                    width: 100%;
                     transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
                 }
 
@@ -2855,19 +2877,13 @@ def _inject_sentiment_css() -> None:
                 .sent-v7-wordcloud-subtitle {
                     color: #8F8F8F;
                     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
-                    line-height: 1.5;
                     margin: 0.32rem 0 0;
-                    min-height: 3em;
                 }
 
                 .sent-v7-wordcloud-note {
-                    align-items: flex-end;
                     color: #9E9E9E;
-                    display: flex;
                     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
-                    line-height: 1.5;
-                    margin: auto 0 0;
-                    min-height: 3em;
+                    margin-top: 0.45rem;
                 }
 
                 .sent-v7-wordcloud-focus-wrap {
@@ -2985,11 +3001,6 @@ def _inject_sentiment_css() -> None:
 
                     .sent-v7-section-heading {
                         align-items: flex-start;
-                    }
-
-                    .sent-v7-wordcloud-card {
-                        height: auto;
-                        min-height: 10.35rem;
                     }
                 }
 
@@ -3115,15 +3126,11 @@ def _inject_sentiment_css() -> None:
 
                 /* Fase 7 v3.2 — viewer fullscreen WordCloud custom */
                 .sent-v7-wc-viewer {
-                    align-items: center;
-                    aspect-ratio: 2 / 1;
-                    background: #0E0E0E;
-                    border-radius: 14px;
-                    display: flex;
-                    justify-content: center;
-                    overflow: hidden;
                     position: relative;
                     width: 100%;
+                    border-radius: 14px;
+                    overflow: hidden;
+                    background: #0E0E0E;
                 }
 
                 .sent-v7-wc-viewer-toggle {
@@ -3134,10 +3141,10 @@ def _inject_sentiment_css() -> None:
 
                 .sent-v7-wc-inline-image {
                     display: block;
-                    height: 100%;
-                    margin: 0 auto;
-                    object-fit: contain;
                     width: 100%;
+                    height: auto;
+                    object-fit: contain;
+                    margin: 0 auto;
                 }
 
                 .sent-v7-wc-fullscreen-trigger {
@@ -5154,21 +5161,64 @@ def _render_telkomsel_top_comments_table(df: pd.DataFrame) -> None:
         st.error(f"Tabel komentar Telkomsel gagal ditampilkan: {exc}")
 
 
-def _wordcloud_text(df: pd.DataFrame, sentiment: str) -> str:
-    """Gabungkan teks bersih untuk satu kelas sentimen secara aman."""
+@st.cache_data(show_spinner=False, max_entries=18)
+def _prepare_wordcloud_corpus(raw_text: str) -> str:
+    """Bersihkan seluruh teks aktual dan buang stopword non-domain."""
     try:
-        subset = df[df["predicted_sentiment"] == sentiment].copy()
+        if not str(raw_text or "").strip():
+            return ""
+
+        cleaned_text = clean_text(str(raw_text))
+        tokens = [
+            token
+            for token in cleaned_text.split()
+            if len(token) > 2 and token not in _WORDCLOUD_STOPWORDS
+        ]
+        return " ".join(tokens).strip()
+    except Exception:
+        return ""
+
+
+def _wordcloud_text(df: pd.DataFrame, sentiment: str) -> str:
+    """Gabungkan seluruh komentar aktual untuk satu kelas sentimen."""
+    try:
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            return ""
+        if sentiment not in _SENTIMENT_ORDER:
+            return ""
+        if "predicted_sentiment" not in df.columns:
+            return ""
+
+        sentiment_values = (
+            df["predicted_sentiment"]
+            .astype("string")
+            .fillna("")
+            .str.lower()
+            .str.strip()
+        )
+        subset = df.loc[sentiment_values.eq(sentiment)].copy()
         if subset.empty:
             return ""
-        text_column = "content_clean" if "content_clean" in subset.columns else "content"
+
+        # Gunakan komentar asli sebagai sumber utama. content_clean hanya
+        # menjadi fallback apabila kolom content tidak tersedia.
+        text_column = "content" if "content" in subset.columns else "content_clean"
+        if text_column not in subset.columns:
+            return ""
+
         values = (
             subset[text_column]
             .astype("string")
             .fillna("")
             .str.strip()
         )
-        values = values[values.ne("")].head(10000)
-        return " ".join(values.tolist()).strip()
+        values = values[values.ne("")]
+        if values.empty:
+            return ""
+
+        # Tidak ada sampling/head(). Seluruh komentar pada filter aktif
+        # diproses sehingga WordCloud mewakili data aktual yang sedang tampil.
+        return _prepare_wordcloud_corpus("\n".join(values.tolist()))
     except Exception:
         return ""
 
@@ -5283,6 +5333,18 @@ def _render_service_wordclouds(df: pd.DataFrame, layanan: str) -> None:
     """Render WordCloud per sentimen secara konsisten untuk seluruh layanan."""
     try:
         layanan_label = str(layanan or "Layanan").strip() or "Layanan"
+
+        # Jangan menyajikan WordCloud dummy sebagai hasil penelitian aktual.
+        # Mode demo tetap diperbolehkan karena memang dipilih secara eksplisit.
+        if not bool(st.session_state.get("demo_mode", False)):
+            source_label = get_data_source_label(layanan_label)
+            if "Real" not in str(source_label):
+                st.warning(
+                    f"WordCloud {layanan_label} belum dibuat karena sumber data "
+                    "aktual belum tersedia atau belum tervalidasi."
+                )
+                return
+
         layanan_slug = "".join(
             character.lower() if character.isalnum() else "_"
             for character in layanan_label
