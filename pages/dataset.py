@@ -3620,7 +3620,8 @@ def _baca_dataset_upload_cached(file_bytes: bytes, ekstensi: str) -> pd.DataFram
     if data.empty:
         raise ValueError("file_kosong")
 
-    _validasi_kolom_wajib_upload(data)
+    # Upload hanya mensyaratkan file valid dan memiliki baris data.
+    # Nama, jumlah, dan susunan kolom bebas; relevansi diperiksa terpisah.
     return data
 
 
@@ -3630,21 +3631,9 @@ def _normalisasi_nama_kolom_upload(nama_kolom: Any) -> str:
 
 
 def _validasi_kolom_wajib_upload(data: pd.DataFrame) -> None:
-    """Pastikan kolom konten, platform, dan username tersedia melalui alias valid."""
-    kolom_tersedia = {
-        _normalisasi_nama_kolom_upload(kolom)
-        for kolom in data.columns
-    }
-    missing = [
-        kolom_wajib
-        for kolom_wajib in REQUIRED_UPLOAD_COLS
-        if not any(
-            _normalisasi_nama_kolom_upload(alias) in kolom_tersedia
-            for alias in REQUIRED_UPLOAD_ALIASES[kolom_wajib]
-        )
-    ]
-    if missing:
-        raise ValueError(f"kolom_wajib_hilang:{','.join(missing)}")
+    """Kompatibilitas lama: upload tidak lagi mewajibkan nama kolom tertentu."""
+    del data
+    return None
 
 
 def _daftar_kolom_teks(data: pd.DataFrame) -> list[Any]:
@@ -3660,11 +3649,18 @@ def _daftar_kolom_teks(data: pd.DataFrame) -> list[Any]:
     return kolom_teks
 
 
-def _memiliki_keyword_telkom(data: pd.DataFrame, kolom_teks: list[Any]) -> bool:
-    """Cari keyword layanan Telkom pada seluruh nilai di seluruh kolom teks."""
+def _memiliki_keyword_telkom(data: pd.DataFrame, kolom_pemeriksaan: list[Any]) -> bool:
+    """Cari keyword Telkom pada nama kolom dan isi file tanpa syarat skema."""
     pola_keyword = "|".join(re.escape(keyword) for keyword in KEYWORD_RELEVANSI_TELKOM)
 
-    for kolom in kolom_teks:
+    try:
+        nama_kolom = " ".join(str(kolom) for kolom in data.columns)
+        if re.search(pola_keyword, nama_kolom, flags=re.IGNORECASE):
+            return True
+    except Exception:
+        LOGGER.exception("Keyword matching gagal pada nama kolom upload")
+
+    for kolom in kolom_pemeriksaan:
         try:
             series_teks = data[kolom].fillna("").astype(str)
             if series_teks.str.contains(
@@ -3712,23 +3708,30 @@ def _ambil_sampel_kolom_teks_terpanjang(
 
 
 def _deteksi_relevansi_dataset_upload(data: pd.DataFrame) -> tuple[bool, str]:
-    """Jalankan keyword matching lalu verifikasi Gemini untuk data yang lolos."""
+    """Bedakan file terkait Telkom dari header dan isi tanpa syarat nama kolom."""
     try:
-        kolom_teks = _daftar_kolom_teks(data)
-        if not _memiliki_keyword_telkom(data, kolom_teks):
-            LOGGER.info("Fase 17: data upload tidak lolos keyword matching.")
-            return False, "keyword"
+        kolom_pemeriksaan = list(data.columns)
+        lolos_keyword = _memiliki_keyword_telkom(data, kolom_pemeriksaan)
 
-        sampel_teks = _ambil_sampel_kolom_teks_terpanjang(data, kolom_teks)
-        hasil_gemini = check_data_relevance(sampel_teks)
+        # Keyword merek yang eksplisit cukup untuk menyatakan file relevan.
+        if lolos_keyword:
+            return True, "keyword"
+
+        sampel_teks = _ambil_sampel_kolom_teks_terpanjang(
+            data,
+            kolom_pemeriksaan,
+        )
+        header_teks = " | ".join(str(kolom) for kolom in data.columns)
+        bahan_relevansi = "\n".join(
+            bagian for bagian in (header_teks, sampel_teks) if bagian.strip()
+        )
+        if not bahan_relevansi:
+            return False, "tanpa-konten"
+
+        hasil_gemini = check_data_relevance(bahan_relevansi)
         if hasil_gemini is None:
-            LOGGER.warning(
-                "Fase 17: verifikasi Gemini tidak tersedia. Data tetap diloloskan "
-                "karena sudah lolos keyword matching."
-            )
-            return True, "keyword-default-lolos"
-
-        return bool(hasil_gemini), "keyword+gemini"
+            return False, "keyword"
+        return bool(hasil_gemini), "gemini"
     except Exception:
         LOGGER.exception("Deteksi relevansi dataset upload gagal")
         return False, "error"
@@ -4033,13 +4036,9 @@ def _siapkan_hasil_analisis_upload(
         st.session_state[STATE_DETECTED_PLATFORM] = platform_terdeteksi
         st.session_state[STATE_UPLOAD_PLATFORM_COL] = kolom_platform
 
-        if is_relevant:
-            if not kolom_teks or kolom_teks not in hasil.columns:
-                raise ValueError(
-                    "Kolom teks tidak terdeteksi. Pastikan file memiliki kolom komentar, "
-                    "content, text, caption, atau kolom teks sejenis."
-                )
-
+        # Analisis sentimen/topik bersifat opsional. File tetap diterima dan
+        # dipreview ketika relevan tetapi tidak mempunyai kolom teks yang cocok.
+        if is_relevant and kolom_teks and kolom_teks in hasil.columns:
             kolom_sentimen = _deteksi_kolom_sentimen_upload(hasil)
             if kolom_sentimen:
                 label_ui = hasil[kolom_sentimen].map(_normalisasi_label_sentimen)
@@ -7849,11 +7848,17 @@ def _render_output_analisis_upload(
         kolom_teks = st.session_state.get(STATE_DETECTED_TEXT_COL)
         kolom_platform = st.session_state.get(STATE_UPLOAD_PLATFORM_COL)
         if is_relevant:
-            if not kolom_teks or kolom_teks not in data_hasil.columns:
-                st.error("Kolom teks hasil deteksi tidak tersedia pada dataset upload.")
-                return
-            _render_hasil_relevan_upload(data_hasil, str(kolom_teks), kolom_platform)
-        else:
+            if kolom_teks and kolom_teks in data_hasil.columns:
+                _render_hasil_relevan_upload(
+                    data_hasil,
+                    str(kolom_teks),
+                    kolom_platform,
+                )
+            return
+
+        # File nonrelevan tanpa kolom teks tetap selesai dianalisis melalui
+        # status relevansi, preview, metrik, dan daftar kolom yang sudah tampil.
+        if kolom_teks and kolom_teks in data_hasil.columns:
             _render_hasil_tidak_relevan_upload(data_hasil, kolom_teks)
     except Exception as exc:
         LOGGER.exception("Pemilihan jalur output analisis upload gagal")
@@ -8346,14 +8351,6 @@ def _render_upload_dataset_sendiri() -> None:
                     pesan_error_analisis = (
                         "Format file tidak didukung. Gunakan CSV atau Excel (.xlsx)."
                     )
-                elif str(exc).startswith("kolom_wajib_hilang:"):
-                    missing = [
-                        kolom
-                        for kolom in str(exc).split(":", 1)[1].split(",")
-                        if kolom
-                    ]
-                    LOGGER.warning("Kolom wajib upload tidak ditemukan: %s", missing)
-                    pesan_error_analisis = f"Kolom wajib tidak ditemukan: {missing}"
                 else:
                     LOGGER.exception("Dataset upload gagal divalidasi")
                     pesan_error_analisis = (
