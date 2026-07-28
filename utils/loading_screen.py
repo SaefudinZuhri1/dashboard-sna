@@ -500,9 +500,17 @@ def _buat_html_loading(judul: str, pesan: Iterable[str]) -> str:
                 .telkom-loading-orbit,
                 .telkom-loading-core,
                 .telkom-loading-bar,
-                .telkom-loading-message-item,
                 .telkom-loading-progress::after {{
                     animation-duration: 4s !important;
+                }}
+
+                /*
+                 * Jaga siklus pesan tetap mengikuti jumlah pesan.
+                 * Durasi 4 detik lebih pendek daripada jeda pesan terakhir
+                 * sehingga pesan pertama dapat berulang dan bertumpuk.
+                 */
+                .telkom-loading-message-item {{
+                    animation-duration: {durasi_total:.2f}s !important;
                 }}
             }}
         </style>
