@@ -2820,9 +2820,29 @@ def _telkomsel_dashboard_columns(dataframe: pd.DataFrame) -> pd.DataFrame:
         if "topic" not in work.columns:
             work["topic"] = "Belum diklasifikasikan"
 
-        work["date_created"] = pd.to_datetime(
-            work["date_created"], errors="coerce", dayfirst=True, format="mixed"
-        )
+        # Format tanggal Telkomsel aktual menggunakan titik pada bagian jam,
+        # misalnya ``30/12/2025 18.03.47``. Samakan perlakuannya dengan
+        # loader IndiHome agar nilai tersebut tidak seluruhnya berubah menjadi
+        # NaT dan grafik Tren Waktu tetap memperoleh tanggal penelitian.
+        if pd.api.types.is_datetime64_any_dtype(work["date_created"]):
+            work["date_created"] = pd.to_datetime(
+                work["date_created"], errors="coerce"
+            )
+        else:
+            telkomsel_date_text = (
+                work["date_created"].astype("string").fillna("").str.strip()
+            )
+            telkomsel_date_text = telkomsel_date_text.str.replace(
+                r"(\d{1,2})\.(\d{2})\.(\d{2})$",
+                r"\1:\2:\3",
+                regex=True,
+            )
+            work["date_created"] = pd.to_datetime(
+                telkomsel_date_text,
+                errors="coerce",
+                dayfirst=True,
+                format="mixed",
+            )
         work["date"] = work["date_created"]
         work["platform"] = (
             work["platform"]
