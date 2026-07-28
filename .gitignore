@@ -26,6 +26,9 @@ build/
 venv/
 .venv/
 env/
+venv*/
+.venv*/
+venv_lama_error_torch/
 
 # Model besar lokal dan file model biner
 models/
@@ -35,10 +38,16 @@ models/
 *.pt
 *.pth
 
-# Dataset penelitian tidak dipublikasikan ke GitHub
+# Dataset penelitian: abaikan seluruh CSV kecuali enam file cloud kanonik
 data/*.csv
 data/**/*.csv
 !data/.gitkeep
+!data/indihome_sentiment.csv
+!data/indibiz_output_sentiment.csv
+!data/telkomsel_sentiment.csv
+!data/SNA Indihome November-Desember 2025 Gabungan.csv
+!data/indibiz_output_sna.csv
+!data/SNA Telkomsel.csv
 
 # Database lokal pengguna
 database/users.db
@@ -61,6 +70,3 @@ desktop.ini
 .fase20_backup/
 PATCH_BACKUP_FASE20/
 backup_tahap5_fase11/
-venv*/
-.venv*/
-venv_lama_error_torch/
