@@ -3034,12 +3034,22 @@ def route_page(selected: str) -> None:
         # Widget Streamlit selalu memicu rerun. Loader global hanya diperlukan
         # saat pengguna benar-benar berpindah halaman, bukan saat menekan tombol,
         # mengganti tab, membuka expander, atau menjalankan prediksi pada route sama.
-        if route_changed:
+        #
+        # Ketika aplikasi baru dibuka, overlay startup sudah menutup seluruh layar.
+        # Jangan menumpuk overlay route pertama di bawah/atas overlay tersebut karena
+        # dua judul dan pesan loading dapat terlihat bersamaan saat browser dibuka
+        # otomatis oleh Streamlit lokal.
+        startup_loading_active = bool(
+            st.session_state.get("_startup_loading_active", False)
+        )
+        if route_changed and not startup_loading_active:
             log_page_view_once(selected_route)
             with layar_loading(selected_route):
                 _render_demo_mode_banner(selected_route)
                 render_fn()
         else:
+            if route_changed:
+                log_page_view_once(selected_route)
             _render_demo_mode_banner(selected_route)
             render_fn()
 
