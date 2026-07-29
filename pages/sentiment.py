@@ -2877,13 +2877,17 @@ def _inject_sentiment_css() -> None:
                 .sent-v7-wordcloud-subtitle {
                     color: #8F8F8F;
                     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
+                    line-height: 1.55;
                     margin: 0.32rem 0 0;
+                    min-height: 3.1em; /* Dua baris tetap disediakan agar ketiga kartu sejajar. */
                 }
 
                 .sent-v7-wordcloud-note {
                     color: #9E9E9E;
                     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
-                    margin-top: 0.45rem;
+                    line-height: 1.55;
+                    margin: 0.45rem 0 0;
+                    min-height: 3.1em; /* Menjaga batas bawah kartu dan posisi WordCloud tetap sama. */
                 }
 
                 .sent-v7-wordcloud-focus-wrap {
