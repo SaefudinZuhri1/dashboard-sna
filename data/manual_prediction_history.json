@@ -1,6 +1,15 @@
 {
   "user_id:1": [
     {
+      "id": "20260729235630383891",
+      "Waktu": "29-07-2026 23:56:30",
+      "Teks": "testing",
+      "Sentimen": "Negatif",
+      "SentimentKey": "negative",
+      "ConfidenceValue": 0.8625926278986861,
+      "Confidence": "86.3%"
+    },
+    {
       "id": "20260726153431887634",
       "Waktu": "26-07-2026 15:34:31",
       "Teks": "parah sih",
@@ -80,15 +89,6 @@
       "SentimentKey": "neutral",
       "ConfidenceValue": 0.943307102909384,
       "Confidence": "94.3%"
-    },
-    {
-      "id": "20260702031715677965",
-      "Waktu": "02-07-2026 03:17:15",
-      "Teks": "Wifi lemot banget!!!",
-      "Sentimen": "Negatif",
-      "SentimentKey": "negative",
-      "ConfidenceValue": 0.9980995406433664,
-      "Confidence": "99.8%"
     }
   ]
 }

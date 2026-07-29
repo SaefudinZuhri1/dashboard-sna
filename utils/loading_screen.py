@@ -1006,9 +1006,20 @@ def _buat_html_loading_aksi(label: str = "Menganalisis komentar") -> str:
 
 
 def mulai_loading_aksi(label: str = "Menganalisis komentar") -> LoadingHandle:
-    """Tampilkan satu overlay lokal untuk proses server-side pada route aktif."""
+    """Tampilkan satu overlay lokal tanpa menumpuk overlay global yang aktif."""
     placeholder = None
     try:
+        # Saat perpindahan halaman, router sudah menampilkan overlay global.
+        # Jangan membuat overlay aksi kedua karena dua lapisan tersebut membuat
+        # judul/pesan loading terlihat bertumpuk pada rerun yang sama.
+        if bool(st.session_state.get(SESSION_GLOBAL_ACTIVE, False)):
+            return LoadingHandle(
+                placeholder=None,
+                mulai_pada=time.monotonic(),
+                konteks="Aksi",
+                global_scope=False,
+            )
+
         placeholder = st.empty()
         placeholder.markdown(
             _buat_html_loading_aksi(label),

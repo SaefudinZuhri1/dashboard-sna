@@ -1,0 +1,9 @@
+﻿pemeriksaan,nilai,status
+jumlah_baris_sentimen,59730,LULUS
+kolom_wajib_hilang,0,LULUS
+platform_tidak_valid,0,LULUS
+sentimen_tidak_valid,0,LULUS
+confidence_tidak_valid,0,LULUS
+konten_kosong,0,LULUS
+jumlah_edge_sna,58747,LULUS
+jumlah_node_sna,34167,LULUS
