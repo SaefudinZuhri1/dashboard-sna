@@ -24,7 +24,9 @@ from utils.app_version import get_auth_footer_text
 from utils.loading_screen import _buat_html_loading
 
 REMEMBER_COOKIE_KEY = "remember_token"
-MAX_COOKIE_POLLS = 12
+# Empat putaran cukup untuk memberi kesempatan komponen cookie melakukan
+# sinkronisasi browser tanpa menahan loading startup terlalu lama.
+MAX_COOKIE_POLLS = 4
 MAX_COOKIE_SAVE_ATTEMPTS = 5
 
 LOGIN_TRANSITION_ACTIVE_KEY = "_login_transition_active_v1"

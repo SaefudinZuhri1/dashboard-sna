@@ -50,6 +50,7 @@ _EARLY_SESSION_DEFAULTS = {
     "_last_rendered_route": None,
     "_startup_loading_active": True,
     "_public_route": "auth",
+    "_database_initialized_v1": False,
 }
 for _session_key, _session_default in _EARLY_SESSION_DEFAULTS.items():
     if _session_key not in st.session_state:
@@ -340,6 +341,11 @@ LOGOUT_TRANSITION_PENDING_KEY = "_logout_transition_pending_v2"
 LOGOUT_TRANSITION_STARTED_KEY = "_logout_transition_started_v2"
 LOGOUT_COOKIE_DELETE_SENT_KEY = "_logout_cookie_delete_sent_v1"
 
+# CookieManager berjalan asinkron dan membutuhkan beberapa rerun singkat.
+# Jeda kecil cukup memberi waktu komponen browser mengirim nilai cookie tanpa
+# menahan custom loading selama beberapa detik.
+COOKIE_RESTORE_POLL_DELAY_SECONDS = 0.12
+
 
 # Label yang terlihat pengguna dipisahkan dari nama route lama agar routing tetap aman.
 MENU_USER = [
@@ -503,6 +509,7 @@ def init_session_state() -> None:
         "_last_rendered_route": None,
         "_startup_loading_active": True,
         "_public_route": "auth",
+        "_database_initialized_v1": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -3437,11 +3444,26 @@ def render_footer() -> None:
         st.caption(FOOTER_TEXT)
 
 
+def _ensure_database_initialized() -> None:
+    """Inisialisasi skema database satu kali pada setiap sesi browser.
+
+    Startup dapat melakukan beberapa rerun singkat ketika membaca cookie
+    remember-me. Menjalankan migrasi SQLite pada setiap rerun hanya menambah
+    waktu tunggu tanpa mengubah hasil, sehingga status keberhasilan disimpan
+    pada session_state.
+    """
+    if st.session_state.get("_database_initialized_v1", False):
+        return
+
+    init_db()
+    st.session_state["_database_initialized_v1"] = True
+
+
 def main() -> None:
     """Jalankan autentikasi, sidebar, routing, dan footer dashboard."""
     try:
-        init_db()
         init_session_state()
+        _ensure_database_initialized()
 
         if _process_pending_logout():
             return
@@ -3462,9 +3484,7 @@ def main() -> None:
                 if st.session_state.get("_cookie_polls", 0) < MAX_COOKIE_POLLS:
                     # Loader sudah dipasang sejak awal eksekusi aplikasi.
                     # Pertahankan loader yang sama selama pemeriksaan cookie.
-                    import time
-
-                    time.sleep(0.35)
+                    time.sleep(COOKIE_RESTORE_POLL_DELAY_SECONDS)
                     st.rerun()
                 st.session_state._remember_restore_done = True
 
