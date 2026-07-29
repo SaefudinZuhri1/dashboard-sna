@@ -135,12 +135,24 @@ def _topic_data_source_label(layanan: str) -> str:
         if bool(st.session_state.get("demo_mode", False)):
             return "🎯 Data Sample Demo"
         if layanan == "IndiBiz":
-            tersedia = sum(path.is_file() for path in list(INDIBIZ_WORDCLOUD_FILES.values()) + list(INDIBIZ_OUTPUT_FILES.values()))
-            if tersedia == len(INDIBIZ_WORDCLOUD_FILES) + len(INDIBIZ_OUTPUT_FILES):
+            wordcloud_ready = sum(
+                path.is_file() for path in INDIBIZ_WORDCLOUD_FILES.values()
+            )
+            csv_ready = sum(path.is_file() for path in INDIBIZ_OUTPUT_FILES.values())
+            sentiment_signature = get_sentiment_file_signature("IndiBiz")
+            sentiment_ready = not sentiment_signature.endswith(":missing")
+
+            # Dua CSV turunan dapat dibangun ulang dari output sentimen IndiBiz.
+            # Karena itu, file CSV yang hilang tidak lagi membuat sumber data
+            # dianggap tidak tersedia selama data sentimennya masih aktif.
+            derived_ready = 2 if sentiment_ready else csv_ready
+            tersedia = wordcloud_ready + derived_ready
+            total_output = len(INDIBIZ_WORDCLOUD_FILES) + len(INDIBIZ_OUTPUT_FILES)
+            if tersedia == total_output:
                 return "📁 Data Real"
             if tersedia > 0:
                 return "⚠️ Output Belum Lengkap"
-            return "ℹ️ Output Belum Tersedia"
+            return "🔧 Data Dummy"
         return get_data_source_label(layanan)
     except Exception as exc:
         st.error(f"Status sumber data Analisis Topik belum dapat diperiksa: {exc}")
@@ -2756,6 +2768,190 @@ def _normalize_indibiz_sentiment(series: pd.Series) -> pd.Series:
     )
 
 
+@st.cache_data(show_spinner=False, max_entries=6)
+def _build_indibiz_runtime_outputs_cached(
+    sentiment_file_signature: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Bangun ulang Top 15 Kata dan Top 5 Topik dari data sentimen IndiBiz.
+
+    CSV hasil pipeline Colab tetap menjadi sumber utama. Fungsi ini hanya menjadi
+    fallback terarah ketika salah satu CSV turunan belum tersimpan di folder data.
+    """
+    top_word_columns = ["sentiment", "rank", "kata", "frekuensi"]
+    topic_columns = [
+        "sentiment",
+        "topik",
+        "keywords",
+        "topic_rank",
+        "jumlah_komentar",
+        "total_topik",
+        "persentase_sentimen",
+        "persentase_topik",
+        "sentimen_dominan",
+        "contoh_komentar",
+        "contoh_platform",
+    ]
+
+    try:
+        source = _load_enriched_topic_data(
+            "IndiBiz",
+            sentiment_file_signature,
+        )
+        if source is None or source.empty:
+            return (
+                pd.DataFrame(columns=top_word_columns),
+                pd.DataFrame(columns=topic_columns),
+            )
+
+        enriched, frequency_map, summary, _, _ = build_indibiz_topic_payload(
+            source,
+            show_brand=False,
+        )
+
+        top_word_rows: list[dict[str, Any]] = []
+        for sentiment in SENTIMENT_ORDER:
+            frequencies = Counter(frequency_map.get(sentiment, {}))
+            for rank, (word, count) in enumerate(
+                frequencies.most_common(15),
+                start=1,
+            ):
+                top_word_rows.append(
+                    {
+                        "sentiment": sentiment,
+                        "rank": rank,
+                        "kata": str(word),
+                        "frekuensi": int(count),
+                    }
+                )
+        top_words = pd.DataFrame(top_word_rows, columns=top_word_columns)
+
+        if enriched is None or enriched.empty or summary is None or summary.empty:
+            return top_words, pd.DataFrame(columns=topic_columns)
+
+        working = enriched.copy()
+        working["predicted_sentiment"] = _normalize_indibiz_sentiment(
+            working["predicted_sentiment"]
+        )
+        working["content"] = working["content"].fillna("").astype(str).str.strip()
+        if "platform" not in working.columns:
+            working["platform"] = "lainnya"
+        working["platform"] = (
+            working["platform"].fillna("lainnya").astype(str).str.strip().str.lower()
+        )
+
+        total_comments = max(1, len(working))
+        sentiment_totals = working["predicted_sentiment"].value_counts().to_dict()
+        topic_rows: list[dict[str, Any]] = []
+
+        for fallback_rank, summary_row in summary.reset_index(drop=True).iterrows():
+            topic_name = str(summary_row.get("topik", "")).strip()
+            if not topic_name:
+                continue
+
+            topic_group = working[
+                working["topic"].fillna("").astype(str).eq(topic_name)
+            ].copy()
+            if topic_group.empty:
+                continue
+
+            topic_rank = fallback_rank + 1
+            topic_total = int(len(topic_group))
+            topic_percentage = topic_total / total_comments * 100.0
+            dominant_sentiment = str(
+                summary_row.get("sentimen_dominan", "neutral")
+            ).strip().lower()
+            dominant_sentiment = INDIBIZ_SENTIMENT_NORMALIZATION.get(
+                dominant_sentiment,
+                dominant_sentiment if dominant_sentiment in SENTIMENT_ORDER else "neutral",
+            )
+            keywords = str(
+                summary_row.get(
+                    "kata_kunci",
+                    summary_row.get("keywords", "—"),
+                )
+            ).strip() or "—"
+
+            for sentiment in SENTIMENT_ORDER:
+                sentiment_group = topic_group[
+                    topic_group["predicted_sentiment"].eq(sentiment)
+                ].copy()
+                if sentiment_group.empty:
+                    continue
+
+                sentiment_count = int(len(sentiment_group))
+                sentiment_total = max(1, int(sentiment_totals.get(sentiment, 0)))
+                example_rows = (
+                    sentiment_group.assign(
+                        _content_length=sentiment_group["content"].str.len()
+                    )
+                    .sort_values("_content_length", ascending=False)
+                    .head(3)
+                )
+                comments = [
+                    str(value).strip()
+                    for value in example_rows["content"].tolist()
+                    if str(value).strip()
+                ]
+                platforms = [
+                    str(value).strip().lower() or "lainnya"
+                    for value in example_rows["platform"].tolist()
+                ]
+
+                topic_rows.append(
+                    {
+                        "sentiment": sentiment,
+                        "topik": topic_name,
+                        "keywords": keywords,
+                        "topic_rank": topic_rank,
+                        "jumlah_komentar": sentiment_count,
+                        "total_topik": topic_total,
+                        "persentase_sentimen": sentiment_count / sentiment_total * 100.0,
+                        "persentase_topik": topic_percentage,
+                        "sentimen_dominan": dominant_sentiment,
+                        "contoh_komentar": "|||".join(comments),
+                        "contoh_platform": "|||".join(platforms[: len(comments)]),
+                    }
+                )
+
+        topics = pd.DataFrame(topic_rows, columns=topic_columns)
+        return top_words, topics
+    except Exception as exc:
+        st.error(f"Fallback Analisis Topik IndiBiz tidak dapat dibangun: {exc}")
+        return (
+            pd.DataFrame(columns=top_word_columns),
+            pd.DataFrame(columns=topic_columns),
+        )
+
+
+def _load_indibiz_runtime_outputs() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Ambil fallback turunan IndiBiz berdasarkan versi file sentimen aktif."""
+    try:
+        top_words, topics = _build_indibiz_runtime_outputs_cached(
+            get_sentiment_file_signature("IndiBiz")
+        )
+        return top_words.copy(), topics.copy()
+    except Exception as exc:
+        st.error(f"Data turunan Analisis Topik IndiBiz belum dapat disiapkan: {exc}")
+        return (
+            pd.DataFrame(columns=["sentiment", "rank", "kata", "frekuensi"]),
+            pd.DataFrame(
+                columns=[
+                    "sentiment",
+                    "topik",
+                    "keywords",
+                    "topic_rank",
+                    "jumlah_komentar",
+                    "total_topik",
+                    "persentase_sentimen",
+                    "persentase_topik",
+                    "sentimen_dominan",
+                    "contoh_komentar",
+                    "contoh_platform",
+                ]
+            ),
+        )
+
+
 def _load_indibiz_wordcloud_output() -> dict[str, bytes | None]:
     """Muat tiga PNG WordCloud IndiBiz tanpa membuat halaman berhenti saat file hilang."""
     results: dict[str, bytes | None] = {}
@@ -2796,9 +2992,12 @@ def _load_indibiz_top_words_output() -> pd.DataFrame:
     """Muat dan rapikan output Top 15 Kata IndiBiz."""
     path = INDIBIZ_OUTPUT_FILES["top_kata"]
     if not path.is_file():
+        runtime_top_words, _ = _load_indibiz_runtime_outputs()
+        if not runtime_top_words.empty:
+            return runtime_top_words
         st.info(
-            "Data Top 15 Kata IndiBiz belum tersedia. "
-            "Pastikan file indibiz_output_top_kata.csv berada di folder data."
+            "Data Top 15 Kata IndiBiz belum dapat dibentuk karena data sentimen "
+            "IndiBiz belum tersedia."
         )
         return pd.DataFrame(columns=["sentiment", "rank", "kata", "frekuensi"])
 
@@ -2849,9 +3048,12 @@ def _load_indibiz_topic_output() -> pd.DataFrame:
         "contoh_platform",
     ]
     if not path.is_file():
+        _, runtime_topics = _load_indibiz_runtime_outputs()
+        if not runtime_topics.empty:
+            return runtime_topics
         st.info(
-            "Data topik IndiBiz belum tersedia. "
-            "Pastikan file indibiz_output_top_topic.csv berada di folder data."
+            "Data topik IndiBiz belum dapat dibentuk karena data sentimen "
+            "IndiBiz belum tersedia."
         )
         return pd.DataFrame(columns=base_columns)
 
@@ -4057,8 +4259,11 @@ def _render_indibiz_outputs(
         st.error(f"Ringkasan output IndiBiz belum dapat ditampilkan: {exc}")
 
     st.caption(
-        "WordCloud, Top 15 Kata, dan Top 5 Topik IndiBiz memakai output pipeline Colab. "
-        "Tabel Frekuensi Kata dihitung dari data sentimen IndiBiz yang sama dengan filter platform, sentimen, dan pengaturan nama brand aktif."
+        "WordCloud IndiBiz memakai PNG output pipeline Colab. Top 15 Kata dan "
+        "Top 5 Topik memakai CSV output jika tersedia; jika CSV turunan belum ada, "
+        "dashboard membangunnya dari data sentimen IndiBiz yang aktif. Tabel "
+        "Frekuensi Kata tetap mengikuti filter platform, sentimen, dan pengaturan "
+        "nama brand."
     )
 
     indibiz_sections = [
