@@ -306,7 +306,7 @@ if (
 
 from streamlit_option_menu import option_menu  # noqa: E402
 
-from auth.auth_utils import get_user_by_id, init_db, revoke_remember_token  # noqa: E402
+from auth.auth_utils import get_user_by_id, init_database, revoke_remember_token  # noqa: E402
 from auth.login import (  # noqa: E402
     MAX_COOKIE_POLLS,
     POST_LOGOUT_RESTORE_GUARD_KEY,
@@ -3455,7 +3455,7 @@ def _ensure_database_initialized() -> None:
     if st.session_state.get("_database_initialized_v1", False):
         return
 
-    init_db()
+    init_database()
     st.session_state["_database_initialized_v1"] = True
 
 

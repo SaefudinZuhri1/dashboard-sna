@@ -24,6 +24,7 @@ LOGGER = logging.getLogger(__name__)
 
 DB_DIR = "database"
 DB_NAME = "users.db"
+DB_PATH = Path(__file__).resolve().parent.parent / DB_DIR / DB_NAME
 REMEMBER_ME_HOURS = 72  # 3 hari — sesi "Ingat Saya" di browser
 ADMIN_SEED = {
     "fullname": "Administrator",
@@ -34,12 +35,22 @@ ADMIN_SEED = {
 }
 
 
+
 def get_db_path() -> str:
     """Bangun path database dari lokasi folder proyek secara portabel."""
-    base = Path(__file__).resolve().parent.parent
-    db_dir = base / DB_DIR
-    db_dir.mkdir(parents=True, exist_ok=True)
-    return str(db_dir / DB_NAME)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    return str(DB_PATH)
+
+
+
+def _connect_raw() -> sqlite3.Connection:
+    """Buka koneksi SQLite dasar tanpa memanggil inisialisasi ulang."""
+    conn = sqlite3.connect(get_db_path(), timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=30000")
+    return conn
+
 
 
 def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
@@ -50,6 +61,7 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
     if "role" in data:
         data["role"] = normalize_role(data.get("role"), data.get("user_id"))
     return data
+
 
 
 def _migrate_legacy_roles(cursor: sqlite3.Cursor) -> None:
@@ -100,71 +112,170 @@ def _migrate_legacy_roles(cursor: sqlite3.Cursor) -> None:
     )
 
 
-def init_db() -> None:
-    """Buat tabel users, seed akun utama, lalu migrasikan role lama."""
+
+def _database_is_corrupt(error: Exception) -> bool:
+    """Kenali error SQLite yang menandakan file database benar-benar rusak."""
+    message = str(error).strip().lower()
+    return any(
+        marker in message
+        for marker in (
+            "database disk image is malformed",
+            "file is not a database",
+            "unsupported file format",
+        )
+    )
+
+
+
+def _remove_corrupt_database() -> None:
+    """Hapus file database rusak agar dapat dibuat ulang saat startup."""
     try:
-        with sqlite3.connect(get_db_path()) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    fullname TEXT NOT NULL,
-                    username TEXT UNIQUE NOT NULL,
-                    email TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    role TEXT DEFAULT 'management',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    profile_picture BLOB
-                )
-                """
-            )
-            cursor.execute(
-                "SELECT user_id FROM users WHERE username = ?",
-                (ADMIN_SEED["username"],),
-            )
-            if cursor.fetchone() is None:
-                password_hash = hash_password(ADMIN_SEED["password"])
-                cursor.execute(
-                    """
-                    INSERT INTO users (fullname, username, email, password_hash, role)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        ADMIN_SEED["fullname"],
-                        ADMIN_SEED["username"],
-                        ADMIN_SEED["email"],
-                        password_hash,
-                        ADMIN_SEED["role"],
-                    ),
-                )
-            _migrate_legacy_roles(cursor)
+        if DB_PATH.exists():
+            DB_PATH.unlink()
+    except Exception as error:
+        LOGGER.exception("Database rusak tidak dapat dihapus: %s", error)
+        raise RuntimeError(f"Database rusak tidak dapat dipulihkan: {error}") from error
 
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS remember_tokens (
-                    token_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    token_hash TEXT NOT NULL UNIQUE,
-                    expires_at TIMESTAMP NOT NULL,
-                    FOREIGN KEY (user_id) REFERENCES users(user_id)
-                )
-                """
-            )
-            conn.commit()
 
-        # Tabel audit dibuat setelah tabel users tersedia agar foreign key aman.
+
+def _create_schema_and_seed(conn: sqlite3.Connection) -> None:
+    """Buat seluruh tabel inti dan seed admin pada satu transaksi."""
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fullname TEXT NOT NULL,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'management',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            profile_picture BLOB
+        )
+        """
+    )
+
+    # Hash bcrypt hanya dibuat ketika akun admin belum tersedia.
+    cursor.execute(
+        "SELECT user_id FROM users WHERE username = ?",
+        (ADMIN_SEED["username"],),
+    )
+    if cursor.fetchone() is None:
+        password_hash = hash_password(ADMIN_SEED["password"])
+        if not password_hash:
+            raise RuntimeError("Password admin default gagal dienkripsi.")
+        # INSERT OR IGNORE tetap melindungi startup cloud yang berjalan paralel.
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO users (fullname, username, email, password_hash, role)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                ADMIN_SEED["fullname"],
+                ADMIN_SEED["username"],
+                ADMIN_SEED["email"],
+                password_hash,
+                ADMIN_SEED["role"],
+            ),
+        )
+
+    _migrate_legacy_roles(cursor)
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS remember_tokens (
+            token_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            expires_at TIMESTAMP NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        )
+        """
+    )
+    conn.commit()
+
+
+
+def init_database() -> None:
+    """Inisialisasi database cloud secara idempotent saat startup aplikasi.
+
+    Folder dan file SQLite dibuat otomatis bila belum ada. Tabel pengguna,
+    remember-me, audit, dan akun admin default juga dibuat satu kali tanpa
+    menggandakan data ketika fungsi dipanggil berulang kali.
+    """
+    try:
+        with _connect_raw() as conn:
+            quick_check = conn.execute("PRAGMA quick_check").fetchone()
+            if quick_check and str(quick_check[0]).lower() != "ok":
+                raise sqlite3.DatabaseError(str(quick_check[0]))
+            _create_schema_and_seed(conn)
+    except sqlite3.DatabaseError as error:
+        if not _database_is_corrupt(error):
+            LOGGER.exception("Inisialisasi database gagal: %s", error)
+            raise RuntimeError(f"Gagal inisialisasi database: {error}") from error
+
+        LOGGER.warning("Database rusak terdeteksi dan akan dibuat ulang: %s", error)
+        _remove_corrupt_database()
         try:
-            from utils.audit_logger import ensure_audit_table
+            with _connect_raw() as conn:
+                _create_schema_and_seed(conn)
+        except Exception as retry_error:
+            LOGGER.exception("Pemulihan database gagal: %s", retry_error)
+            raise RuntimeError(f"Gagal memulihkan database: {retry_error}") from retry_error
+    except Exception as error:
+        LOGGER.exception("Inisialisasi database gagal: %s", error)
+        raise RuntimeError(f"Gagal inisialisasi database: {error}") from error
 
-            ensure_audit_table()
-        except Exception as audit_error:
-            LOGGER.exception("Tabel audit belum dapat disiapkan: %s", audit_error)
-    except Exception as e:
-        LOGGER.exception("init_db gagal: %s", e)
-        raise RuntimeError(f"Gagal inisialisasi database: {e}") from e
+    # Tabel audit dibuat setelah tabel users tersedia agar foreign key aman.
+    try:
+        from utils.audit_logger import ensure_audit_table
 
+        ensure_audit_table()
+    except Exception as audit_error:
+        LOGGER.exception("Tabel audit belum dapat disiapkan: %s", audit_error)
+
+
+
+def init_db() -> None:
+    """Alias kompatibilitas untuk pemanggilan lama di modul dan skrip uji."""
+    init_database()
+
+
+
+def get_db_connection() -> sqlite3.Connection:
+    """Kembalikan koneksi database yang siap dipakai dan pulihkan jika rusak."""
+    conn: sqlite3.Connection | None = None
+    try:
+        conn = _connect_raw()
+        quick_check = conn.execute("PRAGMA quick_check").fetchone()
+        if quick_check and str(quick_check[0]).lower() != "ok":
+            raise sqlite3.DatabaseError(str(quick_check[0]))
+
+        users_table = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'"
+        ).fetchone()
+        if users_table is None:
+            conn.close()
+            conn = None
+            init_database()
+            return _connect_raw()
+        return conn
+    except sqlite3.DatabaseError as error:
+        if conn is not None:
+            conn.close()
+        if not _database_is_corrupt(error):
+            LOGGER.exception("Koneksi database gagal: %s", error)
+            raise RuntimeError(f"Gagal membuka database: {error}") from error
+
+        LOGGER.warning("Koneksi menemukan database rusak; melakukan pemulihan: %s", error)
+        _remove_corrupt_database()
+        init_database()
+        return _connect_raw()
+    except Exception as error:
+        if conn is not None:
+            conn.close()
+        LOGGER.exception("Koneksi database gagal: %s", error)
+        raise RuntimeError(f"Gagal membuka database: {error}") from error
 
 def hash_password(password: str) -> str:
     """Enkripsi password dengan bcrypt, return hash sebagai string."""
@@ -188,7 +299,7 @@ def verify_password(password: str, hashed: str) -> bool:
 def get_user(username: str) -> dict | None:
     """Ambil data user berdasarkan username."""
     try:
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -204,7 +315,7 @@ def get_user(username: str) -> dict | None:
 def get_user_by_id(user_id: int) -> dict | None:
     """Ambil data user berdasarkan user_id."""
     try:
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
@@ -223,7 +334,7 @@ def create_user(
         email = email.strip().lower()
         fullname = fullname.strip()
 
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -259,7 +370,7 @@ def update_user_profile(user_id: int, fullname: str, email: str) -> tuple[bool, 
         email = email.strip().lower()
         fullname = fullname.strip()
 
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -290,7 +401,7 @@ def _save_password(user_id: int, new_password: str) -> tuple[bool, str]:
         if not password_hash:
             return False, "Gagal mengenkripsi password"
 
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE users SET password_hash = ? WHERE user_id = ?",
@@ -329,7 +440,7 @@ def update_password(
 def update_profile_picture(user_id: int, image_bytes: bytes) -> bool:
     """Simpan gambar profil sebagai BLOB ke database."""
     try:
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE users SET profile_picture = ? WHERE user_id = ?",
@@ -347,7 +458,7 @@ def update_profile_picture(user_id: int, image_bytes: bytes) -> bool:
 def get_all_users() -> list[dict]:
     """Ambil semua user, urut dari yang terbaru daftar."""
     try:
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -373,7 +484,7 @@ def delete_user(user_id: int) -> tuple[bool, str]:
         if user_id == 1:
             return False, "Data Analis utama tidak dapat dihapus"
 
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
             if cursor.rowcount == 0:
@@ -388,7 +499,7 @@ def delete_user(user_id: int) -> tuple[bool, str]:
 def get_user_stats() -> dict:
     """Ambil statistik jumlah pengguna per role untuk Admin Panel."""
     try:
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -451,7 +562,7 @@ def create_remember_token(user_id: int) -> str | None:
         token_hash = _hash_token(token)
         expires_at = datetime.now() + timedelta(hours=REMEMBER_ME_HOURS)
 
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "DELETE FROM remember_tokens WHERE user_id = ?",
@@ -478,7 +589,7 @@ def validate_remember_token(token: str) -> dict | None:
             return None
 
         token_hash = _hash_token(token)
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -516,7 +627,7 @@ def revoke_remember_token(token: str) -> bool:
         if not token:
             return False
         token_hash = _hash_token(token)
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "DELETE FROM remember_tokens WHERE token_hash = ?",
@@ -532,7 +643,7 @@ def revoke_remember_token(token: str) -> bool:
 def revoke_all_remember_tokens(user_id: int) -> bool:
     """Hapus semua token remember-me milik satu user."""
     try:
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "DELETE FROM remember_tokens WHERE user_id = ?",
@@ -622,7 +733,7 @@ def update_user_role(user_id: int, new_role: str) -> tuple[bool, str]:
         if role_value not in VALID_ROLES:
             return False, "Role tidak valid."
 
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE users SET role = ? WHERE user_id = ?",
@@ -654,7 +765,7 @@ def admin_create_user(
         if not success:
             return False, message
 
-        with sqlite3.connect(get_db_path()) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE users SET role = ? WHERE username = ?",

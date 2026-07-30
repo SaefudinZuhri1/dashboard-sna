@@ -49,8 +49,7 @@ models/telkomsel/*.safetensors
 # Folder data TIDAK diabaikan agar file dataset dapat di-push ke branch cloud.
 # Jangan memasukkan data sensitif atau file di atas batas GitHub.
 
-# Database lokal pengguna
-database/users.db
+# Database pengguna dikomit agar seed awal tersedia pada repository.
 
 # Editor dan sistem operasi
 .vscode/
