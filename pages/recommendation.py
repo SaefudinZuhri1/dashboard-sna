@@ -61,6 +61,13 @@ except Exception:  # pragma: no cover - fallback jika utilitas loading belum ter
     mulai_loading_aksi = None
     selesaikan_loading_aksi = None
 
+# Fragment menjaga perubahan kontrol matriks tetap lokal. Hasil analisis utama
+# baru dirender ulang setelah tombol Apply atau Reset benar-benar mengubah state.
+_FRAGMENT_DECORATOR = getattr(st, "fragment", None)
+if _FRAGMENT_DECORATOR is None:  # pragma: no cover - fallback Streamlit lama
+    def _FRAGMENT_DECORATOR(function):
+        return function
+
 # Ringkasan Top 5 memakai service bersama tanpa mengimpor seluruh halaman
 # Analisis Topik. Ini mencegah Matplotlib, WordCloud, dan pipeline visual lain
 # ikut dimuat ketika pengguna hanya membuka halaman Rekomendasi.
@@ -78,6 +85,9 @@ INDIBIZ_SNA_FILE = PROJECT_ROOT / "data" / "indibiz_output_sna.csv"
 INDIBIZ_TOPIC_FILE = PROJECT_ROOT / "data" / "indibiz_output_top_topic.csv"
 INDIBIZ_TOP_WORD_FILE = PROJECT_ROOT / "data" / "indibiz_output_top_kata.csv"
 RECOMMENDATION_ACTION_LOADING_KEY = "_recommendation_action_loading_label"
+MATRIX_FILTER_DEFAULT_MIN_SCORE = 1
+MATRIX_FILTER_EVENT_PREFIX = "_recommendation_matrix_filter_event_"
+MATRIX_FILTER_FEEDBACK_PREFIX = "_recommendation_matrix_filter_feedback_"
 RECOMMENDATION_CACHE_RECOVERY_KEY = "_recommendation_cache_recovery_v1_1"
 RECOMMENDATION_CACHE_ERROR_MARKERS = (
     "StringDtype.__init__",
@@ -8663,6 +8673,271 @@ def _build_heatmap_figure(
     return figure
 
 
+def _matrix_filter_state_keys(layanan: str) -> dict[str, str]:
+    """Bangun key session filter matriks yang terpisah untuk setiap layanan."""
+    service_key = _safe_key(layanan)
+    return {
+        "topic_widget": f"rec_matrix_topic_{service_key}",
+        "platform_widget": f"rec_matrix_platform_{service_key}",
+        "score_widget": f"rec_matrix_min_score_{service_key}",
+        "topic_applied": f"_rec_matrix_applied_topic_{service_key}",
+        "platform_applied": f"_rec_matrix_applied_platform_{service_key}",
+        "score_applied": f"_rec_matrix_applied_min_score_{service_key}",
+        "event": f"{MATRIX_FILTER_EVENT_PREFIX}{service_key}",
+        "feedback": f"{MATRIX_FILTER_FEEDBACK_PREFIX}{service_key}",
+    }
+
+
+def _matrix_filter_defaults(
+    topic_labels: list[str],
+    platform_labels: list[str],
+) -> tuple[str, tuple[str, ...], int]:
+    """Kembalikan nilai awal filter matriks sesuai opsi yang tersedia."""
+    default_topic = str(topic_labels[0]) if topic_labels else ""
+    return (
+        default_topic,
+        tuple(str(label) for label in platform_labels),
+        MATRIX_FILTER_DEFAULT_MIN_SCORE,
+    )
+
+
+def _normalise_matrix_platform_labels(
+    values: Any,
+    platform_labels: list[str],
+) -> tuple[str, ...]:
+    """Normalisasi pilihan platform dan pertahankan urutan opsi antarmuka."""
+    try:
+        selected = {str(value) for value in list(values or [])}
+    except Exception:
+        selected = set()
+    return tuple(label for label in platform_labels if label in selected)
+
+
+def _ensure_matrix_filter_state(
+    layanan: str,
+    topic_labels: list[str],
+    platform_labels: list[str],
+) -> None:
+    """Pastikan state draft dan state aktif matriks selalu valid."""
+    keys = _matrix_filter_state_keys(layanan)
+    default_topic, default_platforms, default_score = _matrix_filter_defaults(
+        topic_labels,
+        platform_labels,
+    )
+
+    current_topic = str(st.session_state.get(keys["topic_widget"], default_topic))
+    if current_topic not in topic_labels:
+        st.session_state[keys["topic_widget"]] = default_topic
+
+    current_platforms = _normalise_matrix_platform_labels(
+        st.session_state.get(keys["platform_widget"], list(default_platforms)),
+        platform_labels,
+    )
+    st.session_state[keys["platform_widget"]] = list(current_platforms)
+
+    try:
+        current_score = int(st.session_state.get(keys["score_widget"], default_score))
+    except (TypeError, ValueError):
+        current_score = default_score
+    st.session_state[keys["score_widget"]] = min(10, max(1, current_score))
+
+    applied_topic = str(st.session_state.get(keys["topic_applied"], default_topic))
+    if applied_topic not in topic_labels:
+        applied_topic = default_topic
+    st.session_state[keys["topic_applied"]] = applied_topic
+
+    applied_platforms = _normalise_matrix_platform_labels(
+        st.session_state.get(keys["platform_applied"], list(default_platforms)),
+        platform_labels,
+    )
+    st.session_state[keys["platform_applied"]] = list(applied_platforms)
+
+    try:
+        applied_score = int(st.session_state.get(keys["score_applied"], default_score))
+    except (TypeError, ValueError):
+        applied_score = default_score
+    st.session_state[keys["score_applied"]] = min(10, max(1, applied_score))
+
+
+def _current_matrix_filter_values(
+    layanan: str,
+    topic_labels: list[str],
+    platform_labels: list[str],
+) -> tuple[str, tuple[str, ...], int]:
+    """Ambil nilai filter yang sedang dipilih pengguna."""
+    keys = _matrix_filter_state_keys(layanan)
+    default_topic, default_platforms, default_score = _matrix_filter_defaults(
+        topic_labels,
+        platform_labels,
+    )
+    topic = str(st.session_state.get(keys["topic_widget"], default_topic))
+    platforms = _normalise_matrix_platform_labels(
+        st.session_state.get(keys["platform_widget"], list(default_platforms)),
+        platform_labels,
+    )
+    try:
+        score = int(st.session_state.get(keys["score_widget"], default_score))
+    except (TypeError, ValueError):
+        score = default_score
+    return topic, platforms, min(10, max(1, score))
+
+
+def _applied_matrix_filter_values(
+    layanan: str,
+    topic_labels: list[str],
+    platform_labels: list[str],
+) -> tuple[str, tuple[str, ...], int]:
+    """Ambil snapshot filter matriks yang terakhir diterapkan."""
+    keys = _matrix_filter_state_keys(layanan)
+    default_topic, default_platforms, default_score = _matrix_filter_defaults(
+        topic_labels,
+        platform_labels,
+    )
+    topic = str(st.session_state.get(keys["topic_applied"], default_topic))
+    platforms = _normalise_matrix_platform_labels(
+        st.session_state.get(keys["platform_applied"], list(default_platforms)),
+        platform_labels,
+    )
+    try:
+        score = int(st.session_state.get(keys["score_applied"], default_score))
+    except (TypeError, ValueError):
+        score = default_score
+    return topic, platforms, min(10, max(1, score))
+
+
+def _apply_matrix_filter_state(
+    layanan: str,
+    topic_labels: list[str],
+    platform_labels: list[str],
+) -> None:
+    """Terapkan draft hanya jika berbeda dari filter matriks yang aktif."""
+    try:
+        current_values = _current_matrix_filter_values(
+            layanan,
+            topic_labels,
+            platform_labels,
+        )
+        applied_values = _applied_matrix_filter_values(
+            layanan,
+            topic_labels,
+            platform_labels,
+        )
+        if current_values == applied_values:
+            return
+
+        keys = _matrix_filter_state_keys(layanan)
+        topic, platforms, score = current_values
+        st.session_state[keys["topic_applied"]] = topic
+        st.session_state[keys["platform_applied"]] = list(platforms)
+        st.session_state[keys["score_applied"]] = score
+        st.session_state[keys["feedback"]] = "apply"
+        st.session_state[keys["event"]] = True
+        _show_matrix_filter_loading(layanan)
+    except Exception as exc:
+        st.error(f"Filter matriks belum dapat diterapkan. Detail: {exc}")
+
+
+def _reset_matrix_filter_state(
+    layanan: str,
+    topic_labels: list[str],
+    platform_labels: list[str],
+) -> None:
+    """Reset filter matriks ke nilai awal dan langsung gunakan hasil default."""
+    try:
+        defaults = _matrix_filter_defaults(topic_labels, platform_labels)
+        current_values = _current_matrix_filter_values(
+            layanan,
+            topic_labels,
+            platform_labels,
+        )
+        applied_values = _applied_matrix_filter_values(
+            layanan,
+            topic_labels,
+            platform_labels,
+        )
+        if current_values == defaults and applied_values == defaults:
+            return
+
+        keys = _matrix_filter_state_keys(layanan)
+        topic, platforms, score = defaults
+        st.session_state[keys["topic_widget"]] = topic
+        st.session_state[keys["platform_widget"]] = list(platforms)
+        st.session_state[keys["score_widget"]] = score
+        st.session_state[keys["topic_applied"]] = topic
+        st.session_state[keys["platform_applied"]] = list(platforms)
+        st.session_state[keys["score_applied"]] = score
+        st.session_state[keys["feedback"]] = "reset"
+        st.session_state[keys["event"]] = True
+    except Exception as exc:
+        st.error(f"Filter matriks belum dapat direset. Detail: {exc}")
+
+
+@_FRAGMENT_DECORATOR
+def _render_matrix_filter_fragment(
+    layanan: str,
+    topic_labels: list[str],
+    platform_labels: list[str],
+) -> None:
+    """Render kontrol matriks tanpa memuat ulang analisis sebelum Apply valid."""
+    try:
+        _ensure_matrix_filter_state(layanan, topic_labels, platform_labels)
+        keys = _matrix_filter_state_keys(layanan)
+
+        control_1, control_2, control_3, control_reset, control_apply = st.columns(
+            [1.15, 1.25, 0.92, 0.72, 0.96],
+            gap="medium",
+        )
+        with control_1:
+            st.selectbox(
+                "Fokus topik",
+                options=topic_labels,
+                key=keys["topic_widget"],
+                help="Kolom ini dipakai untuk mengurutkan influencer dari skor tertinggi.",
+            )
+        with control_2:
+            st.multiselect(
+                "Filter platform",
+                options=platform_labels,
+                key=keys["platform_widget"],
+                help="Kosongkan semua pilihan untuk menampilkan semua platform.",
+            )
+        with control_3:
+            st.slider(
+                "Skor minimum",
+                min_value=1,
+                max_value=10,
+                step=1,
+                key=keys["score_widget"],
+                help="Naikkan nilai ini untuk menyaring hanya influencer dengan kecocokan tinggi.",
+            )
+        with control_reset:
+            st.markdown("<div style='height: 31px;'></div>", unsafe_allow_html=True)
+            st.button(
+                "Reset Filter",
+                key=f"rec_matrix_reset_filter_{_safe_key(layanan)}",
+                use_container_width=True,
+                on_click=_reset_matrix_filter_state,
+                args=(layanan, topic_labels, platform_labels),
+            )
+        with control_apply:
+            st.markdown("<div style='height: 31px;'></div>", unsafe_allow_html=True)
+            st.button(
+                "Terapkan Filter",
+                key=f"rec_matrix_apply_filter_{_safe_key(layanan)}",
+                use_container_width=True,
+                type="primary",
+                on_click=_apply_matrix_filter_state,
+                args=(layanan, topic_labels, platform_labels),
+            )
+
+        # Callback hanya mengisi event saat Apply/Reset benar-benar mengubah state.
+        # Klik Apply tanpa perubahan berhenti pada fragment ini tanpa aksi analisis.
+        if bool(st.session_state.pop(keys["event"], False)):
+            st.rerun(scope="app")
+    except Exception as exc:
+        st.error(f"Kontrol filter matriks tidak dapat ditampilkan. Detail: {exc}")
+
+
 def _render_interactive_matrix(score_matrix: pd.DataFrame, layanan: str) -> None:
     """Render matriks dengan kontrol interaktif Streamlit."""
     try:
@@ -8673,52 +8948,26 @@ def _render_interactive_matrix(score_matrix: pd.DataFrame, layanan: str) -> None
 
         topic_label_to_key = {str(item["singkat"]): str(item["key"]) for item in TOPIC_CONFIG}
         platform_label_to_key = _matrix_platform_options()
+        topic_labels = list(topic_label_to_key.keys())
+        platform_labels = list(platform_label_to_key.keys())
 
-        # Kontrol matriks dibungkus dalam form agar halaman tidak langsung reload
-        # setiap kali pengguna baru memilih satu filter. Hasil baru diterapkan
-        # setelah tombol "Terapkan Filter" diklik.
-        with st.form(key=f"rec_matrix_filter_form_{_safe_key(layanan)}", border=False):
-            control_1, control_2, control_3, control_4 = st.columns(
-                [1.15, 1.25, 1.0, 0.78],
-                gap="medium",
+        _render_matrix_filter_fragment(
+            layanan,
+            topic_labels,
+            platform_labels,
+        )
+        selected_topic_label, selected_platform_labels, min_score = (
+            _applied_matrix_filter_values(
+                layanan,
+                topic_labels,
+                platform_labels,
             )
-            with control_1:
-                selected_topic_label = st.selectbox(
-                    "Fokus topik",
-                    options=list(topic_label_to_key.keys()),
-                    index=0,
-                    key=f"rec_matrix_topic_{_safe_key(layanan)}",
-                    help="Kolom ini dipakai untuk mengurutkan influencer dari skor tertinggi.",
-                )
-            with control_2:
-                selected_platform_labels = st.multiselect(
-                    "Filter platform",
-                    options=list(platform_label_to_key.keys()),
-                    default=list(platform_label_to_key.keys()),
-                    key=f"rec_matrix_platform_{_safe_key(layanan)}",
-                    help="Kosongkan semua pilihan untuk menampilkan semua platform.",
-                )
-            with control_3:
-                min_score = st.slider(
-                    "Skor minimum",
-                    min_value=1,
-                    max_value=10,
-                    value=1,
-                    step=1,
-                    key=f"rec_matrix_min_score_{_safe_key(layanan)}",
-                    help="Naikkan nilai ini untuk menyaring hanya influencer dengan kecocokan tinggi.",
-                )
-            with control_4:
-                st.markdown("<div style='height: 31px;'></div>", unsafe_allow_html=True)
-                filter_submitted = st.form_submit_button(
-                    "Terapkan Filter",
-                    use_container_width=True,
-                    type="primary",
-                    on_click=_show_matrix_filter_loading,
-                    args=(layanan,),
-                )
+        )
 
-        selected_topic_key = topic_label_to_key[selected_topic_label]
+        selected_topic_key = topic_label_to_key.get(
+            selected_topic_label,
+            next(iter(topic_label_to_key.values())),
+        )
         selected_platforms = [
             platform_label_to_key[label]
             for label in selected_platform_labels
@@ -8727,8 +8976,12 @@ def _render_interactive_matrix(score_matrix: pd.DataFrame, layanan: str) -> None
         if not selected_platforms:
             selected_platforms = list(PLATFORM_ORDER)
 
-        if filter_submitted:
+        keys = _matrix_filter_state_keys(layanan)
+        feedback = str(st.session_state.pop(keys["feedback"], "")).strip()
+        if feedback == "apply":
             st.toast("Filter matriks berhasil diterapkan.", icon="✅")
+        elif feedback == "reset":
+            st.toast("Filter matriks dikembalikan ke pengaturan awal.", icon="↩️")
 
         filtered_matrix = _filter_matrix_for_display(
             score_matrix,
