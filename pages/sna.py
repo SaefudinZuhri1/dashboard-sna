@@ -110,6 +110,17 @@ SNA_FILTER_EVENT_KIND_KEY = "_sna_v9_filter_event_kind"
 SNA_FILTER_DEFAULT_PLATFORM = "Semua Platform"
 SNA_FILTER_DEFAULT_NODE_LIMIT = 60
 
+SNA_INFLUENCER_APPLIED_SEARCH_KEY = "_sna_v13_influencer_applied_search"
+SNA_INFLUENCER_APPLIED_PLATFORM_KEY = "_sna_v13_influencer_applied_platform"
+SNA_INFLUENCER_APPLIED_ROWS_KEY = "_sna_v13_influencer_applied_rows"
+SNA_INFLUENCER_APPLIED_MODE_KEY = "_sna_v13_influencer_applied_mode"
+SNA_INFLUENCER_EVENT_KIND_KEY = "_sna_v13_influencer_filter_event_kind"
+SNA_INFLUENCER_EVENT_CHANGED_KEY = "_sna_v13_influencer_filter_event_changed"
+SNA_INFLUENCER_DEFAULT_SEARCH = ""
+SNA_INFLUENCER_DEFAULT_PLATFORM = "Semua Platform"
+SNA_INFLUENCER_DEFAULT_ROWS = 10
+SNA_INFLUENCER_DEFAULT_MODE = "Dua Ranking"
+
 # Ikuti pola halaman Dataset: chart layar penuh memakai dialog Streamlit,
 # bukan data-URI/tab baru dan bukan iframe fullscreen custom.
 _DIALOG_DECORATOR = getattr(st, "dialog", None)
@@ -1372,7 +1383,8 @@ def _inject_sna_css() -> None:
                     transform: translateY(-2px);
                 }
 
-                div[data-testid="stForm"]:has(.sna-v12-filter-marker) {
+                div[data-testid="stForm"]:has(.sna-v12-filter-marker),
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker) {
                     background:
                         radial-gradient(circle at 0% 0%, rgba(29,161,242,0.09), transparent 26%),
                         radial-gradient(circle at 100% 100%, rgba(229,57,53,0.09), transparent 28%),
@@ -1384,30 +1396,37 @@ def _inject_sna_css() -> None:
                     transition: border-color .18s ease, box-shadow .18s ease;
                 }
 
-                div[data-testid="stForm"]:has(.sna-v12-filter-marker):focus-within {
+                div[data-testid="stForm"]:has(.sna-v12-filter-marker):focus-within,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker):focus-within {
                     border-color: rgba(29,161,242,0.60) !important;
                     box-shadow: 0 0 0 3px rgba(29,161,242,0.08), 0 18px 40px rgba(0,0,0,0.26) !important;
                 }
 
-                div[data-testid="stForm"]:has(.sna-v12-filter-marker) label {
+                div[data-testid="stForm"]:has(.sna-v12-filter-marker) label,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker) label {
                     color: #EDEDED !important;
                     font-weight: 760 !important;
                 }
 
                 div[data-testid="stForm"]:has(.sna-v12-filter-marker) input,
-                div[data-testid="stForm"]:has(.sna-v12-filter-marker) [data-baseweb="select"] > div {
+                div[data-testid="stForm"]:has(.sna-v12-filter-marker) [data-baseweb="select"] > div,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker) input,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker) [data-baseweb="select"] > div {
                     border-radius: 11px !important;
                     transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
                 }
 
                 div[data-testid="stForm"]:has(.sna-v12-filter-marker) input:focus,
-                div[data-testid="stForm"]:has(.sna-v12-filter-marker) [data-baseweb="select"] > div:focus-within {
+                div[data-testid="stForm"]:has(.sna-v12-filter-marker) [data-baseweb="select"] > div:focus-within,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker) input:focus,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker) [data-baseweb="select"] > div:focus-within {
                     border-color: rgba(29,161,242,0.72) !important;
                     box-shadow: 0 0 0 3px rgba(29,161,242,0.09) !important;
                     transform: translateY(-1px);
                 }
 
-                div[data-testid="stForm"]:has(.sna-v12-filter-marker) button[kind="primary"] {
+                div[data-testid="stForm"]:has(.sna-v12-filter-marker) button[kind="primary"],
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker) button[kind="primary"] {
                     background: linear-gradient(105deg, #E53935 0%, #C43868 48%, #1DA1F2 100%) !important;
                     border: 1px solid rgba(255,255,255,0.13) !important;
                     box-shadow: 0 12px 28px rgba(229,57,53,0.18) !important;
@@ -1415,7 +1434,8 @@ def _inject_sna_css() -> None:
                     transition: box-shadow .18s ease, filter .18s ease, transform .18s ease !important;
                 }
 
-                div[data-testid="stForm"]:has(.sna-v12-filter-marker) button[kind="primary"]:hover {
+                div[data-testid="stForm"]:has(.sna-v12-filter-marker) button[kind="primary"]:hover,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker) button[kind="primary"]:hover {
                     box-shadow: 0 16px 36px rgba(229,57,53,0.26), 0 0 0 3px rgba(29,161,242,0.08) !important;
                     filter: brightness(1.07);
                     transform: translateY(-2px);
@@ -7111,6 +7131,205 @@ def _show_influencer_table_loading() -> None:
         st.error(f"Loading filter tabel influencer belum dapat disiapkan: {exc}")
 
 
+def _current_influencer_filter_values() -> tuple[str, str, int, str]:
+    """Ambil nilai filter tabel influencer yang sedang dipilih pengguna."""
+    search_value = str(
+        st.session_state.get(
+            "sna_v9_influencer_search",
+            SNA_INFLUENCER_DEFAULT_SEARCH,
+        )
+    )
+    platform_value = str(
+        st.session_state.get(
+            "sna_v9_influencer_platform",
+            SNA_INFLUENCER_DEFAULT_PLATFORM,
+        )
+    )
+    try:
+        row_value = int(
+            st.session_state.get(
+                "sna_v9_influencer_rows",
+                SNA_INFLUENCER_DEFAULT_ROWS,
+            )
+        )
+    except (TypeError, ValueError):
+        row_value = SNA_INFLUENCER_DEFAULT_ROWS
+    mode_value = str(
+        st.session_state.get(
+            "sna_v9_influencer_mode",
+            SNA_INFLUENCER_DEFAULT_MODE,
+        )
+    )
+    return search_value, platform_value, row_value, mode_value
+
+
+def _applied_influencer_filter_values() -> tuple[str, str, int, str]:
+    """Ambil snapshot filter tabel influencer yang terakhir diterapkan."""
+    current_search, current_platform, current_rows, current_mode = (
+        _current_influencer_filter_values()
+    )
+    search_value = str(
+        st.session_state.get(
+            SNA_INFLUENCER_APPLIED_SEARCH_KEY,
+            current_search,
+        )
+    )
+    platform_value = str(
+        st.session_state.get(
+            SNA_INFLUENCER_APPLIED_PLATFORM_KEY,
+            current_platform,
+        )
+    )
+    try:
+        row_value = int(
+            st.session_state.get(
+                SNA_INFLUENCER_APPLIED_ROWS_KEY,
+                current_rows,
+            )
+        )
+    except (TypeError, ValueError):
+        row_value = current_rows
+    mode_value = str(
+        st.session_state.get(
+            SNA_INFLUENCER_APPLIED_MODE_KEY,
+            current_mode,
+        )
+    )
+    return search_value, platform_value, row_value, mode_value
+
+
+def _save_applied_influencer_filter_values(
+    values: tuple[str, str, int, str],
+) -> None:
+    """Simpan snapshot filter tabel influencer yang sudah diterapkan."""
+    search_value, platform_value, row_value, mode_value = values
+    st.session_state[SNA_INFLUENCER_APPLIED_SEARCH_KEY] = str(search_value)
+    st.session_state[SNA_INFLUENCER_APPLIED_PLATFORM_KEY] = str(platform_value)
+    st.session_state[SNA_INFLUENCER_APPLIED_ROWS_KEY] = int(row_value)
+    st.session_state[SNA_INFLUENCER_APPLIED_MODE_KEY] = str(mode_value)
+
+
+def _ensure_influencer_filter_state(
+    platform_labels: list[str],
+    row_options: list[int],
+    mode_options: list[str],
+) -> None:
+    """Pastikan nilai draft dan snapshot filter influencer selalu valid."""
+    try:
+        valid_platforms = platform_labels or [SNA_INFLUENCER_DEFAULT_PLATFORM]
+        valid_rows = row_options or [SNA_INFLUENCER_DEFAULT_ROWS]
+        valid_modes = mode_options or [SNA_INFLUENCER_DEFAULT_MODE]
+
+        if not isinstance(
+            st.session_state.get("sna_v9_influencer_search", ""),
+            str,
+        ):
+            st.session_state["sna_v9_influencer_search"] = str(
+                st.session_state.get("sna_v9_influencer_search", "")
+            )
+        if st.session_state.get("sna_v9_influencer_platform") not in valid_platforms:
+            st.session_state["sna_v9_influencer_platform"] = (
+                SNA_INFLUENCER_DEFAULT_PLATFORM
+                if SNA_INFLUENCER_DEFAULT_PLATFORM in valid_platforms
+                else valid_platforms[0]
+            )
+        if st.session_state.get("sna_v9_influencer_rows") not in valid_rows:
+            st.session_state["sna_v9_influencer_rows"] = (
+                SNA_INFLUENCER_DEFAULT_ROWS
+                if SNA_INFLUENCER_DEFAULT_ROWS in valid_rows
+                else valid_rows[0]
+            )
+        if st.session_state.get("sna_v9_influencer_mode") not in valid_modes:
+            st.session_state["sna_v9_influencer_mode"] = (
+                SNA_INFLUENCER_DEFAULT_MODE
+                if SNA_INFLUENCER_DEFAULT_MODE in valid_modes
+                else valid_modes[0]
+            )
+
+        applied_search, applied_platform, applied_rows, applied_mode = (
+            _applied_influencer_filter_values()
+        )
+        if applied_platform not in valid_platforms:
+            applied_platform = (
+                SNA_INFLUENCER_DEFAULT_PLATFORM
+                if SNA_INFLUENCER_DEFAULT_PLATFORM in valid_platforms
+                else valid_platforms[0]
+            )
+        if applied_rows not in valid_rows:
+            applied_rows = (
+                SNA_INFLUENCER_DEFAULT_ROWS
+                if SNA_INFLUENCER_DEFAULT_ROWS in valid_rows
+                else valid_rows[0]
+            )
+        if applied_mode not in valid_modes:
+            applied_mode = (
+                SNA_INFLUENCER_DEFAULT_MODE
+                if SNA_INFLUENCER_DEFAULT_MODE in valid_modes
+                else valid_modes[0]
+            )
+        _save_applied_influencer_filter_values(
+            (applied_search, applied_platform, applied_rows, applied_mode)
+        )
+    except Exception as exc:
+        st.error(f"State filter tabel influencer belum dapat disiapkan: {exc}")
+
+
+def _apply_influencer_table_filters() -> bool:
+    """Terapkan filter tabel hanya ketika nilai draft benar-benar berubah."""
+    try:
+        current_values = _current_influencer_filter_values()
+        changed = current_values != _applied_influencer_filter_values()
+        st.session_state[SNA_INFLUENCER_EVENT_KIND_KEY] = "apply"
+        st.session_state[SNA_INFLUENCER_EVENT_CHANGED_KEY] = bool(changed)
+        if not changed:
+            return False
+
+        _save_applied_influencer_filter_values(current_values)
+        _show_influencer_table_loading()
+        return True
+    except Exception as exc:
+        st.error(f"Filter tabel influencer belum dapat diterapkan: {exc}")
+        return False
+
+
+def _reset_influencer_table_filters() -> bool:
+    """Kembalikan seluruh filter tabel influencer ke nilai awal."""
+    try:
+        default_values = (
+            SNA_INFLUENCER_DEFAULT_SEARCH,
+            SNA_INFLUENCER_DEFAULT_PLATFORM,
+            SNA_INFLUENCER_DEFAULT_ROWS,
+            SNA_INFLUENCER_DEFAULT_MODE,
+        )
+        pending_changed = _current_influencer_filter_values() != default_values
+        table_changed = _applied_influencer_filter_values() != default_values
+        changed = bool(pending_changed or table_changed)
+
+        st.session_state[SNA_INFLUENCER_EVENT_KIND_KEY] = "reset"
+        st.session_state[SNA_INFLUENCER_EVENT_CHANGED_KEY] = bool(changed)
+        if not changed:
+            return False
+
+        st.session_state["sna_v9_influencer_search"] = (
+            SNA_INFLUENCER_DEFAULT_SEARCH
+        )
+        st.session_state["sna_v9_influencer_platform"] = (
+            SNA_INFLUENCER_DEFAULT_PLATFORM
+        )
+        st.session_state["sna_v9_influencer_rows"] = (
+            SNA_INFLUENCER_DEFAULT_ROWS
+        )
+        st.session_state["sna_v9_influencer_mode"] = (
+            SNA_INFLUENCER_DEFAULT_MODE
+        )
+        _save_applied_influencer_filter_values(default_values)
+        _show_influencer_table_loading()
+        return True
+    except Exception as exc:
+        st.error(f"Filter tabel influencer belum dapat direset: {exc}")
+        return False
+
+
 def _show_influencer_detail_loading() -> None:
     """Aktifkan overlay loading custom saat panel detail akun diubah."""
     try:
@@ -7366,6 +7585,110 @@ def _render_filters(clean_df: pd.DataFrame) -> tuple[str, str, int, bool]:
         st.error(f"Gagal menampilkan filter halaman SNA: {exc}")
         return "IndiHome", "all", 80, False
 
+@_FRAGMENT_DECORATOR
+def _render_influencer_table_filter_fragment(
+    platform_labels: list[str],
+    row_options: list[int],
+    mode_options: list[str],
+) -> None:
+    """Render filter tabel influencer tanpa memuat ulang seluruh halaman."""
+    try:
+        _ensure_influencer_filter_state(
+            platform_labels,
+            row_options,
+            mode_options,
+        )
+
+        with st.container(border=True):
+            st.markdown(
+                '<span class="sna-v12-filter-marker"></span>',
+                unsafe_allow_html=True,
+            )
+            col_search, col_platform, col_rows, col_mode = st.columns(
+                [1.35, 1, 0.75, 1.05]
+            )
+            with col_search:
+                st.text_input(
+                    "Cari username",
+                    placeholder="Contoh: indihome",
+                    key="sna_v9_influencer_search",
+                )
+            with col_platform:
+                st.selectbox(
+                    "Filter platform tabel",
+                    options=platform_labels,
+                    key="sna_v9_influencer_platform",
+                )
+            with col_rows:
+                st.selectbox(
+                    "Jumlah baris",
+                    options=row_options,
+                    key="sna_v9_influencer_rows",
+                )
+            with col_mode:
+                st.selectbox(
+                    "Mode ranking",
+                    options=mode_options,
+                    key="sna_v9_influencer_mode",
+                )
+
+            filter_changed = (
+                _current_influencer_filter_values()
+                != _applied_influencer_filter_values()
+            )
+            if not filter_changed:
+                st.markdown(
+                    """
+                    <style>
+                        div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker)
+                        button[kind="primary"] {
+                            cursor: default !important;
+                            pointer-events: none !important;
+                        }
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            col_hint, col_reset, col_apply = st.columns(
+                [2.15, 0.9, 1.2],
+                gap="small",
+            )
+            with col_hint:
+                st.caption(
+                    "Atur pencarian, platform, jumlah baris, dan mode ranking "
+                    "terlebih dahulu. Tabel baru diperbarui setelah tombol di "
+                    "sebelah kanan diklik."
+                )
+            with col_reset:
+                reset_clicked = st.button(
+                    "Reset Filter",
+                    key="sna_v13_reset_influencer_table_filter",
+                    use_container_width=True,
+                )
+            with col_apply:
+                apply_clicked = st.button(
+                    "Terapkan Filter Tabel",
+                    key="sna_v13_apply_influencer_table_filter",
+                    type="primary",
+                    use_container_width=True,
+                )
+
+            if reset_clicked and _reset_influencer_table_filters():
+                st.rerun(scope="app")
+
+            # Guard backend menjaga klik/otomasi tidak melakukan apa pun
+            # ketika nilai filter sama dengan snapshot tabel aktif.
+            if (
+                apply_clicked
+                and filter_changed
+                and _apply_influencer_table_filters()
+            ):
+                st.rerun(scope="app")
+    except Exception as exc:
+        st.error(f"Filter tabel influencer belum dapat ditampilkan: {exc}")
+
+
 def _render_influencer_tables(node_df: pd.DataFrame, service: str, platform: str) -> None:
     """Render tabel influencer yang lebih rapi, ringan, dan interaktif."""
     try:
@@ -7405,62 +7728,36 @@ def _render_influencer_tables(node_df: pd.DataFrame, service: str, platform: str
             row_options = [5, 10, 15, 20]
             mode_options = ["Dua Ranking", "Degree Saja", "Followers Saja"]
 
-            if st.session_state.get("sna_v9_influencer_platform") not in platform_labels:
-                st.session_state["sna_v9_influencer_platform"] = "Semua Platform"
-            if st.session_state.get("sna_v9_influencer_rows") not in row_options:
-                st.session_state["sna_v9_influencer_rows"] = 10
-            if st.session_state.get("sna_v9_influencer_mode") not in mode_options:
-                st.session_state["sna_v9_influencer_mode"] = "Dua Ranking"
-            if not isinstance(st.session_state.get("sna_v9_influencer_search", ""), str):
-                st.session_state["sna_v9_influencer_search"] = str(st.session_state.get("sna_v9_influencer_search", ""))
+            _render_influencer_table_filter_fragment(
+                platform_labels,
+                row_options,
+                mode_options,
+            )
+            _ensure_influencer_filter_state(
+                platform_labels,
+                row_options,
+                mode_options,
+            )
+            search_keyword, selected_platform, row_limit, view_mode = (
+                _applied_influencer_filter_values()
+            )
 
-            # Filter tabel memakai form agar pengguna bisa mengatur beberapa pilihan dulu
-            # tanpa memicu rerun/loading berkali-kali. Loading custom hanya muncul
-            # ketika tombol Terapkan Filter Tabel diklik.
-            with st.form("sna_v9_influencer_table_filter_form", clear_on_submit=False):
-                st.markdown('<span class="sna-v12-filter-marker"></span>', unsafe_allow_html=True)
-                col_search, col_platform, col_rows, col_mode = st.columns([1.35, 1, 0.75, 1.05])
-                with col_search:
-                    search_keyword = st.text_input(
-                        "Cari username",
-                        placeholder="Contoh: indihome",
-                        key="sna_v9_influencer_search",
-                    )
-                with col_platform:
-                    selected_platform = st.selectbox(
-                        "Filter platform tabel",
-                        options=platform_labels,
-                        key="sna_v9_influencer_platform",
-                    )
-                with col_rows:
-                    row_limit = st.selectbox(
-                        "Jumlah baris",
-                        options=row_options,
-                        key="sna_v9_influencer_rows",
-                    )
-                with col_mode:
-                    view_mode = st.selectbox(
-                        "Mode ranking",
-                        options=mode_options,
-                        key="sna_v9_influencer_mode",
-                    )
-
-                col_hint, col_apply = st.columns([2.55, 1])
-                with col_hint:
-                    st.caption(
-                        "Atur pencarian, platform, jumlah baris, dan mode ranking terlebih dahulu. "
-                        "Tabel baru diperbarui setelah tombol di sebelah kanan diklik."
-                    )
-                with col_apply:
-                    table_filter_submitted = st.form_submit_button(
-                        "Terapkan Filter Tabel",
-                        type="primary",
-                        use_container_width=True,
-                        on_click=_show_influencer_table_loading,
-                    )
-
-            if table_filter_submitted:
-                st.success("Filter tabel influencer berhasil diterapkan.", icon="✅")
+            event_kind = str(
+                st.session_state.pop(SNA_INFLUENCER_EVENT_KIND_KEY, "")
+            )
+            event_changed = bool(
+                st.session_state.pop(
+                    SNA_INFLUENCER_EVENT_CHANGED_KEY,
+                    False,
+                )
+            )
+            if event_changed and event_kind in {"apply", "reset"}:
+                message = (
+                    "Filter tabel influencer berhasil direset."
+                    if event_kind == "reset"
+                    else "Filter tabel influencer berhasil diterapkan."
+                )
+                st.success(message, icon="✅")
 
             filtered_table_df = non_brand.copy()
             if selected_platform != "Semua Platform":
