@@ -88,6 +88,15 @@ RECOMMENDATION_ACTION_LOADING_KEY = "_recommendation_action_loading_label"
 MATRIX_FILTER_DEFAULT_MIN_SCORE = 1
 MATRIX_FILTER_EVENT_PREFIX = "_recommendation_matrix_filter_event_"
 MATRIX_FILTER_FEEDBACK_PREFIX = "_recommendation_matrix_filter_feedback_"
+MATRIX_TABLE_FILTER_EVENT_KEY = "_recommendation_matrix_table_filter_event"
+MATRIX_TABLE_FILTER_FEEDBACK_KEY = "_recommendation_matrix_table_filter_feedback"
+MATRIX_TABLE_FILTER_APPLIED_KEYS = {
+    "keyword": "_rec_matrix_table_applied_keyword",
+    "platforms": "_rec_matrix_table_applied_platforms",
+    "sort_by": "_rec_matrix_table_applied_sort_by",
+    "descending": "_rec_matrix_table_applied_descending",
+    "row_limit": "_rec_matrix_table_applied_limit",
+}
 RECOMMENDATION_CACHE_RECOVERY_KEY = "_recommendation_cache_recovery_v1_1"
 RECOMMENDATION_CACHE_ERROR_MARKERS = (
     "StringDtype.__init__",
@@ -8280,6 +8289,422 @@ def _render_matrix_rank_cards(
     components.html(rank_html, height=112, scrolling=False)
 
 
+
+def _matrix_table_filter_defaults(
+    platform_options: list[str],
+    sort_options: list[str],
+    available_row_count: int,
+) -> tuple[str, tuple[str, ...], str, bool, int]:
+    """Kembalikan nilai awal filter tabel skor detail."""
+    limit_max = min(50, max(int(available_row_count), 0))
+    default_limit = min(15, limit_max) if limit_max > 0 else 0
+    default_sort = str(sort_options[0]) if sort_options else "Rata-rata"
+    return "", tuple(str(item) for item in platform_options), default_sort, True, default_limit
+
+
+def _normalise_matrix_table_platforms(
+    values: Any,
+    platform_options: list[str],
+) -> tuple[str, ...]:
+    """Normalisasi pilihan platform sesuai urutan opsi yang tersedia."""
+    try:
+        selected = {str(item) for item in list(values or [])}
+    except Exception:
+        selected = set()
+    return tuple(item for item in platform_options if item in selected)
+
+
+def _normalise_matrix_table_limit(value: Any, available_row_count: int) -> int:
+    """Normalisasi jumlah baris agar tetap valid untuk ukuran tabel aktif."""
+    limit_max = min(50, max(int(available_row_count), 0))
+    if limit_max <= 5:
+        return limit_max
+    try:
+        numeric_value = int(value)
+    except (TypeError, ValueError):
+        numeric_value = min(15, limit_max)
+    return max(5, min(limit_max, numeric_value))
+
+
+def _ensure_matrix_table_filter_state(
+    platform_options: list[str],
+    sort_options: list[str],
+    available_row_count: int,
+) -> None:
+    """Pastikan state draft dan aktif filter tabel selalu valid."""
+    defaults = _matrix_table_filter_defaults(
+        platform_options,
+        sort_options,
+        available_row_count,
+    )
+    default_keyword, default_platforms, default_sort, default_desc, default_limit = defaults
+
+    widget_defaults: dict[str, Any] = {
+        "rec_matrix_table_keyword": default_keyword,
+        "rec_matrix_table_platforms": list(default_platforms),
+        "rec_matrix_table_sort_by": default_sort,
+        "rec_matrix_table_descending": default_desc,
+        "rec_matrix_table_limit": default_limit,
+    }
+    for key, value in widget_defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+    st.session_state["rec_matrix_table_keyword"] = str(
+        st.session_state.get("rec_matrix_table_keyword", default_keyword)
+    )
+    st.session_state["rec_matrix_table_platforms"] = list(
+        _normalise_matrix_table_platforms(
+            st.session_state.get("rec_matrix_table_platforms", default_platforms),
+            platform_options,
+        )
+    )
+    current_sort = str(st.session_state.get("rec_matrix_table_sort_by", default_sort))
+    st.session_state["rec_matrix_table_sort_by"] = (
+        current_sort if current_sort in sort_options else default_sort
+    )
+    st.session_state["rec_matrix_table_descending"] = bool(
+        st.session_state.get("rec_matrix_table_descending", default_desc)
+    )
+    st.session_state["rec_matrix_table_limit"] = _normalise_matrix_table_limit(
+        st.session_state.get("rec_matrix_table_limit", default_limit),
+        available_row_count,
+    )
+
+    applied_defaults: dict[str, Any] = {
+        MATRIX_TABLE_FILTER_APPLIED_KEYS["keyword"]: default_keyword,
+        MATRIX_TABLE_FILTER_APPLIED_KEYS["platforms"]: default_platforms,
+        MATRIX_TABLE_FILTER_APPLIED_KEYS["sort_by"]: default_sort,
+        MATRIX_TABLE_FILTER_APPLIED_KEYS["descending"]: default_desc,
+        MATRIX_TABLE_FILTER_APPLIED_KEYS["row_limit"]: default_limit,
+    }
+    for key, value in applied_defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["keyword"]] = str(
+        st.session_state.get(MATRIX_TABLE_FILTER_APPLIED_KEYS["keyword"], default_keyword)
+    )
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["platforms"]] = (
+        _normalise_matrix_table_platforms(
+            st.session_state.get(MATRIX_TABLE_FILTER_APPLIED_KEYS["platforms"], default_platforms),
+            platform_options,
+        )
+    )
+    applied_sort = str(
+        st.session_state.get(MATRIX_TABLE_FILTER_APPLIED_KEYS["sort_by"], default_sort)
+    )
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["sort_by"]] = (
+        applied_sort if applied_sort in sort_options else default_sort
+    )
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["descending"]] = bool(
+        st.session_state.get(MATRIX_TABLE_FILTER_APPLIED_KEYS["descending"], default_desc)
+    )
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["row_limit"]] = (
+        _normalise_matrix_table_limit(
+            st.session_state.get(MATRIX_TABLE_FILTER_APPLIED_KEYS["row_limit"], default_limit),
+            available_row_count,
+        )
+    )
+
+
+def _current_matrix_table_filter_values(
+    platform_options: list[str],
+    sort_options: list[str],
+    available_row_count: int,
+) -> tuple[str, tuple[str, ...], str, bool, int]:
+    """Ambil snapshot filter tabel yang sedang dipilih pengguna."""
+    defaults = _matrix_table_filter_defaults(
+        platform_options,
+        sort_options,
+        available_row_count,
+    )
+    return (
+        str(st.session_state.get("rec_matrix_table_keyword", defaults[0])).strip(),
+        _normalise_matrix_table_platforms(
+            st.session_state.get("rec_matrix_table_platforms", defaults[1]),
+            platform_options,
+        ),
+        str(st.session_state.get("rec_matrix_table_sort_by", defaults[2])),
+        bool(st.session_state.get("rec_matrix_table_descending", defaults[3])),
+        _normalise_matrix_table_limit(
+            st.session_state.get("rec_matrix_table_limit", defaults[4]),
+            available_row_count,
+        ),
+    )
+
+
+def _applied_matrix_table_filter_values(
+    platform_options: list[str],
+    sort_options: list[str],
+    available_row_count: int,
+) -> tuple[str, tuple[str, ...], str, bool, int]:
+    """Ambil snapshot filter tabel yang terakhir diterapkan."""
+    defaults = _matrix_table_filter_defaults(
+        platform_options,
+        sort_options,
+        available_row_count,
+    )
+    return (
+        str(
+            st.session_state.get(
+                MATRIX_TABLE_FILTER_APPLIED_KEYS["keyword"],
+                defaults[0],
+            )
+        ).strip(),
+        _normalise_matrix_table_platforms(
+            st.session_state.get(
+                MATRIX_TABLE_FILTER_APPLIED_KEYS["platforms"],
+                defaults[1],
+            ),
+            platform_options,
+        ),
+        str(
+            st.session_state.get(
+                MATRIX_TABLE_FILTER_APPLIED_KEYS["sort_by"],
+                defaults[2],
+            )
+        ),
+        bool(
+            st.session_state.get(
+                MATRIX_TABLE_FILTER_APPLIED_KEYS["descending"],
+                defaults[3],
+            )
+        ),
+        _normalise_matrix_table_limit(
+            st.session_state.get(
+                MATRIX_TABLE_FILTER_APPLIED_KEYS["row_limit"],
+                defaults[4],
+            ),
+            available_row_count,
+        ),
+    )
+
+
+def _apply_matrix_table_filter_state(
+    platform_options: list[str],
+    sort_options: list[str],
+    available_row_count: int,
+) -> bool:
+    """Terapkan filter tabel hanya jika nilai draft benar-benar berubah."""
+    current_values = _current_matrix_table_filter_values(
+        platform_options,
+        sort_options,
+        available_row_count,
+    )
+    if current_values == _applied_matrix_table_filter_values(
+        platform_options,
+        sort_options,
+        available_row_count,
+    ):
+        return False
+
+    keyword, platforms, sort_by, descending, row_limit = current_values
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["keyword"]] = keyword
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["platforms"]] = platforms
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["sort_by"]] = sort_by
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["descending"]] = descending
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["row_limit"]] = row_limit
+    st.session_state[MATRIX_TABLE_FILTER_FEEDBACK_KEY] = "Filter tabel berhasil diterapkan."
+    st.session_state[RECOMMENDATION_ACTION_LOADING_KEY] = (
+        "Menerapkan filter tabel rekomendasi..."
+    )
+    return True
+
+
+def _reset_matrix_table_filter_state(
+    platform_options: list[str],
+    sort_options: list[str],
+    available_row_count: int,
+) -> None:
+    """Kembalikan filter tabel ke nilai awal dan tandai reset valid."""
+    defaults = _matrix_table_filter_defaults(
+        platform_options,
+        sort_options,
+        available_row_count,
+    )
+    current_values = _current_matrix_table_filter_values(
+        platform_options,
+        sort_options,
+        available_row_count,
+    )
+    applied_values = _applied_matrix_table_filter_values(
+        platform_options,
+        sort_options,
+        available_row_count,
+    )
+    if current_values == defaults and applied_values == defaults:
+        return
+
+    keyword, platforms, sort_by, descending, row_limit = defaults
+    st.session_state["rec_matrix_table_keyword"] = keyword
+    st.session_state["rec_matrix_table_platforms"] = list(platforms)
+    st.session_state["rec_matrix_table_sort_by"] = sort_by
+    st.session_state["rec_matrix_table_descending"] = descending
+    st.session_state["rec_matrix_table_limit"] = row_limit
+
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["keyword"]] = keyword
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["platforms"]] = platforms
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["sort_by"]] = sort_by
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["descending"]] = descending
+    st.session_state[MATRIX_TABLE_FILTER_APPLIED_KEYS["row_limit"]] = row_limit
+    st.session_state[MATRIX_TABLE_FILTER_EVENT_KEY] = "reset"
+    st.session_state[MATRIX_TABLE_FILTER_FEEDBACK_KEY] = "Filter tabel dikembalikan ke nilai awal."
+    st.session_state[RECOMMENDATION_ACTION_LOADING_KEY] = (
+        "Mengatur ulang filter tabel rekomendasi..."
+    )
+
+
+@_FRAGMENT_DECORATOR
+def _render_matrix_table_filter_fragment(
+    platform_options: list[str],
+    sort_options: list[str],
+    available_row_count: int,
+) -> None:
+    """Render filter tabel secara lokal sampai Apply atau Reset valid."""
+    try:
+        _ensure_matrix_table_filter_state(
+            platform_options,
+            sort_options,
+            available_row_count,
+        )
+        current_values = _current_matrix_table_filter_values(
+            platform_options,
+            sort_options,
+            available_row_count,
+        )
+        applied_values = _applied_matrix_table_filter_values(
+            platform_options,
+            sort_options,
+            available_row_count,
+        )
+        filter_changed = current_values != applied_values
+
+        # Marker membatasi CSS hanya pada dua tombol di filter tabel detail.
+        # Apply tetap terlihat normal, tetapi tidak menerima pointer ketika
+        # belum ada perubahan filter. Guard backend tetap ada di bawah.
+        inert_rule = """
+            div[data-testid="stColumn"]:has(.rec-matrix-table-apply-marker)
+            div[data-testid="stButton"] > button[kind="primary"] {
+                cursor: default !important;
+                pointer-events: none !important;
+            }
+        """ if not filter_changed else ""
+        st.markdown(
+            f"""
+            <style>
+                .rec-matrix-table-reset-marker,
+                .rec-matrix-table-apply-marker {{ display: none; }}
+                div[data-testid="stMarkdownContainer"]:has(.rec-matrix-table-reset-marker),
+                div[data-testid="stMarkdownContainer"]:has(.rec-matrix-table-apply-marker) {{
+                    display: none !important;
+                }}
+                div[data-testid="stColumn"]:has(.rec-matrix-table-reset-marker)
+                div[data-testid="stButton"] > button,
+                div[data-testid="stColumn"]:has(.rec-matrix-table-apply-marker)
+                div[data-testid="stButton"] > button {{
+                    min-height: 3.45rem !important;
+                }}
+                div[data-testid="stColumn"]:has(.rec-matrix-table-reset-marker)
+                div[data-testid="stButton"] > button p,
+                div[data-testid="stColumn"]:has(.rec-matrix-table-apply-marker)
+                div[data-testid="stButton"] > button p {{
+                    white-space: nowrap !important;
+                }}
+                {inert_rule}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        filter_col, platform_col, sort_col, order_col, reset_col, apply_col = st.columns(
+            [1.18, 1.03, .95, .72, .76, .95],
+            gap="medium",
+        )
+        with filter_col:
+            st.text_input(
+                "Cari influencer",
+                placeholder="Contoh: ferindra, detikcom",
+                key="rec_matrix_table_keyword",
+            )
+        with platform_col:
+            st.multiselect(
+                "Filter platform",
+                options=platform_options,
+                key="rec_matrix_table_platforms",
+            )
+        with sort_col:
+            st.selectbox(
+                "Urutkan berdasarkan",
+                options=sort_options,
+                key="rec_matrix_table_sort_by",
+            )
+        with order_col:
+            st.toggle(
+                "Tertinggi dulu",
+                key="rec_matrix_table_descending",
+            )
+        with reset_col:
+            st.markdown(
+                '<span class="rec-matrix-table-reset-marker"></span>',
+                unsafe_allow_html=True,
+            )
+            st.markdown("<div style='height: 31px;'></div>", unsafe_allow_html=True)
+            st.button(
+                "Reset Filter",
+                key="rec_matrix_table_reset_filter",
+                use_container_width=True,
+                on_click=_reset_matrix_table_filter_state,
+                args=(platform_options, sort_options, available_row_count),
+            )
+        with apply_col:
+            st.markdown(
+                '<span class="rec-matrix-table-apply-marker"></span>',
+                unsafe_allow_html=True,
+            )
+            st.markdown("<div style='height: 31px;'></div>", unsafe_allow_html=True)
+            apply_clicked = st.button(
+                "Terapkan Filter",
+                key="rec_matrix_table_apply_filter",
+                use_container_width=True,
+                type="primary",
+            )
+
+        limit_max = min(50, max(int(available_row_count), 0))
+        if available_row_count > 5:
+            st.slider(
+                "Jumlah baris yang ditampilkan",
+                min_value=5,
+                max_value=limit_max,
+                step=1,
+                key="rec_matrix_table_limit",
+            )
+        else:
+            fixed_limit = max(available_row_count, 0)
+            st.markdown(
+                f"""
+                <div class="rec-matrix-table-fixed-limit">
+                    <span>Jumlah baris yang ditampilkan</span>
+                    <strong>{fixed_limit}</strong>
+                    <small>Semua kandidat tersedia langsung ditampilkan, jadi slider tidak diperlukan.</small>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        if st.session_state.pop(MATRIX_TABLE_FILTER_EVENT_KEY, "") == "reset":
+            st.rerun(scope="app")
+
+        if apply_clicked and filter_changed and _apply_matrix_table_filter_state(
+            platform_options,
+            sort_options,
+            available_row_count,
+        ):
+            st.rerun(scope="app")
+    except Exception as exc:
+        st.error(f"Filter tabel skor detail gagal ditampilkan: {exc}")
+
+
 def _render_matrix_table(filtered_matrix: pd.DataFrame) -> None:
     """Tampilkan tabel skor dengan pencarian, filter, sorting, dan detail akun."""
     if filtered_matrix.empty:
@@ -8321,75 +8746,25 @@ def _render_matrix_table(filtered_matrix: pd.DataFrame) -> None:
         # Streamlit tidak mengizinkan slider ketika min_value sama dengan max_value,
         # sehingga kontrol jumlah baris dibuat adaptif agar halaman tidak gagal tampil.
         available_row_count = int(len(table))
-        limit_max = min(50, available_row_count)
-        default_limit = min(15, limit_max) if limit_max > 0 else 0
 
-        # Form dipakai agar perubahan filter baru diterapkan setelah tombol diklik.
-        with st.form("rec_matrix_table_filter_form", border=False):
-            filter_col, platform_col, sort_col, order_col, apply_col = st.columns(
-                [1.25, 1.10, 1.00, .78, .88],
-                gap="medium",
+        _render_matrix_table_filter_fragment(
+            platform_options,
+            sort_options,
+            available_row_count,
+        )
+        keyword, selected_platforms, sort_by, descending, row_limit = (
+            _applied_matrix_table_filter_values(
+                platform_options,
+                sort_options,
+                available_row_count,
             )
-            with filter_col:
-                keyword = st.text_input(
-                    "Cari influencer",
-                    value="",
-                    placeholder="Contoh: ferindra, detikcom",
-                    key="rec_matrix_table_keyword",
-                )
-            with platform_col:
-                selected_platforms = st.multiselect(
-                    "Filter platform",
-                    options=platform_options,
-                    default=platform_options,
-                    key="rec_matrix_table_platforms",
-                )
-            with sort_col:
-                sort_by = st.selectbox(
-                    "Urutkan berdasarkan",
-                    options=sort_options,
-                    index=0,
-                    key="rec_matrix_table_sort_by",
-                )
-            with order_col:
-                descending = st.toggle(
-                    "Tertinggi dulu",
-                    value=True,
-                    key="rec_matrix_table_descending",
-                )
-            with apply_col:
-                st.markdown("<div style='height: 31px;'></div>", unsafe_allow_html=True)
-                table_filter_submitted = st.form_submit_button(
-                    "Terapkan Filter",
-                    use_container_width=True,
-                    type="primary",
-                    on_click=_show_matrix_table_filter_loading,
-                )
+        )
 
-            if available_row_count > 5:
-                row_limit = st.slider(
-                    "Jumlah baris yang ditampilkan",
-                    min_value=5,
-                    max_value=limit_max,
-                    value=default_limit,
-                    step=1,
-                    key="rec_matrix_table_limit",
-                )
-            else:
-                row_limit = max(available_row_count, 0)
-                st.markdown(
-                    f"""
-                    <div class="rec-matrix-table-fixed-limit">
-                        <span>Jumlah baris yang ditampilkan</span>
-                        <strong>{row_limit}</strong>
-                        <small>Semua kandidat tersedia langsung ditampilkan, jadi slider tidak diperlukan.</small>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-        if table_filter_submitted:
-            st.toast("Filter tabel berhasil diterapkan.", icon="✅")
+        table_filter_feedback = str(
+            st.session_state.pop(MATRIX_TABLE_FILTER_FEEDBACK_KEY, "")
+        ).strip()
+        if table_filter_feedback:
+            st.toast(table_filter_feedback, icon="✅")
 
         st.markdown(
             """
