@@ -3406,25 +3406,104 @@ def render_footer() -> None:
                             }});
                         }});
 
-                        topButton.addEventListener('click', () => {{
+                        const scrollElementToTop = (element, behavior = 'smooth') => {{
+                            if (!element) return false;
+
+                            let scrolled = false;
+                            try {{
+                                if (typeof element.scrollTo === 'function') {{
+                                    element.scrollTo({{ top: 0, left: 0, behavior }});
+                                    scrolled = true;
+                                }}
+                            }} catch (error) {{
+                                // Lanjutkan ke assignment scrollTop sebagai fallback.
+                            }}
+
+                            try {{
+                                if ('scrollTop' in element) {{
+                                    element.scrollTop = 0;
+                                    scrolled = true;
+                                }}
+                            }} catch (error) {{
+                                // Elemen tertentu dapat menolak assignment; kandidat lain tetap dicoba.
+                            }}
+
+                            return scrolled;
+                        }};
+
+                        const scrollDashboardToTop = () => {{
+                            try {{
+                                const parentWindow = window.parent;
+                                const parentDocument = parentWindow.document;
+                                const candidates = [
+                                    parentDocument.querySelector('[data-testid="stMain"]'),
+                                    parentDocument.querySelector('section[data-testid="stMain"]'),
+                                    parentDocument.querySelector('section.main'),
+                                    parentDocument.querySelector('[data-testid="stAppViewContainer"]'),
+                                    parentDocument.querySelector('main'),
+                                    parentDocument.scrollingElement,
+                                    parentDocument.documentElement,
+                                    parentDocument.body,
+                                ];
+
+                                // Ikuti rantai parent dari iframe footer karena container scroll
+                                // Streamlit dapat berubah antarversi.
+                                try {{
+                                    let ancestor = window.frameElement;
+                                    while (ancestor) {{
+                                        candidates.push(ancestor);
+                                        ancestor = ancestor.parentElement;
+                                    }}
+                                }} catch (error) {{
+                                    // Kandidat selector di atas tetap cukup sebagai fallback.
+                                }}
+
+                                const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
+                                let scrolled = false;
+                                uniqueCandidates.forEach((candidate) => {{
+                                    scrolled = scrollElementToTop(candidate) || scrolled;
+                                }});
+
+                                try {{
+                                    parentWindow.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
+                                    scrolled = true;
+                                }} catch (error) {{
+                                    // Root document sudah dicoba melalui daftar kandidat.
+                                }}
+
+                                // Pastikan posisi benar-benar nol setelah animasi browser selesai.
+                                parentWindow.setTimeout(() => {{
+                                    uniqueCandidates.forEach((candidate) => {{
+                                        scrollElementToTop(candidate, 'auto');
+                                    }});
+                                    try {{
+                                        parentWindow.scrollTo({{ top: 0, left: 0, behavior: 'auto' }});
+                                    }} catch (error) {{
+                                        // Tidak perlu menampilkan error ke pengguna.
+                                    }}
+                                }}, 420);
+
+                                return scrolled;
+                            }} catch (error) {{
+                                try {{
+                                    window.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
+                                    return true;
+                                }} catch (fallbackError) {{
+                                    return false;
+                                }}
+                            }}
+                        }};
+
+                        topButton.addEventListener('click', (event) => {{
+                            event.preventDefault();
+                            event.stopPropagation();
+
                             topButton.classList.remove('is-clicked');
                             void topButton.offsetWidth;
                             topButton.classList.add('is-clicked');
                             topLabel.textContent = 'Naik...';
 
-                            try {{
-                                const parentDocument = window.parent.document;
-                                const appView = parentDocument.querySelector('[data-testid="stAppViewContainer"]');
-                                const mainSection = parentDocument.querySelector('section.main');
-                                const scrollTarget = appView || mainSection || parentDocument.scrollingElement;
-                                if (scrollTarget && typeof scrollTarget.scrollTo === 'function') {{
-                                    scrollTarget.scrollTo({{ top: 0, behavior: 'smooth' }});
-                                }} else {{
-                                    window.parent.scrollTo({{ top: 0, behavior: 'smooth' }});
-                                }}
-                            }} catch (error) {{
-                                window.scrollTo({{ top: 0, behavior: 'smooth' }});
-                            }}
+                            scrollDashboardToTop();
 
                             window.setTimeout(() => {{
                                 topLabel.textContent = 'Ke atas';
