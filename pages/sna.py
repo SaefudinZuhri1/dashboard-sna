@@ -102,6 +102,13 @@ BRAND_PREFIXES = ("indihome", "indibiz", "telkomsel")
 REQUIRED_SNA_COLUMNS = {"source", "target", "relationship", "followers", "platform"}
 SNA_ACTION_LOADING_KEY = "_sna_v9_action_loading_label"
 SNA_GRAPH_RENDER_REQUEST_KEY = "_sna_v9_graph_render_request"
+SNA_FILTER_APPLIED_SERVICE_KEY = "_sna_v9_applied_service_filter"
+SNA_FILTER_APPLIED_PLATFORM_KEY = "_sna_v9_applied_platform_filter"
+SNA_FILTER_APPLIED_NODE_LIMIT_KEY = "_sna_v9_applied_node_limit"
+SNA_FILTER_EVENT_CHANGED_KEY = "_sna_v9_filter_event_changed"
+SNA_FILTER_EVENT_KIND_KEY = "_sna_v9_filter_event_kind"
+SNA_FILTER_DEFAULT_PLATFORM = "Semua Platform"
+SNA_FILTER_DEFAULT_NODE_LIMIT = 60
 
 # Ikuti pola halaman Dataset: chart layar penuh memakai dialog Streamlit,
 # bukan data-URI/tab baru dan bukan iframe fullscreen custom.
@@ -6968,7 +6975,7 @@ def _finish_filter_loading(handle: Any) -> None:
 
 
 def _show_filter_loading() -> None:
-    """Aktifkan overlay loading custom pada rerun setelah tombol filter diklik."""
+    """Aktifkan overlay loading custom hanya untuk perubahan filter yang nyata."""
     try:
         st.session_state.pop(SNA_GRAPH_RENDER_REQUEST_KEY, None)
         layanan = str(st.session_state.get("sna_v9_service_filter", "layanan terpilih")).strip()
@@ -6976,6 +6983,93 @@ def _show_filter_loading() -> None:
         st.session_state[SNA_ACTION_LOADING_KEY] = f"Menerapkan filter SNA untuk {layanan}..."
     except Exception as exc:
         st.error(f"Loading filter SNA belum dapat disiapkan: {exc}")
+
+
+def _filter_node_limit(value: Any, default: int = SNA_FILTER_DEFAULT_NODE_LIMIT) -> int:
+    """Normalisasi nilai jumlah node agar selalu berada pada rentang slider."""
+    try:
+        node_limit = int(value)
+    except (TypeError, ValueError):
+        node_limit = int(default)
+    if node_limit < 20 or node_limit > 160:
+        node_limit = int(default)
+    return node_limit
+
+
+def _current_filter_values() -> tuple[str, str, int]:
+    """Ambil nilai filter yang saat ini dipilih pada widget form."""
+    service = str(st.session_state.get("sna_v9_service_filter", "IndiHome"))
+    platform = str(
+        st.session_state.get("sna_v9_platform_filter", SNA_FILTER_DEFAULT_PLATFORM)
+    )
+    node_limit = _filter_node_limit(st.session_state.get("sna_v9_node_limit"))
+    return service, platform, node_limit
+
+
+def _applied_filter_values() -> tuple[str, str, int]:
+    """Ambil snapshot filter terakhir yang benar-benar diterapkan."""
+    current_service, current_platform, current_node_limit = _current_filter_values()
+    service = str(
+        st.session_state.get(SNA_FILTER_APPLIED_SERVICE_KEY, current_service)
+    )
+    platform = str(
+        st.session_state.get(SNA_FILTER_APPLIED_PLATFORM_KEY, current_platform)
+    )
+    node_limit = _filter_node_limit(
+        st.session_state.get(
+            SNA_FILTER_APPLIED_NODE_LIMIT_KEY,
+            current_node_limit,
+        )
+    )
+    return service, platform, node_limit
+
+
+def _save_applied_filter_values(values: tuple[str, str, int]) -> None:
+    """Simpan snapshot filter yang sudah diterapkan ke session state."""
+    service, platform, node_limit = values
+    st.session_state[SNA_FILTER_APPLIED_SERVICE_KEY] = str(service)
+    st.session_state[SNA_FILTER_APPLIED_PLATFORM_KEY] = str(platform)
+    st.session_state[SNA_FILTER_APPLIED_NODE_LIMIT_KEY] = int(node_limit)
+
+
+def _apply_sna_filters() -> None:
+    """Terapkan filter hanya ketika nilainya berbeda dari snapshot aktif."""
+    try:
+        current_values = _current_filter_values()
+        changed = current_values != _applied_filter_values()
+        st.session_state[SNA_FILTER_EVENT_KIND_KEY] = "apply"
+        st.session_state[SNA_FILTER_EVENT_CHANGED_KEY] = bool(changed)
+        if not changed:
+            return
+
+        _save_applied_filter_values(current_values)
+        _show_filter_loading()
+    except Exception as exc:
+        st.error(f"Filter SNA belum dapat diterapkan: {exc}")
+
+
+def _reset_sna_filters(default_service: str) -> None:
+    """Kembalikan filter ke nilai awal dan terapkan reset bila diperlukan."""
+    try:
+        service = str(default_service).strip() or "IndiHome"
+        default_values = (
+            service,
+            SNA_FILTER_DEFAULT_PLATFORM,
+            SNA_FILTER_DEFAULT_NODE_LIMIT,
+        )
+        analysis_changed = _applied_filter_values() != default_values
+
+        st.session_state["sna_v9_service_filter"] = service
+        st.session_state["sna_v9_platform_filter"] = SNA_FILTER_DEFAULT_PLATFORM
+        st.session_state["sna_v9_node_limit"] = SNA_FILTER_DEFAULT_NODE_LIMIT
+        _save_applied_filter_values(default_values)
+
+        st.session_state[SNA_FILTER_EVENT_KIND_KEY] = "reset"
+        st.session_state[SNA_FILTER_EVENT_CHANGED_KEY] = bool(analysis_changed)
+        if analysis_changed:
+            _show_filter_loading()
+    except Exception as exc:
+        st.error(f"Filter SNA belum dapat direset: {exc}")
 
 
 def _show_influencer_table_loading() -> None:
@@ -7028,6 +7122,7 @@ def _ensure_filter_widget_state(available_services: list[str]) -> None:
             if layanan_global not in available_services:
                 layanan_global = "IndiHome" if "IndiHome" in available_services else available_services[0]
             st.session_state["sna_v9_service_filter"] = layanan_global
+            st.session_state[SNA_FILTER_APPLIED_SERVICE_KEY] = layanan_global
             st.session_state.pop("_active_service_sync_target", None)
 
         if st.session_state.get("sna_v9_service_filter") not in available_services:
@@ -7035,16 +7130,25 @@ def _ensure_filter_widget_state(available_services: list[str]) -> None:
             st.session_state["sna_v9_service_filter"] = default_service
 
         if st.session_state.get("sna_v9_platform_filter") not in PLATFORM_OPTIONS:
-            st.session_state["sna_v9_platform_filter"] = "Semua Platform"
+            st.session_state["sna_v9_platform_filter"] = SNA_FILTER_DEFAULT_PLATFORM
 
-        node_limit = st.session_state.get("sna_v9_node_limit", 60)
-        try:
-            node_limit_int = int(node_limit)
-        except Exception:
-            node_limit_int = 60
-        if node_limit_int < 20 or node_limit_int > 160:
-            node_limit_int = 60
-        st.session_state["sna_v9_node_limit"] = node_limit_int
+        st.session_state["sna_v9_node_limit"] = _filter_node_limit(
+            st.session_state.get("sna_v9_node_limit")
+        )
+
+        current_values = _current_filter_values()
+        applied_service, applied_platform, applied_node_limit = _applied_filter_values()
+        if applied_service not in available_services:
+            applied_service = current_values[0]
+        if applied_platform not in PLATFORM_OPTIONS:
+            applied_platform = current_values[1]
+        applied_node_limit = _filter_node_limit(
+            applied_node_limit,
+            current_values[2],
+        )
+        _save_applied_filter_values(
+            (applied_service, applied_platform, applied_node_limit)
+        )
     except Exception as exc:
         st.error(f"Gagal menyiapkan state filter SNA: {exc}")
 
@@ -7134,32 +7238,64 @@ def _render_filters(clean_df: pd.DataFrame) -> tuple[str, str, int, bool]:
                         help="Naikkan jika ingin melihat graf lebih lengkap. Turunkan jika graf terasa berat.",
                     )
 
-                col_hint, col_apply = st.columns([2.45, 1])
+                col_hint, col_actions = st.columns([2.45, 1])
                 with col_hint:
                     st.caption(
                         "Perubahan pilihan di atas tidak akan langsung memuat ulang graf. "
                         "Klik tombol di sebelah kanan untuk menerapkan filter dan menampilkan loading."
                     )
-                with col_apply:
-                    submitted = st.form_submit_button(
-                        "Terapkan Filter",
-                        type="primary",
-                        use_container_width=True,
-                        on_click=_show_filter_loading,
-                    )
+                with col_actions:
+                    col_reset, col_apply = st.columns(2, gap="small")
+                    with col_reset:
+                        reset_submitted = st.form_submit_button(
+                            "Reset Filter",
+                            use_container_width=True,
+                            on_click=_reset_sna_filters,
+                            args=(
+                                "IndiHome"
+                                if "IndiHome" in available_services
+                                else available_services[0],
+                            ),
+                        )
+                    with col_apply:
+                        submitted = st.form_submit_button(
+                            "Terapkan Filter",
+                            type="primary",
+                            use_container_width=True,
+                            on_click=_apply_sna_filters,
+                        )
 
         selected_platform = PLATFORM_OPTIONS[selected_platform_label]
-        if submitted:
+        event_kind = str(st.session_state.pop(SNA_FILTER_EVENT_KIND_KEY, ""))
+        event_changed = bool(
+            st.session_state.pop(SNA_FILTER_EVENT_CHANGED_KEY, False)
+        )
+        filter_applied = bool(
+            event_changed
+            and (
+                (submitted and event_kind == "apply")
+                or (reset_submitted and event_kind == "reset")
+            )
+        )
+        if filter_applied:
             st.session_state["active_service"] = selected_service
+            activity_description = (
+                f"Mereset filter analisis jaringan untuk layanan {selected_service}."
+                if event_kind == "reset"
+                else f"Menjalankan analisis jaringan untuk layanan {selected_service}."
+            )
             log_activity(
                 "SNA_ANALYSIS",
                 "Social Network Analysis",
-                f"Menjalankan analisis jaringan untuk layanan {selected_service}.",
+                activity_description,
                 service=selected_service,
                 platform=selected_platform_label,
-                metadata={"node_limit": int(node_limit)},
+                metadata={
+                    "node_limit": int(node_limit),
+                    "filter_action": event_kind,
+                },
             )
-        return selected_service, selected_platform, int(node_limit), bool(submitted)
+        return selected_service, selected_platform, int(node_limit), filter_applied
     except Exception as exc:
         st.error(f"Gagal menampilkan filter halaman SNA: {exc}")
         return "IndiHome", "all", 80, False
