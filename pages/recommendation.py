@@ -9522,8 +9522,8 @@ def _render_strategic_summary(points: list[str]) -> None:
                 overflow: hidden;
             }}
             body {{
-                min-height: 0;
-                max-height: none;
+                min-height: 100%;
+                max-height: 560px;
                 overflow-x: hidden;
                 overflow-y: auto;
                 padding: 0 6px 0 0;
@@ -9565,7 +9565,6 @@ def _render_strategic_summary(points: list[str]) -> None:
                     0 24px 70px rgba(0,0,0,.42),
                     inset 0 1px 0 rgba(255,255,255,.08),
                     inset 0 -1px 0 rgba(255,255,255,.04);
-                contain: paint;
                 animation: strategyPanelIn .62s cubic-bezier(.2,.85,.2,1) both;
             }}
             .rec-strategy-showcase::before {{
@@ -9701,7 +9700,6 @@ def _render_strategic_summary(points: list[str]) -> None:
                 border-radius: 20px;
                 background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
                 box-shadow: 0 18px 40px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08);
-                contain: paint;
                 animation: strategyCardIn .58s cubic-bezier(.2,.85,.2,1) both;
                 transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
             }}
@@ -9869,21 +9867,6 @@ def _render_strategic_summary(points: list[str]) -> None:
                 .rec-badge {{ padding: 7px 9px; font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */; }}
                 .rec-strategy-text {{ font-size: 13px; line-height: 1.52; }}
             }}
-            /* Saat pengguna menggulir, animasi kontinu dijeda sementara agar
-               browser tidak melakukan repaint efek blur pada setiap frame. */
-            .rec-scroll-active .rec-strategy-showcase::before,
-            .rec-scroll-active .rec-strategy-showcase::after,
-            .rec-scroll-active .rec-strategy-heading-icon,
-            .rec-scroll-active .rec-orb,
-            .rec-scroll-active .rec-footer-line,
-            .rec-motion-paused .rec-strategy-showcase::before,
-            .rec-motion-paused .rec-strategy-showcase::after,
-            .rec-motion-paused .rec-strategy-heading-icon,
-            .rec-motion-paused .rec-orb,
-            .rec-motion-paused .rec-footer-line {{
-                animation-play-state: paused !important;
-            }}
-
             @media (prefers-reduced-motion: reduce) {{
                 .rec-strategy-showcase,
                 .rec-strategy-showcase::before,
@@ -9925,61 +9908,6 @@ def _render_strategic_summary(points: list[str]) -> None:
                 <span class="rec-footer-line" aria-hidden="true"></span>
             </footer>
         </section>
-
-        <script>
-            (() => {{
-                const root = document.documentElement;
-                const panel = document.querySelector('.rec-strategy-showcase');
-                let resizeTimer = null;
-                let scrollTimer = null;
-
-                // Sesuaikan tinggi iframe dengan tinggi konten agar halaman tidak
-                // memiliki scrollbar bertingkat yang terasa berat saat digulir.
-                const postFrameHeight = () => {{
-                    if (!panel) return;
-                    const targetHeight = Math.ceil(panel.getBoundingClientRect().height + 2);
-                    window.parent.postMessage({{
-                        isStreamlitMessage: true,
-                        type: 'streamlit:setFrameHeight',
-                        height: targetHeight,
-                    }}, '*');
-                }};
-
-                const scheduleFrameHeight = () => {{
-                    window.clearTimeout(resizeTimer);
-                    resizeTimer = window.setTimeout(postFrameHeight, 40);
-                }};
-
-                // Jeda animasi kontinu hanya ketika wheel/touch sedang aktif.
-                // Setelah scroll berhenti, animasi kembali berjalan seperti semula.
-                const pauseMotionDuringScroll = () => {{
-                    root.classList.add('rec-scroll-active');
-                    window.clearTimeout(scrollTimer);
-                    scrollTimer = window.setTimeout(() => {{
-                        root.classList.remove('rec-scroll-active');
-                    }}, 180);
-                }};
-
-                window.addEventListener('load', scheduleFrameHeight, {{ once: true }});
-                window.addEventListener('resize', scheduleFrameHeight, {{ passive: true }});
-                window.addEventListener('wheel', pauseMotionDuringScroll, {{ passive: true }});
-                window.addEventListener('touchmove', pauseMotionDuringScroll, {{ passive: true }});
-                window.addEventListener('scroll', pauseMotionDuringScroll, {{ passive: true }});
-
-                document.addEventListener('visibilitychange', () => {{
-                    root.classList.toggle('rec-motion-paused', document.hidden);
-                }});
-
-                if (document.fonts && document.fonts.ready) {{
-                    document.fonts.ready.then(scheduleFrameHeight).catch(() => null);
-                }}
-                if ('ResizeObserver' in window && panel) {{
-                    const observer = new ResizeObserver(scheduleFrameHeight);
-                    observer.observe(panel);
-                }}
-                scheduleFrameHeight();
-            }})();
-        </script>
     </body>
     </html>
     """
