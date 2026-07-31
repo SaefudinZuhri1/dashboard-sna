@@ -1,54 +1,31 @@
 @echo off
-setlocal
-cd /d "%~dp0"
-title Dashboard Analisis Telkom Group
-
-echo ================================================================
-echo DASHBOARD ANALISIS TELKOM GROUP
-echo ================================================================
+title Dashboard Telkom Group — Analisis Sentimen SNA
+color 0A
+echo.
+echo  ======================================================
+echo   Dashboard Analisis Sentimen ^& SNA — Telkom Group
+echo   Skripsi S1 Sains Data — ULBI Bandung 2026
+echo  ======================================================
 echo.
 
-if defined VIRTUAL_ENV goto :CHECK_PYTHON
-
-if exist ".venv\Scripts\activate.bat" (
-    echo Mengaktifkan virtual environment .venv...
-    call ".venv\Scripts\activate.bat"
-    goto :CHECK_PYTHON
+REM Cek apakah virtual environment ada
+if not exist "venv\Scripts\activate.bat" (
+    echo [SETUP] Virtual environment tidak ditemukan.
+    echo [SETUP] Membuat virtual environment baru...
+    python -m venv venv
+    echo [SETUP] Menginstall dependency dari requirements.txt...
+    call venv\Scripts\activate.bat
+    pip install -r requirements.txt
+    echo [SETUP] Instalasi selesai!
+) else (
+    call venv\Scripts\activate.bat
 )
 
-if exist "venv\Scripts\activate.bat" (
-    echo Mengaktifkan virtual environment venv...
-    call "venv\Scripts\activate.bat"
-)
-
-:CHECK_PYTHON
-where python >nul 2>nul
-if errorlevel 1 (
-    echo [GAGAL] Python tidak ditemukan.
-    echo Instal Python 3.10 atau 3.11, lalu jalankan file ini kembali.
-    pause
-    exit /b 1
-)
-
-python -c "import streamlit" >nul 2>nul
-if errorlevel 1 (
-    echo [GAGAL] Streamlit belum terpasang pada environment aktif.
-    echo Jalankan: python -m pip install -r requirements.txt
-    pause
-    exit /b 1
-)
-
-echo Dashboard siap di http://localhost:8501
-echo Tekan Ctrl+C pada jendela ini untuk menghentikan dashboard.
 echo.
-python -m streamlit run app.py
-set "APP_EXIT=%ERRORLEVEL%"
+echo [INFO] Memulai dashboard...
+echo [INFO] Browser akan terbuka otomatis di http://localhost:8501
+echo [INFO] Tekan Ctrl+C untuk menghentikan server
+echo.
+streamlit run app.py --server.port 8501 --server.headless false
 
-if not "%APP_EXIT%"=="0" (
-    echo.
-    echo [GAGAL] Dashboard berhenti dengan kode %APP_EXIT%.
-    echo Baca pesan error paling bawah pada terminal.
-    pause
-)
-
-exit /b %APP_EXIT%
+pause

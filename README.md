@@ -60,6 +60,8 @@ Struktur berikut menggambarkan baseline proyek saat ini dan folder runtime yang 
 project/
 ├── app.py                         # Titik masuk aplikasi, autentikasi, sidebar, dan routing halaman
 ├── README.md                      # Ringkasan proyek dan panduan cepat
+├── run.bat                        # Launcher otomatis untuk Windows
+├── run.sh                         # Launcher otomatis untuk macOS/Linux
 ├── requirements.txt               # Daftar library Python dan versinya
 ├── Procfile                       # Perintah startup untuk platform deployment yang mendukung Procfile
 ├── UI_UX_LOCK.md                  # Aturan penguncian tampilan dashboard
@@ -114,9 +116,18 @@ project/
     └── PANDUAN_PENGGUNAAN.md      # Panduan penggunaan seluruh halaman utama
 ```
 
-> **Catatan baseline:** Arsip proyek dapat tidak menyertakan folder `data/` dan `models/` karena ukurannya besar atau bersifat lokal. Aplikasi tetap dapat dibuka dengan fallback dummy. Baseline `skripsi_v4.18` juga belum menyertakan `run.bat` dan `run.sh`; perintah resmi yang digunakan adalah `streamlit run app.py`.
+> **Catatan baseline:** Arsip proyek dapat tidak menyertakan folder `data/` dan `models/` karena ukurannya besar atau bersifat lokal. Aplikasi tetap dapat dibuka dengan fallback dummy. Mulai Tahap 5 Fase 14, launcher `run.bat` dan `run.sh` tersedia di root proyek.
 
 ## 🚀 Cara Menjalankan (Lokal)
+
+### Cara termudah — launcher otomatis
+
+- **Windows:** buka folder proyek, lalu klik dua kali file `run.bat`.
+- **macOS/Linux:** berikan izin satu kali dengan perintah `chmod +x run.sh`, kemudian klik dua kali file `run.sh` atau jalankan `./run.sh` dari Terminal.
+
+Pada penggunaan pertama, launcher akan membuat folder `venv` dan memasang seluruh dependency dari `requirements.txt` secara otomatis. Penggunaan berikutnya langsung mengaktifkan `venv` yang sudah tersedia dan menjalankan dashboard.
+
+### Cara manual — alternatif jika launcher bermasalah
 
 ### 1. Buka terminal pada folder proyek
 

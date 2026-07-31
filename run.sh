@@ -1,36 +1,28 @@
-#!/usr/bin/env bash
-set -u
+#!/bin/bash
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+echo ""
+echo "======================================================"
+echo " Dashboard Analisis Sentimen & SNA — Telkom Group"
+echo " Skripsi S1 Sains Data — ULBI Bandung 2026"
+echo "======================================================"
+echo ""
 
-if [[ -z "${VIRTUAL_ENV:-}" ]]; then
-    if [[ -f ".venv/bin/activate" ]]; then
-        echo "Mengaktifkan virtual environment .venv..."
-        # shellcheck disable=SC1091
-        source ".venv/bin/activate"
-    elif [[ -f "venv/bin/activate" ]]; then
-        echo "Mengaktifkan virtual environment venv..."
-        # shellcheck disable=SC1091
-        source "venv/bin/activate"
-    fi
-fi
-
-if command -v python3 >/dev/null 2>&1; then
-    PYTHON_BIN="python3"
-elif command -v python >/dev/null 2>&1; then
-    PYTHON_BIN="python"
+# Cek apakah virtual environment ada
+if [ ! -d "venv" ]; then
+    echo "[SETUP] Virtual environment tidak ditemukan."
+    echo "[SETUP] Membuat virtual environment baru..."
+    python3 -m venv venv
+    echo "[SETUP] Menginstall dependency dari requirements.txt..."
+    source venv/bin/activate
+    pip install -r requirements.txt
+    echo "[SETUP] Instalasi selesai!"
 else
-    echo "[GAGAL] Python tidak ditemukan. Instal Python 3.10 atau 3.11."
-    exit 1
+    source venv/bin/activate
 fi
 
-if ! "$PYTHON_BIN" -c "import streamlit" >/dev/null 2>&1; then
-    echo "[GAGAL] Streamlit belum terpasang pada environment aktif."
-    echo "Jalankan: $PYTHON_BIN -m pip install -r requirements.txt"
-    exit 1
-fi
-
-echo "Dashboard siap di http://localhost:8501"
-echo "Tekan Ctrl+C untuk menghentikan dashboard."
-exec "$PYTHON_BIN" -m streamlit run app.py
+echo ""
+echo "[INFO] Memulai dashboard..."
+echo "[INFO] Buka browser di http://localhost:8501"
+echo "[INFO] Tekan Ctrl+C untuk menghentikan server"
+echo ""
+streamlit run app.py --server.port 8501
