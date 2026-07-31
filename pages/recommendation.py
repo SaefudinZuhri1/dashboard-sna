@@ -8908,6 +8908,7 @@ def _render_matrix_table(filtered_matrix: pd.DataFrame) -> None:
             mime="text/csv",
             use_container_width=True,
             key="rec_matrix_table_download",
+            on_click="ignore",
         )
 
         selected_account = st.selectbox(
