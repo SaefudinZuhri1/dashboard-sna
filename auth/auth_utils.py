@@ -4,12 +4,11 @@ import hashlib
 import logging
 import secrets
 import sqlite3
+import threading
 from datetime import datetime, timedelta
-from io import BytesIO
 from pathlib import Path
 
 import bcrypt
-from PIL import Image
 
 from utils.access_control import (
     DEFAULT_ROLE,
@@ -33,6 +32,9 @@ ADMIN_SEED = {
     "password": "admin123",
     "role": ROLE_DATA_ANALYST,
 }
+
+_DATABASE_INIT_LOCK = threading.RLock()
+_DATABASE_READY = False
 
 
 
@@ -129,7 +131,9 @@ def _database_is_corrupt(error: Exception) -> bool:
 
 def _remove_corrupt_database() -> None:
     """Hapus file database rusak agar dapat dibuat ulang saat startup."""
+    global _DATABASE_READY
     try:
+        _DATABASE_READY = False
         if DB_PATH.exists():
             DB_PATH.unlink()
     except Exception as error:
@@ -197,42 +201,50 @@ def _create_schema_and_seed(conn: sqlite3.Connection) -> None:
 
 
 def init_database() -> None:
-    """Inisialisasi database cloud secara idempotent saat startup aplikasi.
+    """Inisialisasi database cloud satu kali per proses secara idempotent.
 
-    Folder dan file SQLite dibuat otomatis bila belum ada. Tabel pengguna,
-    remember-me, audit, dan akun admin default juga dibuat satu kali tanpa
-    menggandakan data ketika fungsi dipanggil berulang kali.
+    Pemeriksaan integritas penuh dilakukan pada startup pertama proses Python.
+    Session browser berikutnya memakai hasil yang sama selama file database masih
+    tersedia, sehingga pembukaan aplikasi tidak mengulang migrasi dan quick-check.
     """
-    try:
-        with _connect_raw() as conn:
-            quick_check = conn.execute("PRAGMA quick_check").fetchone()
-            if quick_check and str(quick_check[0]).lower() != "ok":
-                raise sqlite3.DatabaseError(str(quick_check[0]))
-            _create_schema_and_seed(conn)
-    except sqlite3.DatabaseError as error:
-        if not _database_is_corrupt(error):
+    global _DATABASE_READY
+
+    with _DATABASE_INIT_LOCK:
+        if _DATABASE_READY and DB_PATH.exists():
+            return
+
+        try:
+            with _connect_raw() as conn:
+                quick_check = conn.execute("PRAGMA quick_check(1)").fetchone()
+                if quick_check and str(quick_check[0]).lower() != "ok":
+                    raise sqlite3.DatabaseError(str(quick_check[0]))
+                _create_schema_and_seed(conn)
+        except sqlite3.DatabaseError as error:
+            if not _database_is_corrupt(error):
+                LOGGER.exception("Inisialisasi database gagal: %s", error)
+                raise RuntimeError(f"Gagal inisialisasi database: {error}") from error
+
+            LOGGER.warning("Database rusak terdeteksi dan akan dibuat ulang: %s", error)
+            _remove_corrupt_database()
+            try:
+                with _connect_raw() as conn:
+                    _create_schema_and_seed(conn)
+            except Exception as retry_error:
+                LOGGER.exception("Pemulihan database gagal: %s", retry_error)
+                raise RuntimeError(f"Gagal memulihkan database: {retry_error}") from retry_error
+        except Exception as error:
             LOGGER.exception("Inisialisasi database gagal: %s", error)
             raise RuntimeError(f"Gagal inisialisasi database: {error}") from error
 
-        LOGGER.warning("Database rusak terdeteksi dan akan dibuat ulang: %s", error)
-        _remove_corrupt_database()
+        # Tabel audit dibuat setelah tabel users tersedia agar foreign key aman.
         try:
-            with _connect_raw() as conn:
-                _create_schema_and_seed(conn)
-        except Exception as retry_error:
-            LOGGER.exception("Pemulihan database gagal: %s", retry_error)
-            raise RuntimeError(f"Gagal memulihkan database: {retry_error}") from retry_error
-    except Exception as error:
-        LOGGER.exception("Inisialisasi database gagal: %s", error)
-        raise RuntimeError(f"Gagal inisialisasi database: {error}") from error
+            from utils.audit_logger import ensure_audit_table
 
-    # Tabel audit dibuat setelah tabel users tersedia agar foreign key aman.
-    try:
-        from utils.audit_logger import ensure_audit_table
+            ensure_audit_table()
+        except Exception as audit_error:
+            LOGGER.exception("Tabel audit belum dapat disiapkan: %s", audit_error)
 
-        ensure_audit_table()
-    except Exception as audit_error:
-        LOGGER.exception("Tabel audit belum dapat disiapkan: %s", audit_error)
+        _DATABASE_READY = True
 
 
 
@@ -243,20 +255,25 @@ def init_db() -> None:
 
 
 def get_db_connection() -> sqlite3.Connection:
-    """Kembalikan koneksi database yang siap dipakai dan pulihkan jika rusak."""
+    """Kembalikan koneksi database siap pakai tanpa full integrity scan berulang."""
     conn: sqlite3.Connection | None = None
     try:
-        conn = _connect_raw()
-        quick_check = conn.execute("PRAGMA quick_check").fetchone()
-        if quick_check and str(quick_check[0]).lower() != "ok":
-            raise sqlite3.DatabaseError(str(quick_check[0]))
+        if not DB_PATH.exists():
+            init_database()
 
+        conn = _connect_raw()
+        # schema_version membaca header/skema secara ringan dan tetap memicu
+        # DatabaseError bila file bukan SQLite yang valid. Full quick-check sudah
+        # dilakukan satu kali oleh init_database() pada startup proses.
+        conn.execute("PRAGMA schema_version").fetchone()
         users_table = conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'"
         ).fetchone()
         if users_table is None:
             conn.close()
             conn = None
+            global _DATABASE_READY
+            _DATABASE_READY = False
             init_database()
             return _connect_raw()
         return conn
@@ -276,6 +293,7 @@ def get_db_connection() -> sqlite3.Connection:
             conn.close()
         LOGGER.exception("Koneksi database gagal: %s", error)
         raise RuntimeError(f"Gagal membuka database: {error}") from error
+
 
 def hash_password(password: str) -> str:
     """Enkripsi password dengan bcrypt, return hash sebagai string."""
@@ -701,6 +719,11 @@ def update_profile(user_id: int, fullname: str, email: str) -> tuple[bool, str]:
 
 def _resize_avatar(image_bytes: bytes) -> bytes:
     """Resize gambar avatar ke 200x200 pixel."""
+    # Pillow hanya dibutuhkan ketika pengguna benar-benar mengganti avatar.
+    # Menundanya mengurangi dependency yang dimuat saat startup aplikasi.
+    from io import BytesIO
+    from PIL import Image
+
     img = Image.open(BytesIO(image_bytes)).convert("RGB")
     img = img.resize((200, 200), Image.Resampling.LANCZOS)
     buffer = BytesIO()

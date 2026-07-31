@@ -21,7 +21,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
-from pyvis.network import Network
 
 try:
     from utils.loading_screen import mulai_loading_aksi, selesaikan_loading_aksi
@@ -5510,6 +5509,10 @@ def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
     try:
         if graph.number_of_nodes() == 0 or visual_nodes.empty:
             return ""
+
+        # PyVis hanya diperlukan saat pengguna meminta Network Graph. Halaman
+        # statistik dan tabel influencer tidak perlu menanggung biaya import ini.
+        from pyvis.network import Network
 
         net = Network(
             height="660px",

@@ -49,6 +49,7 @@ _EARLY_SESSION_DEFAULTS = {
     "demo_mode": False,
     "_last_rendered_route": None,
     "_startup_loading_active": True,
+    "_startup_browser_overlay_installed_v3": False,
     "_public_route": "auth",
     "_database_initialized_v1": False,
 }
@@ -289,9 +290,19 @@ def _install_persistent_startup_overlay() -> bool:
         return False
 
 
-_STARTUP_BROWSER_OVERLAY_INSTALLED = False
-if st.session_state.get("_startup_loading_active", True):
+# Overlay browser cukup dipasang satu kali selama rangkaian rerun startup.
+# Cookie remember-me dapat memicu beberapa rerun singkat; memasang ulang komponen
+# HTML besar pada setiap putaran hanya menambah waktu tunggu tanpa mengubah UI.
+_STARTUP_BROWSER_OVERLAY_INSTALLED = bool(
+    st.session_state.get("_startup_browser_overlay_installed_v3", False)
+)
+if (
+    st.session_state.get("_startup_loading_active", True)
+    and not _STARTUP_BROWSER_OVERLAY_INSTALLED
+):
     _STARTUP_BROWSER_OVERLAY_INSTALLED = _install_persistent_startup_overlay()
+    if _STARTUP_BROWSER_OVERLAY_INSTALLED:
+        st.session_state["_startup_browser_overlay_installed_v3"] = True
 
 # Fallback hanya dipakai bila overlay browser gagal dikirim. Menjalankan dua
 # loader full-screen sekaligus dapat menimbulkan pergantian visual/flicker.
@@ -344,7 +355,7 @@ LOGOUT_COOKIE_DELETE_SENT_KEY = "_logout_cookie_delete_sent_v1"
 # CookieManager berjalan asinkron dan membutuhkan beberapa rerun singkat.
 # Jeda kecil cukup memberi waktu komponen browser mengirim nilai cookie tanpa
 # menahan custom loading selama beberapa detik.
-COOKIE_RESTORE_POLL_DELAY_SECONDS = 0.12
+COOKIE_RESTORE_POLL_DELAY_SECONDS = 0.06
 
 
 # Label yang terlihat pengguna dipisahkan dari nama route lama agar routing tetap aman.
@@ -488,6 +499,7 @@ def _selesaikan_loading_awal() -> None:
         LOGGER.debug("Boot overlay browser gagal ditutup: %s", exc)
     finally:
         st.session_state["_startup_loading_active"] = False
+        st.session_state["_startup_browser_overlay_installed_v3"] = False
         _STARTUP_LOADING_PLACEHOLDER = None
 
 
@@ -557,6 +569,9 @@ def sync_authenticated_user_state() -> bool:
         st.session_state["username"] = str(public_user["username"])
         st.session_state["fullname"] = str(public_user["fullname"])
         st.session_state["role"] = str(public_user["role"])
+        # Baris pengguna yang sama juga memuat avatar. Simpan di session agar
+        # sidebar tidak membuka koneksi SQLite kedua pada setiap rerun halaman.
+        st.session_state["_sidebar_avatar_bytes_v1"] = user.get("profile_picture")
         return True
     except Exception as exc:
         st.error(f"Sesi login tidak dapat dipulihkan: {exc}")
@@ -568,13 +583,11 @@ def sync_authenticated_user_state() -> bool:
 
 
 def get_avatar_bytes() -> bytes | None:
-    """Ambil avatar pengguna dari database atau file avatar default."""
+    """Ambil avatar dari cache session atau file avatar default."""
     try:
-        user_id = st.session_state.get("user_id")
-        if user_id:
-            user = get_user_by_id(user_id)
-            if user and user.get("profile_picture"):
-                return user["profile_picture"]
+        cached_avatar = st.session_state.get("_sidebar_avatar_bytes_v1")
+        if cached_avatar:
+            return bytes(cached_avatar)
         if DEFAULT_AVATAR.exists():
             return DEFAULT_AVATAR.read_bytes()
         return None
@@ -1503,8 +1516,14 @@ def _install_logout_click_overlay() -> None:
                         }};
 
                         bindButton();
+                        const observerKey = '__telkomLogoutOverlayObserverV3';
+                        const oldObserver = window.parent[observerKey];
+                        if (oldObserver && typeof oldObserver.disconnect === 'function') {{
+                            oldObserver.disconnect();
+                        }}
                         const observer = new MutationObserver(bindButton);
                         observer.observe(parentDocument.body, {{ childList: true, subtree: true }});
+                        window.parent[observerKey] = observer;
                     }})();
                 </script>
                 </body>
@@ -2643,6 +2662,12 @@ def _inject_sidebar_open_button_fix() -> None:
                 window.setTimeout(applyOpenButton, 250);
                 window.setTimeout(applyOpenButton, 700);
 
+                const observerKey = "__telkomSidebarOpenObserverV3";
+                const oldObserver = window.parent[observerKey];
+                if (oldObserver && typeof oldObserver.disconnect === "function") {
+                    oldObserver.disconnect();
+                }
+
                 const observer = new MutationObserver(() => {
                     applyOpenButton();
                 });
@@ -2650,6 +2675,7 @@ def _inject_sidebar_open_button_fix() -> None:
                     childList: true,
                     subtree: true,
                 });
+                window.parent[observerKey] = observer;
             })();
             </script>
             """,
@@ -2721,10 +2747,16 @@ def _inject_option_menu_hover_fallback() -> None:
                     });
                 };
 
+                const timerKey = "__telkomOptionMenuHoverTimersV3";
+                const oldTimers = window.parent[timerKey] || [];
+                oldTimers.forEach((timerId) => window.parent.clearTimeout(timerId));
+
                 applyHoverStyle();
-                window.setTimeout(applyHoverStyle, 150);
-                window.setTimeout(applyHoverStyle, 500);
-                window.setTimeout(applyHoverStyle, 1200);
+                window.parent[timerKey] = [
+                    window.parent.setTimeout(applyHoverStyle, 150),
+                    window.parent.setTimeout(applyHoverStyle, 500),
+                    window.parent.setTimeout(applyHoverStyle, 1200),
+                ];
             })();
             </script>
             """,

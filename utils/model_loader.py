@@ -6,8 +6,6 @@ from __future__ import annotations
 from typing import Any
 
 import streamlit as st
-import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 MODEL_NAME = "mdhugol/indonesia-bert-sentiment-classification"
 
@@ -28,6 +26,12 @@ def load_indobert() -> tuple[Any | None, Any | None, Any | None]:
     pengguna, bukan pada folder ``models/`` di dalam proyek.
     """
     try:
+        # Torch dan Transformers termasuk dependency paling berat. Keduanya baru
+        # diimpor ketika pengguna benar-benar menjalankan prediksi IndoBERT, bukan
+        # saat membuka Dataset atau halaman overview Analisis Sentimen.
+        import torch
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
         model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
         model.eval()
@@ -47,6 +51,8 @@ def load_indobert() -> tuple[Any | None, Any | None, Any | None]:
 def predict_sentiment_batch(texts: list, batch_size: int = 32) -> list[dict[str, Any]]:
     """Prediksi sentimen batch menggunakan IndoBERT dari HuggingFace Hub."""
     try:
+        import torch
+
         daftar_teks = [str(text or "").strip() for text in list(texts or [])]
         if not daftar_teks:
             return []
