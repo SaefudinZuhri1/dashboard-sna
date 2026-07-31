@@ -116,6 +116,11 @@ _DIALOG_DECORATOR = getattr(st, "dialog", None)
 if _DIALOG_DECORATOR is None:
     _DIALOG_DECORATOR = st.experimental_dialog
 
+_FRAGMENT_DECORATOR = getattr(st, "fragment", None)
+if _FRAGMENT_DECORATOR is None:  # pragma: no cover - fallback Streamlit lama
+    def _FRAGMENT_DECORATOR(function):
+        return function
+
 
 def _opsi_lebar_penuh(fungsi: Any) -> dict[str, Any]:
     """Pilih parameter lebar yang kompatibel dengan versi Streamlit aktif."""
@@ -245,12 +250,16 @@ def _inject_sna_css() -> None:
                 .sna-v9-card-marker,
                 .sna-v9-control-marker,
                 .sna-v9-section-marker,
-                .sna-v9-graph-marker { display: none; }
+                .sna-v9-graph-marker,
+                .sna-v13-apply-button-marker,
+                .sna-v13-apply-inert-marker { display: none; }
 
                 div[data-testid="stMarkdownContainer"]:has(.sna-v9-card-marker),
                 div[data-testid="stMarkdownContainer"]:has(.sna-v9-control-marker),
                 div[data-testid="stMarkdownContainer"]:has(.sna-v9-section-marker),
-                div[data-testid="stMarkdownContainer"]:has(.sna-v9-graph-marker) { display: none; }
+                div[data-testid="stMarkdownContainer"]:has(.sna-v9-graph-marker),
+                div[data-testid="stMarkdownContainer"]:has(.sna-v13-apply-button-marker),
+                div[data-testid="stMarkdownContainer"]:has(.sna-v13-apply-inert-marker) { display: none; }
 
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker),
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-section-marker),
@@ -263,6 +272,25 @@ def _inject_sna_css() -> None:
                 }
 
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker) { margin-bottom: 1rem; }
+
+                /* Patch Fase 13: teks tombol Apply selalu satu baris. Saat filter
+                   belum berubah, tombol tetap terlihat normal tetapi tidak menerima klik. */
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                div[data-testid="stColumn"]:has(.sna-v13-apply-button-marker)
+                button,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                div[data-testid="stColumn"]:has(.sna-v13-apply-button-marker)
+                button p {
+                    white-space: nowrap !important;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                div[data-testid="stColumn"]:has(.sna-v13-apply-inert-marker)
+                button {
+                    cursor: default !important;
+                    pointer-events: none !important;
+                }
+
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-section-marker),
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-graph-marker) { margin: 1.2rem 0 0.75rem; }
 
@@ -7032,7 +7060,7 @@ def _save_applied_filter_values(values: tuple[str, str, int]) -> None:
     st.session_state[SNA_FILTER_APPLIED_NODE_LIMIT_KEY] = int(node_limit)
 
 
-def _apply_sna_filters() -> None:
+def _apply_sna_filters() -> bool:
     """Terapkan filter hanya ketika nilainya berbeda dari snapshot aktif."""
     try:
         current_values = _current_filter_values()
@@ -7040,15 +7068,17 @@ def _apply_sna_filters() -> None:
         st.session_state[SNA_FILTER_EVENT_KIND_KEY] = "apply"
         st.session_state[SNA_FILTER_EVENT_CHANGED_KEY] = bool(changed)
         if not changed:
-            return
+            return False
 
         _save_applied_filter_values(current_values)
         _show_filter_loading()
+        return True
     except Exception as exc:
         st.error(f"Filter SNA belum dapat diterapkan: {exc}")
+        return False
 
 
-def _reset_sna_filters(default_service: str) -> None:
+def _reset_sna_filters(default_service: str) -> bool:
     """Kembalikan filter ke nilai awal dan terapkan reset bila diperlukan."""
     try:
         service = str(default_service).strip() or "IndiHome"
@@ -7057,20 +7087,24 @@ def _reset_sna_filters(default_service: str) -> None:
             SNA_FILTER_DEFAULT_PLATFORM,
             SNA_FILTER_DEFAULT_NODE_LIMIT,
         )
+        pending_changed = _current_filter_values() != default_values
         analysis_changed = _applied_filter_values() != default_values
+        changed = bool(pending_changed or analysis_changed)
+
+        st.session_state[SNA_FILTER_EVENT_KIND_KEY] = "reset"
+        st.session_state[SNA_FILTER_EVENT_CHANGED_KEY] = bool(changed)
+        if not changed:
+            return False
 
         st.session_state["sna_v9_service_filter"] = service
         st.session_state["sna_v9_platform_filter"] = SNA_FILTER_DEFAULT_PLATFORM
         st.session_state["sna_v9_node_limit"] = SNA_FILTER_DEFAULT_NODE_LIMIT
         _save_applied_filter_values(default_values)
-
-        st.session_state[SNA_FILTER_EVENT_KIND_KEY] = "reset"
-        st.session_state[SNA_FILTER_EVENT_CHANGED_KEY] = bool(analysis_changed)
-        if analysis_changed:
-            _show_filter_loading()
+        _show_filter_loading()
+        return True
     except Exception as exc:
         st.error(f"Filter SNA belum dapat direset: {exc}")
-
+        return False
 
 def _show_influencer_table_loading() -> None:
     """Aktifkan overlay loading custom pada rerun setelah filter tabel influencer diklik."""
@@ -7182,18 +7216,11 @@ def _render_hero(service: str, has_real_data: bool) -> None:
         st.error(f"Gagal menampilkan header halaman SNA: {exc}")
 
 
-def _render_filters(clean_df: pd.DataFrame) -> tuple[str, str, int, bool]:
-    """Render selector layanan, platform, dan batas node graf di dalam form.
+@_FRAGMENT_DECORATOR
 
-    Form dipakai agar perubahan dropdown/slider tidak langsung memicu proses
-    analisis ulang. Filter baru diterapkan hanya setelah tombol Terapkan Filter
-    diklik oleh pengguna.
-    """
+def _render_filter_controls_fragment(available_services: list[str]) -> None:
+    """Render kontrol filter secara terisolasi agar perubahan belum memuat analisis."""
     try:
-        available_services = [service for service in SERVICE_OPTIONS if service in set(clean_df.get("layanan", []))]
-        if not available_services:
-            available_services = SERVICE_OPTIONS.copy()
-
         _ensure_filter_widget_state(available_services)
 
         with st.container(border=True):
@@ -7211,71 +7238,111 @@ def _render_filters(clean_df: pd.DataFrame) -> tuple[str, str, int, bool]:
                 unsafe_allow_html=True,
             )
 
-            with st.form("sna_v9_filter_form", clear_on_submit=False):
-                col_service, col_platform, col_limit = st.columns(
-                    [1, 1, 1],
-                    gap="large",
+            col_service, col_platform, col_limit = st.columns(
+                [1, 1, 1],
+                gap="large",
+            )
+            with col_service:
+                st.selectbox(
+                    "Pilih Layanan",
+                    options=available_services,
+                    key="sna_v9_service_filter",
                 )
-                with col_service:
-                    selected_service = st.selectbox(
-                        "Pilih Layanan",
-                        options=available_services,
-                        key="sna_v9_service_filter",
+            with col_platform:
+                st.selectbox(
+                    "Pilih Platform",
+                    options=list(PLATFORM_OPTIONS.keys()),
+                    key="sna_v9_platform_filter",
+                )
+            with col_limit:
+                st.slider(
+                    "Jumlah node graf",
+                    min_value=20,
+                    max_value=160,
+                    step=10,
+                    key="sna_v9_node_limit",
+                    help="Naikkan jika ingin melihat graf lebih lengkap. Turunkan jika graf terasa berat.",
+                )
+
+            current_values = _current_filter_values()
+            filter_changed = current_values != _applied_filter_values()
+            default_service = (
+                "IndiHome"
+                if "IndiHome" in available_services
+                else available_services[0]
+            )
+
+            col_hint, col_actions = st.columns([2.45, 1], gap="small")
+            with col_hint:
+                st.caption(
+                    "Perubahan pilihan di atas tidak akan langsung memuat ulang graf. "
+                    "Klik tombol di sebelah kanan untuk menerapkan filter dan menampilkan loading."
+                )
+            with col_actions:
+                # Apply diberi ruang sedikit lebih lebar agar teks tidak terpotong dua baris.
+                col_reset, col_apply = st.columns([0.9, 1.2], gap="small")
+                with col_reset:
+                    reset_clicked = st.button(
+                        "Reset Filter",
+                        key="sna_v13_reset_filter_button",
+                        use_container_width=True,
                     )
-                with col_platform:
-                    selected_platform_label = st.selectbox(
-                        "Pilih Platform",
-                        options=list(PLATFORM_OPTIONS.keys()),
-                        key="sna_v9_platform_filter",
+                with col_apply:
+                    st.markdown(
+                        '<span class="sna-v13-apply-button-marker"></span>',
+                        unsafe_allow_html=True,
                     )
-                with col_limit:
-                    node_limit = st.slider(
-                        "Jumlah node graf",
-                        min_value=20,
-                        max_value=160,
-                        step=10,
-                        key="sna_v9_node_limit",
-                        help="Naikkan jika ingin melihat graf lebih lengkap. Turunkan jika graf terasa berat.",
+                    if not filter_changed:
+                        st.markdown(
+                            '<span class="sna-v13-apply-inert-marker"></span>',
+                            unsafe_allow_html=True,
+                        )
+                    apply_clicked = st.button(
+                        "Terapkan Filter",
+                        key="sna_v13_apply_filter_button",
+                        type="primary",
+                        use_container_width=True,
                     )
 
-                col_hint, col_actions = st.columns([2.45, 1])
-                with col_hint:
-                    st.caption(
-                        "Perubahan pilihan di atas tidak akan langsung memuat ulang graf. "
-                        "Klik tombol di sebelah kanan untuk menerapkan filter dan menampilkan loading."
-                    )
-                with col_actions:
-                    col_reset, col_apply = st.columns(2, gap="small")
-                    with col_reset:
-                        reset_submitted = st.form_submit_button(
-                            "Reset Filter",
-                            use_container_width=True,
-                            on_click=_reset_sna_filters,
-                            args=(
-                                "IndiHome"
-                                if "IndiHome" in available_services
-                                else available_services[0],
-                            ),
-                        )
-                    with col_apply:
-                        submitted = st.form_submit_button(
-                            "Terapkan Filter",
-                            type="primary",
-                            use_container_width=True,
-                            on_click=_apply_sna_filters,
-                        )
+            if reset_clicked and _reset_sna_filters(default_service):
+                st.rerun(scope="app")
 
+            # Guard backend tetap dipertahankan untuk akses keyboard/otomasi.
+            if apply_clicked and filter_changed and _apply_sna_filters():
+                st.rerun(scope="app")
+    except Exception as exc:
+        st.error(f"Gagal menampilkan kontrol filter halaman SNA: {exc}")
+
+
+def _render_filters(clean_df: pd.DataFrame) -> tuple[str, str, int, bool]:
+    """Render kontrol filter dan kembalikan snapshot yang sudah diterapkan."""
+    try:
+        available_services = [
+            service
+            for service in SERVICE_OPTIONS
+            if service in set(clean_df.get("layanan", []))
+        ]
+        if not available_services:
+            available_services = SERVICE_OPTIONS.copy()
+
+        _ensure_filter_widget_state(available_services)
+        _render_filter_controls_fragment(available_services)
+
+        selected_service, selected_platform_label, node_limit = _applied_filter_values()
+        if selected_service not in available_services:
+            selected_service = (
+                "IndiHome" if "IndiHome" in available_services else available_services[0]
+            )
+        if selected_platform_label not in PLATFORM_OPTIONS:
+            selected_platform_label = SNA_FILTER_DEFAULT_PLATFORM
         selected_platform = PLATFORM_OPTIONS[selected_platform_label]
+
         event_kind = str(st.session_state.pop(SNA_FILTER_EVENT_KIND_KEY, ""))
         event_changed = bool(
             st.session_state.pop(SNA_FILTER_EVENT_CHANGED_KEY, False)
         )
         filter_applied = bool(
-            event_changed
-            and (
-                (submitted and event_kind == "apply")
-                or (reset_submitted and event_kind == "reset")
-            )
+            event_changed and event_kind in {"apply", "reset"}
         )
         if filter_applied:
             st.session_state["active_service"] = selected_service
@@ -7646,7 +7713,12 @@ def render_sna() -> None:
 
         # Hero tetap ditampilkan sebagai bagian pertama halaman. Nilai layanan
         # awal dibaca dari state filter yang sudah tersimpan pada rerun sebelumnya.
-        active_service = str(st.session_state.get("sna_v9_service_filter", "IndiHome"))
+        active_service = str(
+            st.session_state.get(
+                SNA_FILTER_APPLIED_SERVICE_KEY,
+                st.session_state.get("sna_v9_service_filter", "IndiHome"),
+            )
+        )
         if active_service not in SERVICE_OPTIONS:
             active_service = "IndiHome"
         _render_hero(
