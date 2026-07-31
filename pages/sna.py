@@ -250,16 +250,12 @@ def _inject_sna_css() -> None:
                 .sna-v9-card-marker,
                 .sna-v9-control-marker,
                 .sna-v9-section-marker,
-                .sna-v9-graph-marker,
-                .sna-v13-apply-button-marker,
-                .sna-v13-apply-inert-marker { display: none; }
+                .sna-v9-graph-marker { display: none; }
 
                 div[data-testid="stMarkdownContainer"]:has(.sna-v9-card-marker),
                 div[data-testid="stMarkdownContainer"]:has(.sna-v9-control-marker),
                 div[data-testid="stMarkdownContainer"]:has(.sna-v9-section-marker),
-                div[data-testid="stMarkdownContainer"]:has(.sna-v9-graph-marker),
-                div[data-testid="stMarkdownContainer"]:has(.sna-v13-apply-button-marker),
-                div[data-testid="stMarkdownContainer"]:has(.sna-v13-apply-inert-marker) { display: none; }
+                div[data-testid="stMarkdownContainer"]:has(.sna-v9-graph-marker) { display: none; }
 
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker),
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-section-marker),
@@ -273,22 +269,23 @@ def _inject_sna_css() -> None:
 
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker) { margin-bottom: 1rem; }
 
-                /* Patch Fase 13: teks tombol Apply selalu satu baris. Saat filter
-                   belum berubah, tombol tetap terlihat normal tetapi tidak menerima klik. */
+                /* Patch Fase 13: tombol aksi filter harus sejajar, teks Apply satu baris,
+                   dan Apply tetap inert saat filter aktif belum berubah. */
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
-                div[data-testid="stColumn"]:has(.sna-v13-apply-button-marker)
-                button,
+                div[data-testid="stButton"] > button {
+                    min-height: 3.75rem !important;
+                }
+
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
-                div[data-testid="stColumn"]:has(.sna-v13-apply-button-marker)
-                button p {
+                div[data-testid="stButton"] > button[kind="primary"],
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                div[data-testid="stButton"] > button[kind="primary"] p {
                     white-space: nowrap !important;
                 }
 
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
-                div[data-testid="stColumn"]:has(.sna-v13-apply-inert-marker)
-                button {
-                    cursor: default !important;
-                    pointer-events: none !important;
+                div[data-testid="stButton"] > button[kind="primary"] {
+                    min-width: 100% !important;
                 }
 
                 div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-section-marker),
@@ -7272,37 +7269,39 @@ def _render_filter_controls_fragment(available_services: list[str]) -> None:
                 else available_services[0]
             )
 
-            col_hint, col_actions = st.columns([2.45, 1], gap="small")
+            if not filter_changed:
+                st.markdown(
+                    """
+                    <style>
+                        div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                        div[data-testid="stButton"] > button[kind="primary"] {
+                            cursor: default !important;
+                            pointer-events: none !important;
+                        }
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            col_hint, col_reset, col_apply = st.columns([2.15, 0.9, 1.15], gap="small")
             with col_hint:
                 st.caption(
                     "Perubahan pilihan di atas tidak akan langsung memuat ulang graf. "
                     "Klik tombol di sebelah kanan untuk menerapkan filter dan menampilkan loading."
                 )
-            with col_actions:
-                # Apply diberi ruang sedikit lebih lebar agar teks tidak terpotong dua baris.
-                col_reset, col_apply = st.columns([0.9, 1.2], gap="small")
-                with col_reset:
-                    reset_clicked = st.button(
-                        "Reset Filter",
-                        key="sna_v13_reset_filter_button",
-                        use_container_width=True,
-                    )
-                with col_apply:
-                    st.markdown(
-                        '<span class="sna-v13-apply-button-marker"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    if not filter_changed:
-                        st.markdown(
-                            '<span class="sna-v13-apply-inert-marker"></span>',
-                            unsafe_allow_html=True,
-                        )
-                    apply_clicked = st.button(
-                        "Terapkan Filter",
-                        key="sna_v13_apply_filter_button",
-                        type="primary",
-                        use_container_width=True,
-                    )
+            with col_reset:
+                reset_clicked = st.button(
+                    "Reset Filter",
+                    key="sna_v13_reset_filter_button",
+                    use_container_width=True,
+                )
+            with col_apply:
+                apply_clicked = st.button(
+                    "Terapkan Filter",
+                    key="sna_v13_apply_filter_button",
+                    type="primary",
+                    use_container_width=True,
+                )
 
             if reset_clicked and _reset_sna_filters(default_service):
                 st.rerun(scope="app")
