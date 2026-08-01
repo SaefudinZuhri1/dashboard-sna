@@ -2476,6 +2476,7 @@ def _render_change_role_dialog(
                 div[data-testid="stDialog"] div[role="radiogroup"] > label:hover::after {opacity:.48;transform:scale(1.08);}
                 div[data-testid="stDialog"] div[role="radiogroup"] > label:has(input:checked) {
                     transform:translateY(-3px);
+                    padding-top:2.55rem !important;
                     border-color:rgba(236,72,153,.58) !important;
                     background:linear-gradient(145deg,rgba(229,57,53,.15),rgba(139,92,246,.16)) !important;
                     box-shadow:0 18px 36px rgba(139,92,246,.20),inset 0 0 0 1px rgba(255,255,255,.045);
@@ -2483,6 +2484,7 @@ def _render_change_role_dialog(
                 div[data-testid="stDialog"] div[role="radiogroup"] > label:has(input:checked)::before {
                     content:"TERPILIH";position:absolute;right:.6rem;top:.55rem;padding:.2rem .42rem;border-radius:999px;
                     color:#FFF;font-size:0.75rem /* FIX: minimum 12px agar terbaca di tablet */;font-weight:900;letter-spacing:.08em;
+                    white-space:nowrap;z-index:4;pointer-events:none;
                     background:linear-gradient(90deg,#E53935,#A855F7);box-shadow:0 6px 14px rgba(139,92,246,.26);
                 }
                 div[data-testid="stDialog"] div[role="radiogroup"] p {
@@ -3943,6 +3945,66 @@ def _audit_action_label(action: str) -> str:
     return labels.get(str(action), str(action).replace("_", " ").title())
 
 
+_AUDIT_FILTER_DEFAULTS = {
+    "period": "30 Hari",
+    "username": "Semua Pengguna",
+    "action": "Semua Aktivitas",
+    "status": "Semua Status",
+    "search": "",
+}
+
+_AUDIT_FILTER_WIDGET_KEYS = {
+    "period": "admin_audit_period",
+    "username": "admin_audit_username",
+    "action": "admin_audit_action",
+    "status": "admin_audit_status",
+    "search": "admin_audit_search",
+}
+
+_AUDIT_FILTER_APPLIED_KEYS = {
+    name: f"admin_audit_applied_{name}" for name in _AUDIT_FILTER_DEFAULTS
+}
+
+
+def _audit_filter_snapshot(key_map: dict[str, str]) -> dict[str, str]:
+    """Ambil nilai filter audit dari session state secara aman."""
+    return {
+        name: str(st.session_state.get(key_map[name], default) or "").strip()
+        for name, default in _AUDIT_FILTER_DEFAULTS.items()
+    }
+
+
+def _initialize_applied_audit_filters(draft_filters: dict[str, str]) -> None:
+    """Simpan filter awal sebagai baseline tanpa memicu perubahan data."""
+    for name, value in draft_filters.items():
+        applied_key = _AUDIT_FILTER_APPLIED_KEYS[name]
+        if applied_key not in st.session_state:
+            st.session_state[applied_key] = value
+
+
+def _apply_audit_filters() -> None:
+    """Terapkan filter hanya ketika pilihan pengguna benar-benar berubah."""
+    draft_filters = _audit_filter_snapshot(_AUDIT_FILTER_WIDGET_KEYS)
+    applied_filters = _audit_filter_snapshot(_AUDIT_FILTER_APPLIED_KEYS)
+    if draft_filters == applied_filters:
+        return
+
+    for name, value in draft_filters.items():
+        st.session_state[_AUDIT_FILTER_APPLIED_KEYS[name]] = value
+
+
+def _reset_audit_filters() -> None:
+    """Reset filter hanya ketika ada filter aktif atau perubahan yang tertunda."""
+    draft_filters = _audit_filter_snapshot(_AUDIT_FILTER_WIDGET_KEYS)
+    applied_filters = _audit_filter_snapshot(_AUDIT_FILTER_APPLIED_KEYS)
+    if draft_filters == _AUDIT_FILTER_DEFAULTS and applied_filters == _AUDIT_FILTER_DEFAULTS:
+        return
+
+    for name, default in _AUDIT_FILTER_DEFAULTS.items():
+        st.session_state[_AUDIT_FILTER_WIDGET_KEYS[name]] = default
+        st.session_state[_AUDIT_FILTER_APPLIED_KEYS[name]] = default
+
+
 def _render_activity_log_tab() -> None:
     """Render audit trail nyata dari tabel audit_logs di SQLite."""
     try:
@@ -3995,12 +4057,38 @@ def _render_activity_log_tab() -> None:
                 key="admin_audit_search",
             )
 
+            draft_filters = {
+                "period": period_label,
+                "username": username_filter,
+                "action": action_filter,
+                "status": status_filter,
+                "search": search_text.strip(),
+            }
+            _initialize_applied_audit_filters(draft_filters)
+
+            apply_col, reset_col = st.columns(2, gap="medium")
+            with apply_col:
+                st.button(
+                    "Terapkan Filter",
+                    key="admin_audit_apply_filter",
+                    use_container_width=True,
+                    on_click=_apply_audit_filters,
+                )
+            with reset_col:
+                st.button(
+                    "Reset Filter",
+                    key="admin_audit_reset_filter",
+                    use_container_width=True,
+                    on_click=_reset_audit_filters,
+                )
+
+        applied_filters = _audit_filter_snapshot(_AUDIT_FILTER_APPLIED_KEYS)
         logs = fetch_audit_logs(
-            days=period_map[period_label],
-            username=username_filter,
-            action=action_filter,
-            status=status_filter,
-            search=search_text,
+            days=period_map[applied_filters["period"]],
+            username=applied_filters["username"],
+            action=applied_filters["action"],
+            status=applied_filters["status"],
+            search=applied_filters["search"],
             limit=5000,
         )
         frame = audit_dataframe(logs)
