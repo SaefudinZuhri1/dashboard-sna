@@ -3575,24 +3575,20 @@ def main() -> None:
         init_session_state()
         _ensure_database_initialized()
 
-        # Cookie dibaca saat belum login dan saat penulisan cookie Ingat Saya
-        # masih perlu dikonfirmasi. Konfirmasi berjalan di belakang layar dan
-        # tidak boleh menahan perpindahan pengguna ke Beranda.
-        cookie_confirmation_pending = bool(
-            st.session_state.get("pending_remember_token")
-        )
-        if (
-            not st.session_state.get("logged_in", False)
-            or cookie_confirmation_pending
-        ):
+        # CookieManager hanya boleh dirender pada fase autentikasi. Setelah
+        # session aktif, komponen ini dikeluarkan dari tree Streamlit agar urutan
+        # komponen sidebar (terutama streamlit-option-menu) tetap stabil.
+        if not st.session_state.get("logged_in", False):
             refresh_cookie_manager_for_run()
 
         if _process_pending_logout():
             return
 
-        # Selesaikan transaksi cookie lama/baru tanpa menjadikan cookie sebagai
-        # syarat keberhasilan login pada session aktif.
-        complete_pending_remember_login()
+        # Kompatibilitas untuk state pending dari patch lama. Penyelesaiannya
+        # hanya dilakukan sebelum session aktif dan tidak ikut dirender bersama
+        # sidebar dashboard.
+        if not st.session_state.get("logged_in", False):
+            complete_pending_remember_login()
         sync_authenticated_user_state()
 
         if not st.session_state.logged_in:
@@ -3606,10 +3602,17 @@ def main() -> None:
                 restore_status = try_restore_remember_login()
 
             if restore_status == "wait":
-                # Mekanisme ini sebelumnya sudah terbukti berhasil memulihkan
-                # cookie di browser pengguna. Jangan paksa polling/rerun karena
-                # dapat memotong respons komponen dan merusak proses login.
+                # Tunggu snapshot cookie dari browser. Komponen akan memicu
+                # rerun alami satu kali ketika nilainya siap.
                 st.stop()
+
+            if restore_status == "ok" or st.session_state.get(
+                "logged_in", False
+            ):
+                # Pemulihan cookie terjadi pada run yang masih memuat komponen
+                # autentikasi. Lakukan satu rerun bersih agar sidebar dirender
+                # tanpa CookieManager dan option-menu tidak menjadi iframe kosong.
+                st.rerun()
 
             if not st.session_state.get("logged_in", False):
                 public_transition_pending = bool(
@@ -3650,10 +3653,6 @@ def main() -> None:
                 if st.session_state.pop("_logout_just_completed_v2", False):
                     _remove_client_logout_overlay()
                 return
-
-            # Session berhasil dipulihkan. Lanjut render Beranda pada run yang
-            # sama, tanpa st.rerun() tambahan yang membuat boot overlay terasa
-            # lama padahal autentikasi sudah selesai.
 
         selected = render_sidebar_menu()
         route_page(selected)
