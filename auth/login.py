@@ -22,10 +22,13 @@ from auth.auth_utils import (
 from utils.access_control import DEFAULT_ROLE, normalize_role
 from utils.app_version import get_auth_footer_text
 from utils.loading_screen import _buat_html_loading
+from utils.audit_logger import log_activity
 
 REMEMBER_COOKIE_KEY = "remember_token"
-# Empat putaran cukup untuk memberi kesempatan komponen cookie melakukan
-# sinkronisasi browser tanpa menahan loading startup terlalu lama.
+COOKIE_MANAGER_SESSION_KEY = "_remember_cookie_manager_v2"
+COOKIE_BOOTSTRAP_PASS_KEY = "_remember_cookie_bootstrap_pass_v2"
+# Dipertahankan untuk kompatibilitas blok logout lama. Pemulihan sesi startup
+# sekarang memakai satu bootstrap alami dari komponen cookie, bukan polling cepat.
 MAX_COOKIE_POLLS = 4
 MAX_COOKIE_SAVE_ATTEMPTS = 5
 
@@ -940,22 +943,42 @@ def _cancel_login_transition() -> None:
     st.session_state.pop(LOGIN_SUBMISSION_LOCK_KEY, None)
     remove_login_transition_overlay()
 
+def refresh_cookie_manager_for_run() -> stx.CookieManager | None:
+    """Segarkan snapshot cookie satu kali pada setiap rerun autentikasi.
+
+    ``extra-streamlit-components`` mengembalikan nilai cookie secara asinkron.
+    Objek lama tidak boleh terus dipakai setelah proses Streamlit dimulai ulang,
+    karena snapshot awalnya dapat masih kosong. Fungsi ini sengaja dipanggil dari
+    ``app.main`` hanya ketika pengguna belum terautentikasi.
+    """
+    try:
+        manager = stx.CookieManager(key="dashboard_remember_me_v2")
+        st.session_state[COOKIE_MANAGER_SESSION_KEY] = manager
+        return manager
+    except Exception as error:
+        LOGGER.exception("refresh_cookie_manager_for_run gagal: %s", error)
+        st.session_state.pop(COOKIE_MANAGER_SESSION_KEY, None)
+        return None
+
+
 def _get_cookie_manager() -> stx.CookieManager:
-    """Inisialisasi CookieManager satu kali per sesi Streamlit."""
-    if "cookie_manager" not in st.session_state:
-        st.session_state.cookie_manager = stx.CookieManager(
-            key="dashboard_remember_me"
-        )
-    return st.session_state.cookie_manager
+    """Ambil CookieManager yang sudah disegarkan pada rerun aktif."""
+    manager = st.session_state.get(COOKIE_MANAGER_SESSION_KEY)
+    if manager is None:
+        manager = refresh_cookie_manager_for_run()
+    if manager is None:
+        raise RuntimeError("Komponen cookie browser belum tersedia.")
+    return manager
 
 
 def _read_remember_token() -> str | None:
-    """Baca token remember-me dari cookie browser."""
+    """Baca token remember-me dari snapshot cookie pada rerun aktif."""
     try:
-        cookies = _get_cookie_manager().get_all()
-        if not cookies:
+        token = _get_cookie_manager().get(REMEMBER_COOKIE_KEY)
+        if token is None:
             return None
-        return cookies.get(REMEMBER_COOKIE_KEY)
+        token_text = str(token).strip()
+        return token_text or None
     except Exception as error:
         LOGGER.exception("_read_remember_token gagal: %s", error)
         return None
@@ -1017,6 +1040,7 @@ def _finish_login(user: dict, token: str | None = None) -> None:
     st.session_state.pop("_cookie_polls", None)
     st.session_state.pop("_remember_restore_done", None)
     st.session_state.pop("_remember_cookie_save_attempts", None)
+    st.session_state.pop(COOKIE_BOOTSTRAP_PASS_KEY, None)
     st.session_state.pop(LOGIN_SUBMISSION_LOCK_KEY, None)
     st.session_state.pop(POST_LOGOUT_RESTORE_GUARD_KEY, None)
 
@@ -1102,14 +1126,22 @@ def try_restore_remember_login() -> str:
 
         token = _read_remember_token()
         if not token:
-            polls = int(st.session_state.get("_cookie_polls", 0))
-            if polls < MAX_COOKIE_POLLS:
-                st.session_state["_cookie_polls"] = polls + 1
+            # Pada render pertama komponen cookie mengembalikan nilai default
+            # sebelum browser mengirim snapshot sebenarnya. Tahan boot overlay
+            # satu kali dan biarkan komponen memicu rerun alami. Pada rerun
+            # berikutnya, nilai cookie sudah siap atau memang tidak tersedia.
+            bootstrap_pass = int(
+                st.session_state.get(COOKIE_BOOTSTRAP_PASS_KEY, 0)
+            )
+            if bootstrap_pass < 1:
+                st.session_state[COOKIE_BOOTSTRAP_PASS_KEY] = 1
                 return "wait"
+
             st.session_state["_remember_restore_done"] = True
             return "none"
 
         st.session_state["_remember_restore_done"] = True
+        st.session_state.pop(COOKIE_BOOTSTRAP_PASS_KEY, None)
         user = validate_remember_token(token)
         if user is None:
             clear_remember_cookie()

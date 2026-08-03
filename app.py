@@ -324,6 +324,7 @@ from auth.login import (  # noqa: E402
     clear_remember_cookie,
     complete_pending_remember_login,
     remove_login_transition_overlay,
+    refresh_cookie_manager_for_run,
     show_login_page,
     try_restore_remember_login,
 )
@@ -352,10 +353,8 @@ LOGOUT_TRANSITION_PENDING_KEY = "_logout_transition_pending_v2"
 LOGOUT_TRANSITION_STARTED_KEY = "_logout_transition_started_v2"
 LOGOUT_COOKIE_DELETE_SENT_KEY = "_logout_cookie_delete_sent_v1"
 
-# CookieManager berjalan asinkron dan membutuhkan beberapa rerun singkat.
-# Jeda kecil cukup memberi waktu komponen browser mengirim nilai cookie tanpa
-# menahan custom loading selama beberapa detik.
-COOKIE_RESTORE_POLL_DELAY_SECONDS = 0.06
+# CookieManager berjalan asinkron. Pemulihan sesi membiarkan komponen browser
+# memicu satu rerun alami agar snapshot cookie tidak kalah oleh polling manual.
 
 
 # Label yang terlihat pengguna dipisahkan dari nama route lama agar routing tetap aman.
@@ -3576,6 +3575,12 @@ def main() -> None:
         init_session_state()
         _ensure_database_initialized()
 
+        # Cookie browser harus diambil ulang pada setiap rerun autentikasi.
+        # Saat sesi sudah aktif, komponen tidak dirender lagi agar interaksi
+        # dashboard tidak memperoleh rerun tambahan yang tidak diperlukan.
+        if not st.session_state.get("logged_in", False):
+            refresh_cookie_manager_for_run()
+
         if _process_pending_logout():
             return
 
@@ -3592,12 +3597,10 @@ def main() -> None:
 
             restore_status = try_restore_remember_login()
             if restore_status == "wait":
-                if st.session_state.get("_cookie_polls", 0) < MAX_COOKIE_POLLS:
-                    # Loader sudah dipasang sejak awal eksekusi aplikasi.
-                    # Pertahankan loader yang sama selama pemeriksaan cookie.
-                    time.sleep(COOKIE_RESTORE_POLL_DELAY_SECONDS)
-                    st.rerun()
-                st.session_state._remember_restore_done = True
+                # Jangan memaksa polling cepat dengan sleep + rerun. Komponen
+                # CookieManager akan mengirim snapshot browser dan memicu rerun
+                # alaminya sendiri. Boot overlay tetap aktif selama proses ini.
+                st.stop()
 
             if restore_status == "ok" or st.session_state.get("logged_in"):
                 st.rerun()
