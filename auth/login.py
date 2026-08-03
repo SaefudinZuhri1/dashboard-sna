@@ -1052,20 +1052,31 @@ def _finish_login(user: dict, token: str | None = None) -> None:
     if st.session_state.get(LOGIN_TRANSITION_ACTIVE_KEY):
         st.session_state[LOGIN_TRANSITION_DONE_KEY] = True
 
-    log_activity(
-        "LOGIN_SUCCESS",
-        "Autentikasi",
-        "Login pengguna berhasil.",
-        user_id=public_user.get("user_id"),
-        username=str(public_user.get("username", "")),
-        fullname=str(public_user.get("fullname", "")),
-        role=str(public_user.get("role", "")),
-        metadata={"remember_me": bool(token)},
-    )
+    # Audit log bersifat pelengkap. Kegagalan pencatatan tidak boleh
+    # membatalkan session yang kredensialnya sudah tervalidasi.
+    try:
+        log_activity(
+            "LOGIN_SUCCESS",
+            "Autentikasi",
+            "Login pengguna berhasil.",
+            user_id=public_user.get("user_id"),
+            username=str(public_user.get("username", "")),
+            fullname=str(public_user.get("fullname", "")),
+            role=str(public_user.get("role", "")),
+            metadata={"remember_me": bool(token)},
+        )
+    except Exception as error:
+        LOGGER.exception("Audit login berhasil gagal dicatat: %s", error)
 
 
 def complete_pending_remember_login() -> bool:
-    """Selesaikan login hanya setelah cookie terbukti tersimpan di browser."""
+    """Konfirmasi cookie remember-me tanpa menahan keberhasilan login.
+
+    Kredensial yang valid langsung membuka session pada klik pertama. Cookie
+    dipastikan tersimpan secara terpisah pada rerun berikutnya. Dengan begitu,
+    keterlambatan komponen browser tidak pernah mengembalikan pengguna ke form
+    login atau meminta pengguna menekan tombol Masuk berulang kali.
+    """
     try:
         pending_user = st.session_state.get("pending_remember_user")
         pending_token = st.session_state.get("pending_remember_token")
@@ -1073,38 +1084,44 @@ def complete_pending_remember_login() -> bool:
         if not pending_user or not pending_token:
             return False
 
+        # Pulihkan state dari versi patch lama yang sempat menunggu cookie
+        # sebelum mengaktifkan session. Ini membuat pengguna tidak perlu login
+        # ulang setelah patch baru dipasang pada tab yang masih terbuka.
+        if not st.session_state.get("logged_in", False):
+            _finish_login(pending_user, str(pending_token))
+
         browser_token = _read_remember_token()
         if browser_token == pending_token:
             st.session_state.pop("pending_remember_user", None)
             st.session_state.pop("pending_remember_token", None)
             st.session_state.pop("_remember_cookie_save_attempts", None)
             st.session_state["remembered_username"] = pending_user["username"]
-            _finish_login(pending_user, pending_token)
             return True
 
         attempts = int(
             st.session_state.get("_remember_cookie_save_attempts", 0)
         )
-
         if attempts < MAX_COOKIE_SAVE_ATTEMPTS:
             st.session_state["_remember_cookie_save_attempts"] = attempts + 1
             set_remember_cookie(str(pending_token))
             return False
 
-        # Hindari loop tanpa akhir jika browser memblokir cookie.
+        # Cookie yang diblokir hanya menonaktifkan fitur Ingat Saya. Session
+        # aktif saat ini tetap dipertahankan dan pengguna tidak ditendang.
         revoke_remember_token(str(pending_token))
         st.session_state.pop("pending_remember_user", None)
         st.session_state.pop("pending_remember_token", None)
         st.session_state.pop("_remember_cookie_save_attempts", None)
-        st.session_state["remembered_username"] = ""
+        if st.session_state.get("active_remember_token") == pending_token:
+            st.session_state.pop("active_remember_token", None)
         st.session_state["remember_cookie_warning"] = (
-            "Sesi berhasil dibuka, tetapi browser tidak mengizinkan cookie. "
+            "Login berhasil, tetapi browser tidak mengizinkan cookie. "
             "Aktifkan cookie untuk localhost agar fitur Ingat Saya bekerja."
         )
-        _finish_login(pending_user, None)
         return True
     except Exception as error:
         LOGGER.exception("complete_pending_remember_login gagal: %s", error)
+        # Jangan ubah logged_in pada kegagalan sinkronisasi cookie.
         return False
 
 
@@ -1156,27 +1173,41 @@ def try_restore_remember_login() -> str:
 
 
 def start_remember_login(user: dict) -> bool:
-    """Mulai proses login persisten dan tunggu konfirmasi dari browser."""
+    """Aktifkan session sekarang dan simpan cookie secara asinkron.
+
+    Keberhasilan autentikasi tidak lagi menunggu pembacaan ulang cookie dari
+    browser. Token tetap diverifikasi pada startup berikutnya melalui
+    ``try_restore_remember_login``.
+    """
     try:
+        # Bersihkan sisa transaksi lama agar satu klik hanya memiliki satu token.
+        stale_token = st.session_state.pop("pending_remember_token", None)
+        st.session_state.pop("pending_remember_user", None)
+        st.session_state.pop("_remember_cookie_save_attempts", None)
+        if stale_token:
+            revoke_remember_token(str(stale_token))
+
         token = create_remember_token(user["user_id"])
         if not token:
-            # Login biasa tetap dilanjutkan. Jangan memanggil komponen cookie
-            # karena komponen asinkron dapat memicu rerun sebelum session stabil.
             _finish_login(user, None)
             return False
 
+        cookie_command_sent = set_remember_cookie(token)
+        if not cookie_command_sent:
+            revoke_remember_token(token)
+            _finish_login(user, None)
+            st.session_state["remember_cookie_warning"] = (
+                "Login berhasil, tetapi cookie Ingat Saya belum dapat dibuat."
+            )
+            return False
+
+        # Session dikomit terlebih dahulu. Konfirmasi cookie dikerjakan di
+        # belakang layar dan tidak boleh menghalangi perpindahan ke Beranda.
+        _finish_login(user, token)
         st.session_state["pending_remember_user"] = user
         st.session_state["pending_remember_token"] = token
         st.session_state["remembered_username"] = user["username"]
-        st.session_state["_remember_cookie_save_attempts"] = 0
-
-        if not set_remember_cookie(token):
-            revoke_remember_token(token)
-            st.session_state.pop("pending_remember_user", None)
-            st.session_state.pop("pending_remember_token", None)
-            _finish_login(user, None)
-            return False
-
+        st.session_state["_remember_cookie_save_attempts"] = 1
         return True
     except Exception as error:
         LOGGER.exception("start_remember_login gagal: %s", error)
@@ -1312,14 +1343,10 @@ def show_login_page() -> None:
                 return
 
             if remember_me:
-                remember_started = start_remember_login(user)
-                if remember_started:
-                    feedback_slot.info("Menyimpan sesi login di browser...")
-                    # Jangan melakukan st.rerun() di sini. CookieManager adalah
-                    # komponen browser asinkron dan akan memicu rerun setelah
-                    # cookie benar-benar ditulis.
-                    st.stop()
-
+                start_remember_login(user)
+                # Session sudah dikomit pada klik pertama. Rerun tunggal ini
+                # hanya memindahkan tampilan ke Beranda; penulisan cookie akan
+                # dikonfirmasi tanpa menahan akses pengguna.
                 st.rerun()
 
             st.session_state["remembered_username"] = ""

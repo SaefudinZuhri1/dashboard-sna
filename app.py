@@ -353,8 +353,8 @@ LOGOUT_TRANSITION_PENDING_KEY = "_logout_transition_pending_v2"
 LOGOUT_TRANSITION_STARTED_KEY = "_logout_transition_started_v2"
 LOGOUT_COOKIE_DELETE_SENT_KEY = "_logout_cookie_delete_sent_v1"
 
-# CookieManager berjalan asinkron. Pemulihan sesi membiarkan komponen browser
-# memicu satu rerun alami agar snapshot cookie tidak kalah oleh polling manual.
+# CookieManager berjalan asinkron. Biarkan komponen browser menyelesaikan
+# sinkronisasi cookie secara alami; optimasi dilakukan setelah sesi ditemukan.
 
 
 # Label yang terlihat pengguna dipisahkan dari nama route lama agar routing tetap aman.
@@ -3575,15 +3575,24 @@ def main() -> None:
         init_session_state()
         _ensure_database_initialized()
 
-        # Cookie browser harus diambil ulang pada setiap rerun autentikasi.
-        # Saat sesi sudah aktif, komponen tidak dirender lagi agar interaksi
-        # dashboard tidak memperoleh rerun tambahan yang tidak diperlukan.
-        if not st.session_state.get("logged_in", False):
+        # Cookie dibaca saat belum login dan saat penulisan cookie Ingat Saya
+        # masih perlu dikonfirmasi. Konfirmasi berjalan di belakang layar dan
+        # tidak boleh menahan perpindahan pengguna ke Beranda.
+        cookie_confirmation_pending = bool(
+            st.session_state.get("pending_remember_token")
+        )
+        if (
+            not st.session_state.get("logged_in", False)
+            or cookie_confirmation_pending
+        ):
             refresh_cookie_manager_for_run()
 
         if _process_pending_logout():
             return
 
+        # Selesaikan transaksi cookie lama/baru tanpa menjadikan cookie sebagai
+        # syarat keberhasilan login pada session aktif.
+        complete_pending_remember_login()
         sync_authenticated_user_state()
 
         if not st.session_state.logged_in:
@@ -3592,55 +3601,59 @@ def main() -> None:
                 hide_sidebar=True,
             )
 
-            if complete_pending_remember_login():
-                st.rerun()
+            restore_status = "none"
+            if not st.session_state.get("logged_in", False):
+                restore_status = try_restore_remember_login()
 
-            restore_status = try_restore_remember_login()
             if restore_status == "wait":
-                # Jangan memaksa polling cepat dengan sleep + rerun. Komponen
-                # CookieManager akan mengirim snapshot browser dan memicu rerun
-                # alaminya sendiri. Boot overlay tetap aktif selama proses ini.
+                # Mekanisme ini sebelumnya sudah terbukti berhasil memulihkan
+                # cookie di browser pengguna. Jangan paksa polling/rerun karena
+                # dapat memotong respons komponen dan merusak proses login.
                 st.stop()
 
-            if restore_status == "ok" or st.session_state.get("logged_in"):
-                st.rerun()
-
-            public_transition_pending = bool(
-                st.session_state.pop("_public_route_loading_pending", False)
-            )
-            if public_transition_pending:
-                public_route = str(st.session_state.get("_public_route") or "auth")
-                if public_route == "ai_content_studio":
-                    with layar_loading(
-                        "AI Content Studio",
-                        judul="Membuka AI Content Studio",
-                        pesan=(
-                            "Menyiapkan ruang ide konten",
-                            "Memuat pilihan layanan dan platform",
-                            "Mengaktifkan generator Gemini AI",
-                            "Menyiapkan formulir influencer",
-                        ),
-                    ):
-                        render_auth_page()
+            if not st.session_state.get("logged_in", False):
+                public_transition_pending = bool(
+                    st.session_state.pop("_public_route_loading_pending", False)
+                )
+                if public_transition_pending:
+                    public_route = str(
+                        st.session_state.get("_public_route") or "auth"
+                    )
+                    if public_route == "ai_content_studio":
+                        with layar_loading(
+                            "AI Content Studio",
+                            judul="Membuka AI Content Studio",
+                            pesan=(
+                                "Menyiapkan ruang ide konten",
+                                "Memuat pilihan layanan dan platform",
+                                "Mengaktifkan generator Gemini AI",
+                                "Menyiapkan formulir influencer",
+                            ),
+                        ):
+                            render_auth_page()
+                    else:
+                        with layar_loading(
+                            "Autentikasi",
+                            judul="Kembali ke Halaman Masuk",
+                            pesan=(
+                                "Menutup ruang ide konten",
+                                "Menyiapkan formulir autentikasi",
+                                "Memulihkan tampilan halaman masuk",
+                            ),
+                        ):
+                            render_auth_page()
                 else:
-                    with layar_loading(
-                        "Autentikasi",
-                        judul="Kembali ke Halaman Masuk",
-                        pesan=(
-                            "Menutup ruang ide konten",
-                            "Menyiapkan formulir autentikasi",
-                            "Memulihkan tampilan halaman masuk",
-                        ),
-                    ):
-                        render_auth_page()
-            else:
-                render_auth_page()
+                    render_auth_page()
 
-            render_footer()
-            _selesaikan_loading_awal()
-            if st.session_state.pop("_logout_just_completed_v2", False):
-                _remove_client_logout_overlay()
-            return
+                render_footer()
+                _selesaikan_loading_awal()
+                if st.session_state.pop("_logout_just_completed_v2", False):
+                    _remove_client_logout_overlay()
+                return
+
+            # Session berhasil dipulihkan. Lanjut render Beranda pada run yang
+            # sama, tanpa st.rerun() tambahan yang membuat boot overlay terasa
+            # lama padahal autentikasi sudah selesai.
 
         selected = render_sidebar_menu()
         route_page(selected)
