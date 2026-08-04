@@ -1,966 +1,2222 @@
-# Panduan Instalasi Dashboard dari Nol
-
-## Dashboard Analisis Sentimen dan SNA Telkom Group
-
-Panduan ini dibuat untuk pengguna pemula yang belum terbiasa menggunakan File Explorer, Command Prompt, Git, Python, virtual environment, atau Streamlit. Ikuti langkah secara berurutan dan jangan melewati satu langkah pun.
+# Panduan Instalasi Dashboard Analisis Sentimen & SNA
+## Telkom Group — Skripsi ULBI Bandung 2026
 
 ---
 
-## 1. Tujuan pengujian instalasi fresh
+Panduan ini menjelaskan cara memasang dan menjalankan **Dashboard Analisis Sentimen & Social Network Analysis (SNA) Layanan Telkom Group** pada komputer pribadi.
 
-Pengujian ini mensimulasikan kondisi laptop baru dengan cara:
+Panduan ditulis untuk pengguna yang belum pernah menggunakan Python, Command Prompt, Terminal, Git, atau Streamlit. Ikuti langkah secara berurutan. Jangan melewati langkah yang diberi tanda **⚠️ PENTING**.
 
-1. Mengamankan folder proyek lama sebagai backup.
-2. Mengunduh ulang proyek dari GitHub menggunakan `git clone`.
-3. Memastikan Python yang kompatibel tersedia.
-4. Menjalankan launcher otomatis `run.bat` pada Windows atau `run.sh` pada macOS/Linux.
-5. Memeriksa login, seluruh halaman utama, Mode Demo, terminal, dan Console browser.
-6. Mencatat waktu instalasi dan seluruh error yang ditemukan.
+Dashboard mencakup analisis layanan:
 
-> Jangan menghapus folder proyek lama. Folder tersebut hanya diganti nama sementara agar data dan pekerjaan sebelumnya tetap aman.
+- IndiHome;
+- IndiBiz;
+- Telkomsel;
+- platform Twitter/X, Instagram, dan TikTok;
+- analisis sentimen menggunakan IndoBERT;
+- Social Network Analysis menggunakan NetworkX dan Pyvis.
 
----
-
-## 2. Persiapan sebelum mulai
-
-Siapkan hal berikut:
-
-- Koneksi internet yang stabil.
-- Ruang kosong penyimpanan minimal sekitar 6 GB. Library PyTorch, Transformers, cache, dan virtual environment dapat berukuran besar.
-- Browser Google Chrome atau Microsoft Edge.
-- Git untuk Windows.
-- Python 3.10 atau Python 3.11. Python 3.12 masih diterima launcher, tetapi Python 3.10 atau 3.11 adalah pilihan yang paling aman untuk dependency proyek ini.
-
-Akun awal lokal:
+Aplikasi dijalankan secara lokal melalui alamat:
 
 ```text
-Username: admin
-Password: admin123
+http://localhost:8501
 ```
 
-Password tersebut hanya untuk instalasi awal dan demonstrasi lokal. Ganti password sebelum aplikasi dipublikasikan.
-
----
-
-# BAGIAN A — SIMULASI INSTALASI FRESH DI WINDOWS
-
-## Langkah 1 — Menutup dashboard lama
-
-1. Lihat taskbar di bagian bawah layar Windows.
-2. Cari jendela Command Prompt atau terminal yang sebelumnya menjalankan Streamlit.
-3. Klik jendela terminal tersebut.
-4. Tekan tombol `Ctrl` dan `C` secara bersamaan.
-5. Jika muncul pertanyaan seperti `Terminate batch job (Y/N)?`, ketik `Y`, lalu tekan `Enter`.
-6. Tutup browser dashboard lama.
-
-Ciri berhasil:
-
-- Terminal kembali menampilkan baris tempat mengetik perintah, atau jendela launcher berhenti.
-- Alamat `http://localhost:8501` tidak lagi menampilkan dashboard lama setelah beberapa saat.
-
----
-
-## Langkah 2 — Membuka File Explorer
-
-1. Tekan tombol `Windows` dan `E` secara bersamaan.
-2. File Explorer akan terbuka.
-3. Pada panel sebelah kiri, klik lokasi tempat folder proyek disimpan, misalnya `Documents`, `Downloads`, atau `Desktop`.
-4. Cari folder proyek lama. Nama folder dapat berupa `dashboard-sna`, `project`, atau nama versi skripsi yang Anda gunakan.
-
----
-
-## Langkah 3 — Mengganti nama folder proyek lama menjadi backup
-
-1. Klik satu kali folder proyek lama.
-2. Klik kanan folder tersebut.
-3. Klik menu **Rename** atau **Ganti nama**.
-4. Ubah nama menjadi:
+Jika port 8501 sedang digunakan aplikasi lain, launcher proyek dapat memakai:
 
 ```text
-dashboard-sna_backup
+http://localhost:8502
 ```
 
-5. Tekan `Enter`.
+### Gambaran proses instalasi
 
-Ciri berhasil:
-
-- Folder lama masih ada.
-- Namanya berubah menjadi `dashboard-sna_backup`.
-- Isi folder tidak terhapus.
-
-Jika Windows menolak penggantian nama:
-
-1. Pastikan Streamlit dan semua terminal yang menggunakan folder tersebut sudah ditutup.
-2. Tutup aplikasi editor seperti Visual Studio Code atau Cursor.
-3. Ulangi proses rename.
+```text
+[Install Python]
+       |
+       v
+[Download proyek dari GitHub]
+       |
+       v
+[Buka folder proyek]
+       |
+       v
+[Jalankan run.bat atau run.sh]
+       |
+       v
+[Dependency dipasang otomatis]
+       |
+       v
+[Browser membuka dashboard]
+       |
+       v
+[Login: admin / admin123]
+```
 
 ---
 
-## Langkah 4 — Membuka Command Prompt
+## Prasyarat Sistem
 
-1. Tekan tombol `Windows` pada keyboard.
+Sebelum memulai, pastikan komputer memenuhi kebutuhan berikut.
+
+| Komponen | Kebutuhan minimum | Rekomendasi | Keterangan |
+|---|---:|---:|---|
+| Sistem operasi | Windows 10/11 atau macOS 11+ | Windows 11 atau macOS terbaru yang masih didukung | Linux juga dapat digunakan melalui `run.sh`. |
+| RAM | 8 GB | 16 GB | IndoBERT dan PyTorch membutuhkan memori cukup besar. |
+| Penyimpanan kosong | 5 GB | 8–10 GB | Dibutuhkan untuk proyek, virtual environment, library, dan cache model. |
+| Internet | Wajib saat instalasi pertama | Stabil, tanpa VPN | Dibutuhkan untuk mengunduh Git, library Python, dan model IndoBERT. |
+| Browser | Chrome, Edge, Firefox, atau Safari | Versi terbaru | Digunakan untuk membuka dashboard Streamlit. |
+| Python | Python 3.10 | Python 3.10.11 64-bit | Launcher Windows proyek dikunci ke Python 3.10. |
+
+> ⚠️ **PENTING UNTUK WINDOWS:** file `run.bat` pada proyek ini secara sengaja hanya menerima **Python 3.10**. Python 3.11, 3.12, atau 3.13 tidak digunakan oleh launcher Windows ini.
+
+> ℹ️ **UNTUK macOS/LINUX:** file `run.sh` dapat mencari Python 3.10, 3.11, atau 3.12, tetapi Python 3.10 tetap menjadi pilihan paling konsisten dengan launcher Windows dan baseline proyek.
+
+### Sebelum melanjutkan
+
+Pastikan Anda mengetahui tempat menyimpan folder proyek. Untuk pemula, lokasi yang paling mudah adalah:
+
+```text
+Desktop
+```
+
+atau:
+
+```text
+Documents
+```
+
+Hindari menyimpan proyek terlalu dalam, misalnya:
+
+```text
+C:\Users\Nama\Downloads\Folder A\Folder B\Folder C\dashboard-sna
+```
+
+Lokasi yang lebih sederhana lebih mudah digunakan, misalnya:
+
+```text
+C:\Users\Nama\Desktop\dashboard-sna
+```
+
+---
+
+## Langkah 1: Install Python
+
+## Windows — langkah per langkah sangat detail
+
+### A. Download installer Python 3.10
+
+1. Nyalakan komputer dan tunggu sampai halaman Desktop tampil.
+2. Buka browser, misalnya Google Chrome, Microsoft Edge, atau Mozilla Firefox.
+3. Klik satu kali kolom alamat di bagian paling atas browser.
+4. Hapus alamat yang sedang tampil, lalu ketik:
+
+   ```text
+   https://www.python.org/downloads/release/python-31011/
+   ```
+
+5. Tekan tombol `Enter` pada keyboard.
+6. Tunggu halaman **Python 3.10.11** terbuka.
+7. Gulir halaman ke bawah sampai menemukan bagian **Files**.
+8. Cari baris **Windows installer (64-bit)**.
+9. Klik tulisan **Windows installer (64-bit)**.
+10. Tunggu proses download selesai.
+11. File yang diunduh biasanya bernama:
+
+    ```text
+    python-3.10.11-amd64.exe
+    ```
+
+12. Jika browser bertanya lokasi penyimpanan, pilih folder **Downloads**, lalu klik **Save** atau **Simpan**.
+
+> ⚠️ Jangan memilih **embeddable package**, **source tarball**, atau installer 32-bit. Gunakan **Windows installer (64-bit)**.
+
+### B. Menjalankan installer Python
+
+1. Tekan tombol `Windows + E` secara bersamaan untuk membuka File Explorer.
+2. Pada panel kiri, klik folder **Downloads**.
+3. Cari file:
+
+   ```text
+   python-3.10.11-amd64.exe
+   ```
+
+4. Klik dua kali file tersebut.
+5. Jika muncul jendela **User Account Control** yang menanyakan izin perubahan, klik **Yes** atau **Ya**.
+6. Jendela installer Python akan terbuka.
+7. Lihat bagian paling bawah jendela installer.
+8. Cari kotak kecil dengan tulisan serupa:
+
+   ```text
+   Add Python 3.10 to PATH
+   ```
+
+9. **Centang kotak tersebut.**
+10. Pastikan tanda centang terlihat.
+11. Klik tombol **Install Now**.
+12. Tunggu sampai proses selesai. Proses biasanya membutuhkan beberapa menit.
+13. Jangan menutup installer saat progress bar masih berjalan.
+14. Jika muncul tulisan **Setup was successful**, instalasi berhasil.
+15. Jika tersedia tombol **Disable path length limit**, klik tombol tersebut.
+16. Jika muncul permintaan izin, klik **Yes**.
+17. Klik **Close** untuk menutup installer.
+
+> ⚠️ **PENTING SEKALI:** apabila `Add Python 3.10 to PATH` tidak dicentang, perintah Python dapat tidak dikenali oleh Command Prompt.
+
+### C. Memverifikasi Python di Windows
+
+1. Tutup semua jendela Command Prompt yang sebelumnya terbuka.
+2. Tekan tombol `Windows` pada keyboard.
+3. Ketik:
+
+   ```text
+   cmd
+   ```
+
+4. Klik **Command Prompt**, atau tekan `Enter`.
+5. Jendela hitam akan muncul.
+6. Ketik perintah berikut persis:
+
+   ```bat
+   py -3.10 --version
+   ```
+
+7. Tekan `Enter`.
+8. Hasil yang benar harus menyerupai:
+
+   ```text
+   Python 3.10.11
+   ```
+
+9. Lakukan pemeriksaan kedua dengan mengetik:
+
+   ```bat
+   python --version
+   ```
+
+10. Tekan `Enter`.
+11. Hasil ideal juga menunjukkan Python 3.10.x.
+
+### D. Konfirmasi berhasil
+
+Python sudah siap apabila minimal salah satu perintah berikut berhasil:
+
+```bat
+py -3.10 --version
+```
+
+atau:
+
+```bat
+python --version
+```
+
+dan hasilnya menampilkan:
+
+```text
+Python 3.10.x
+```
+
+### E. Jika muncul `python is not recognized`
+
+1. Jangan panik.
+2. Coba perintah:
+
+   ```bat
+   py -3.10 --version
+   ```
+
+3. Jika perintah `py -3.10` berhasil, Python sebenarnya sudah terpasang dan launcher `run.bat` tetap dapat menemukannya.
+4. Jika kedua perintah gagal, ulangi instalasi Python.
+5. Saat installer dibuka kembali, pastikan **Add Python 3.10 to PATH** dicentang.
+6. Setelah instalasi selesai, tutup Command Prompt lama.
+7. Buka Command Prompt baru.
+8. Ulangi pemeriksaan versi.
+
+---
+
+## macOS — langkah per langkah sangat detail
+
+### A. Mengetahui jenis prosesor Mac
+
+1. Klik ikon Apple `` di pojok kiri atas layar.
+2. Klik **About This Mac** atau **Mengenai Mac Ini**.
+3. Cari bagian **Chip** atau **Processor**.
+4. Catat apakah tertulis:
+   - Apple M1, M2, M3, M4, atau generasi Apple Silicon lain; atau
+   - Intel.
+5. Installer **macOS 64-bit universal2** dapat digunakan untuk Mac Apple Silicon maupun Intel yang didukung.
+
+### B. Download Python 3.10 untuk macOS
+
+1. Buka Safari, Chrome, atau Firefox.
+2. Klik kolom alamat browser.
+3. Ketik:
+
+   ```text
+   https://www.python.org/downloads/release/python-31011/
+   ```
+
+4. Tekan `Return` atau `Enter`.
+5. Tunggu halaman Python 3.10.11 terbuka.
+6. Gulir ke bagian **Files**.
+7. Cari tulisan:
+
+   ```text
+   macOS 64-bit universal2 installer
+   ```
+
+8. Klik tulisan tersebut.
+9. Tunggu download selesai.
+10. File biasanya masuk ke folder **Downloads** dan memiliki nama serupa:
+
+    ```text
+    python-3.10.11-macos11.pkg
+    ```
+
+### C. Menjalankan installer di macOS
+
+1. Buka Finder dengan mengklik ikon wajah biru di Dock.
+2. Pada panel kiri Finder, klik **Downloads**.
+3. Cari file installer Python yang berakhiran `.pkg`.
+4. Klik dua kali file tersebut.
+5. Jendela installer akan terbuka.
+6. Klik **Continue**.
+7. Baca informasi instalasi, lalu klik **Continue** lagi.
+8. Klik **Agree** untuk menyetujui lisensi.
+9. Pilih lokasi instalasi default.
+10. Klik **Install**.
+11. Masukkan password akun Mac apabila diminta.
+12. Klik **Install Software**.
+13. Tunggu sampai proses selesai.
+14. Jika muncul tulisan instalasi berhasil, klik **Close**.
+15. Apabila Finder membuka folder Python di Applications, cari file:
+
+    ```text
+    Install Certificates.command
+    ```
+
+16. Klik dua kali file tersebut.
+17. Terminal dapat terbuka sebentar untuk memasang sertifikat.
+18. Tunggu sampai proses selesai, lalu tutup jendela Terminal tersebut.
+
+> ℹ️ Langkah pemasangan sertifikat membantu Python terhubung dengan layanan HTTPS saat mengunduh library atau model.
+
+### D. Memverifikasi Python di macOS
+
+1. Tekan `Command + Space` untuk membuka Spotlight Search.
 2. Ketik:
 
-```text
-cmd
-```
+   ```text
+   Terminal
+   ```
 
-3. Klik **Command Prompt**, atau tekan `Enter`.
-4. Jendela hitam akan terbuka.
+3. Tekan `Return`.
+4. Jendela Terminal akan terbuka.
+5. Ketik:
 
-Anda tidak perlu menjalankan Command Prompt sebagai Administrator untuk proses normal ini.
+   ```bash
+   python3.10 --version
+   ```
 
----
+6. Tekan `Return`.
+7. Hasil yang benar harus menyerupai:
 
-## Langkah 5 — Berpindah ke folder induk
+   ```text
+   Python 3.10.11
+   ```
 
-Folder induk adalah lokasi tempat folder proyek baru akan dibuat. Contoh berikut menggunakan folder `Documents`.
+8. Periksa lokasi Python dengan mengetik:
 
-Ketik perintah berikut, lalu tekan `Enter`:
+   ```bash
+   which python3.10
+   ```
 
-```bat
-cd /d "%USERPROFILE%\Documents"
-```
+9. Tekan `Return`.
+10. Hasil biasanya menunjukkan lokasi Python, misalnya:
 
-Untuk menggunakan Desktop, ketik:
+    ```text
+    /usr/local/bin/python3.10
+    ```
 
-```bat
-cd /d "%USERPROFILE%\Desktop"
-```
+### E. Jika `python3.10: command not found`
 
-Untuk memastikan lokasi sudah benar, ketik:
+1. Tutup Terminal.
+2. Buka Terminal baru.
+3. Jalankan lagi:
 
-```bat
-dir
-```
+   ```bash
+   python3.10 --version
+   ```
 
-Ciri berhasil:
+4. Jika masih gagal, buka Finder.
+5. Buka folder **Applications**.
+6. Cari folder **Python 3.10**.
+7. Pastikan folder tersebut ada.
+8. Jika folder tidak ada, instalasi belum selesai dan perlu diulang.
+9. Jalankan kembali installer `.pkg` dari folder Downloads.
+10. Setelah selesai, restart Mac, lalu lakukan verifikasi ulang.
 
-- Nama folder yang tampil sesuai lokasi tujuan.
-- Folder `dashboard-sna_backup` terlihat jika backup disimpan di lokasi yang sama.
+### F. Konfirmasi berhasil
 
-Ciri gagal:
-
-- Muncul pesan `The system cannot find the path specified`.
-
-Solusi:
-
-1. Buka File Explorer.
-2. Masuk ke folder tujuan.
-3. Klik kolom alamat di bagian atas File Explorer.
-4. Salin alamat folder.
-5. Kembali ke Command Prompt.
-6. Ketik `cd /d`, beri satu spasi, lalu tempel alamat dalam tanda kutip. Contoh:
-
-```bat
-cd /d "D:\Skripsi"
-```
-
----
-
-## Langkah 6 — Memastikan Git tersedia
-
-Di Command Prompt, ketik:
-
-```bat
-git --version
-```
-
-Hasil yang diharapkan menyerupai:
+Python siap apabila Terminal menampilkan:
 
 ```text
-git version 2.x.x.windows.x
+Python 3.10.x
 ```
 
-Jika muncul pesan `git is not recognized`:
+setelah perintah:
 
-1. Buka browser Chrome atau Edge.
-2. Cari **Git for Windows**.
-3. Buka situs resmi Git.
-4. Unduh installer Windows.
-5. Jalankan installer.
-6. Gunakan pilihan default dengan menekan **Next** sampai instalasi selesai.
-7. Tutup Command Prompt lama.
-8. Buka Command Prompt baru.
-9. Jalankan kembali `git --version`.
+```bash
+python3.10 --version
+```
 
 ---
 
-## Langkah 7 — Clone proyek dari GitHub
+## Langkah 2: Download Proyek dari GitHub
 
-Pastikan Command Prompt berada di folder induk, lalu copy-paste perintah berikut:
+Repository proyek:
 
-```bat
-git clone https://github.com/SaefudinZuhri1/dashboard-sna.git
+```text
+https://github.com/SaefudinZuhri1/dashboard-sna
 ```
 
-Tekan `Enter` dan tunggu sampai proses selesai.
+Tersedia dua cara. Gunakan **Opsi A** jika ingin mudah mengambil pembaruan dari GitHub. Gunakan **Opsi B** jika hanya ingin menjalankan proyek dengan cara paling sederhana.
 
-Ciri clone berhasil:
+---
 
-- Muncul teks `Cloning into 'dashboard-sna'...`.
-- Proses berakhir tanpa kata `fatal:`.
-- Folder baru bernama `dashboard-sna` muncul di File Explorer.
+## Opsi A — Dengan Git
 
-Ciri clone gagal:
+### Kapan memilih Opsi A?
 
-- Muncul teks `fatal:`.
-- Muncul pesan repository tidak ditemukan, autentikasi gagal, atau koneksi gagal.
+Pilih Git apabila Anda ingin:
 
-Solusi umum:
+- mengambil versi terbaru menggunakan `git pull`;
+- mengirim perubahan menggunakan `git push`;
+- mempertahankan riwayat perubahan proyek;
+- menyinkronkan komputer dengan GitHub.
 
-- Periksa koneksi internet.
-- Pastikan alamat repository diketik persis.
-- Jika folder `dashboard-sna` sudah ada, rename atau hapus folder clone yang gagal terlebih dahulu. Jangan menghapus folder backup.
+### A. Install Git di Windows
 
-Setelah clone selesai, masuk ke folder proyek:
+1. Buka browser.
+2. Ketik alamat:
 
-```bat
-cd dashboard-sna
+   ```text
+   https://git-scm.com/download/win
+   ```
+
+3. Tekan `Enter`.
+4. Download Git for Windows biasanya dimulai otomatis.
+5. Tunggu file installer selesai diunduh.
+6. Buka folder **Downloads**.
+7. Klik dua kali installer Git.
+8. Jika muncul User Account Control, klik **Yes**.
+9. Pada setiap halaman installer, gunakan pilihan default.
+10. Klik **Next** berulang kali sampai menemukan tombol **Install**.
+11. Klik **Install**.
+12. Tunggu proses selesai.
+13. Klik **Finish**.
+14. Tutup semua Command Prompt lama.
+15. Buka Command Prompt baru.
+16. Ketik:
+
+    ```bat
+    git --version
+    ```
+
+17. Tekan `Enter`.
+18. Jika muncul `git version ...`, Git berhasil dipasang.
+
+### B. Install Git di macOS
+
+Cara paling sederhana:
+
+1. Buka Terminal.
+2. Ketik:
+
+   ```bash
+   git --version
+   ```
+
+3. Tekan `Return`.
+4. Jika Git belum tersedia, macOS dapat menampilkan popup untuk memasang **Command Line Developer Tools**.
+5. Klik **Install**.
+6. Klik **Agree** apabila diminta menyetujui lisensi.
+7. Tunggu instalasi selesai.
+8. Tutup Terminal lama.
+9. Buka Terminal baru.
+10. Jalankan lagi:
+
+    ```bash
+    git --version
+    ```
+
+11. Jika versi Git tampil, instalasi berhasil.
+
+Alternatifnya, Git dapat diunduh melalui:
+
+```text
+https://git-scm.com/download/mac
 ```
 
-Periksa isi folder:
+### C. Clone proyek di Windows
 
-```bat
-dir
+1. Tekan `Windows + E` untuk membuka File Explorer.
+2. Pilih lokasi penyimpanan, misalnya **Desktop**.
+3. Klik satu kali kolom alamat di bagian atas File Explorer.
+4. Ketik:
+
+   ```text
+   cmd
+   ```
+
+5. Tekan `Enter`.
+6. Command Prompt akan terbuka langsung pada lokasi tersebut.
+7. Ketik:
+
+   ```bat
+   git clone https://github.com/SaefudinZuhri1/dashboard-sna.git
+   ```
+
+8. Tekan `Enter`.
+9. Tunggu sampai proses selesai.
+10. Jangan tutup jendela ketika masih muncul progress download.
+11. Jika berhasil, akan terbentuk folder:
+
+    ```text
+    dashboard-sna
+    ```
+
+12. Masuk ke folder proyek dengan perintah:
+
+    ```bat
+    cd dashboard-sna
+    ```
+
+13. Tekan `Enter`.
+14. Tampilkan isi folder dengan:
+
+    ```bat
+    dir
+    ```
+
+15. Pastikan terlihat minimal file berikut:
+
+    ```text
+    app.py
+    requirements.txt
+    run.bat
+    run.sh
+    UI_UX_LOCK.md
+    docs
+    auth
+    pages
+    utils
+    ```
+
+### D. Clone proyek di macOS
+
+1. Buka Terminal.
+2. Untuk menyimpan proyek di Desktop, ketik:
+
+   ```bash
+   cd ~/Desktop
+   ```
+
+3. Tekan `Return`.
+4. Ketik:
+
+   ```bash
+   git clone https://github.com/SaefudinZuhri1/dashboard-sna.git
+   ```
+
+5. Tekan `Return`.
+6. Tunggu proses clone selesai.
+7. Masuk ke folder proyek:
+
+   ```bash
+   cd dashboard-sna
+   ```
+
+8. Tampilkan isi folder:
+
+   ```bash
+   ls
+   ```
+
+9. Pastikan file `app.py`, `requirements.txt`, dan `run.sh` terlihat.
+
+### E. Konfirmasi clone berhasil
+
+Clone berhasil apabila:
+
+- tidak ada pesan yang diawali `fatal:`;
+- folder `dashboard-sna` terbentuk;
+- file `app.py` berada di dalam folder tersebut.
+
+---
+
+## Opsi B — Download ZIP
+
+Opsi ZIP lebih mudah karena tidak membutuhkan Git.
+
+### A. Download ZIP di Windows atau macOS
+
+1. Buka browser.
+2. Masuk ke:
+
+   ```text
+   https://github.com/SaefudinZuhri1/dashboard-sna
+   ```
+
+3. Tunggu halaman repository terbuka.
+4. Cari tombol hijau atau tombol bertulis **Code** di bagian atas daftar file.
+5. Klik tombol **Code**.
+6. Klik **Download ZIP**.
+7. Tunggu download selesai.
+8. File biasanya bernama:
+
+   ```text
+   dashboard-sna-main.zip
+   ```
+
+### B. Extract ZIP di Windows
+
+1. Tekan `Windows + E`.
+2. Buka folder **Downloads**.
+3. Cari file `dashboard-sna-main.zip`.
+4. Klik kanan file tersebut.
+5. Klik **Extract All...** atau **Ekstrak Semua...**.
+6. Pilih lokasi yang mudah, misalnya Desktop.
+7. Centang pilihan untuk menampilkan file setelah proses selesai apabila tersedia.
+8. Klik **Extract**.
+9. Tunggu proses selesai.
+10. Buka folder hasil extract.
+11. Sering kali terdapat folder luar dan folder dalam dengan nama mirip.
+12. Pastikan Anda membuka folder yang langsung berisi `app.py`.
+
+Contoh lokasi benar:
+
+```text
+Desktop\dashboard-sna-main\app.py
 ```
 
-File minimum yang harus terlihat:
+Contoh lokasi yang masih satu tingkat terlalu luar:
+
+```text
+Desktop\dashboard-sna-main\dashboard-sna-main\app.py
+```
+
+Jika ada folder ganda, gunakan folder paling dalam yang berisi `app.py`.
+
+### C. Extract ZIP di macOS
+
+1. Buka Finder.
+2. Klik folder **Downloads**.
+3. Cari `dashboard-sna-main.zip`.
+4. Klik dua kali file ZIP tersebut.
+5. macOS akan membuat folder hasil extract secara otomatis.
+6. Pindahkan folder hasil extract ke Desktop apabila lebih mudah.
+7. Buka folder tersebut.
+8. Pastikan file `app.py` terlihat.
+
+### D. Kekurangan Opsi ZIP
+
+Folder hasil Download ZIP tidak memiliki konfigurasi Git lokal. Artinya:
+
+- Anda tidak dapat langsung menjalankan `git pull`;
+- perubahan tidak dapat langsung dipush sebelum Git diinisialisasi;
+- untuk mengambil versi terbaru, biasanya perlu download ZIP ulang.
+
+Untuk penggunaan jangka panjang, Opsi A dengan Git lebih direkomendasikan.
+
+---
+
+## Langkah 3: Jalankan Aplikasi
+
+Sebelum menjalankan aplikasi, buka folder proyek dan pastikan file berikut berada pada tingkat folder yang sama:
 
 ```text
 app.py
 requirements.txt
 run.bat
 run.sh
-UI_UX_LOCK.md
-docs
-```
-
-Jika `run.bat` atau folder `docs` tidak terlihat, repository GitHub belum berisi patch instalasi terbaru. Jangan lanjut ke launcher sebelum file tersebut dipush ke GitHub.
-
----
-
-## Langkah 8 — Memastikan versi Python
-
-Di Command Prompt yang masih berada di folder `dashboard-sna`, ketik:
-
-```bat
-python --version
-```
-
-Jika perintah tersebut gagal, coba:
-
-```bat
-py --version
-```
-
-Hasil yang disarankan:
-
-```text
-Python 3.10.x
-```
-
-atau:
-
-```text
-Python 3.11.x
-```
-
-Launcher menerima Python 3.10 sampai 3.12. Python 3.13 atau lebih baru belum digunakan sebagai baseline dependency proyek.
-
-### Jika Python belum terpasang
-
-1. Buka browser Chrome atau Edge.
-2. Masuk ke situs resmi `python.org`.
-3. Buka menu **Downloads**.
-4. Pilih installer Python 3.11 untuk Windows 64-bit.
-5. Setelah file selesai diunduh, klik dua kali installer.
-6. Pada layar pertama installer, cari kotak **Add Python to PATH**.
-7. Centang kotak tersebut. Langkah ini wajib.
-8. Klik **Install Now**.
-9. Tunggu sampai muncul pesan instalasi berhasil.
-10. Tutup installer.
-11. Tutup Command Prompt lama.
-12. Buka Command Prompt baru.
-13. Jalankan kembali:
-
-```bat
-python --version
 ```
 
 ---
 
-## Langkah 9 — Menjalankan `run.bat`
+## Windows — Cara Termudah dengan Double Click `run.bat`
 
-Cara paling mudah:
+File `run.bat` adalah launcher otomatis untuk Windows. Launcher akan:
 
-1. Buka File Explorer dengan `Windows + E`.
-2. Masuk ke folder hasil clone bernama `dashboard-sna`.
-3. Cari file `run.bat`.
-4. Klik dua kali `run.bat`.
-5. Jendela terminal hitam akan terbuka.
-6. Jangan menutup jendela tersebut.
+1. mencari Python 3.10;
+2. membuat folder virtual environment bernama `venv` jika belum ada;
+3. memasang library dari `requirements.txt` jika diperlukan;
+4. memeriksa apakah port 8501 tersedia;
+5. menggunakan port 8502 jika port 8501 sedang dipakai;
+6. menjalankan Streamlit;
+7. membuka browser secara otomatis.
 
-Pada penggunaan pertama, launcher akan:
+### Langkah menjalankan
 
-1. Memastikan `app.py` dan `requirements.txt` tersedia.
-2. Mencari Python 3.10, 3.11, atau 3.12.
-3. Membuat folder `venv`.
-4. Memperbarui pip.
-5. Menginstal dependency dari `requirements.txt`.
-6. Memeriksa library inti.
-7. Menjalankan Streamlit.
-8. Membuka browser secara otomatis.
+1. Tekan `Windows + E` untuk membuka File Explorer.
+2. Masuk ke folder proyek yang berisi `app.py`.
+3. Cari file bernama:
 
-Teks sukses yang dapat muncul:
+   ```text
+   run.bat
+   ```
+
+4. Jika ekstensi file disembunyikan, file dapat terlihat hanya sebagai `run` dengan tipe **Windows Batch File**.
+5. Klik dua kali `run.bat`.
+6. Jendela Command Prompt berwarna hitam akan terbuka.
+7. Jangan langsung menutup jendela tersebut.
+8. Launcher akan menampilkan pemeriksaan Python.
+9. Hasil yang benar memuat tulisan serupa:
+
+   ```text
+   [OK] Python proyek ditemukan: Python 3.10.x
+   ```
+
+10. Jika folder `venv` belum ada, launcher akan membuatnya.
+11. Jika dependency belum tersedia, launcher akan mengunduh dan memasangnya.
+12. Proses pertama dapat berlangsung cukup lama karena PyTorch dan library NLP berukuran besar.
+13. Jangan menekan tombol apa pun selama instalasi masih berjalan, kecuali muncul pertanyaan yang jelas.
+14. Setelah selesai, terminal akan menampilkan alamat dashboard.
+15. Browser seharusnya terbuka otomatis.
+16. Alamat yang digunakan adalah salah satu dari:
+
+    ```text
+    http://localhost:8501
+    ```
+
+    atau:
+
+    ```text
+    http://localhost:8502
+    ```
+
+17. Jika browser tidak terbuka, buka Chrome atau Edge secara manual.
+18. Ketik alamat yang ditampilkan terminal.
+19. Tekan `Enter`.
+
+### Jika muncul `Windows protected your PC`
+
+1. Jangan langsung menutup popup.
+2. Klik **More info** atau **Info selengkapnya**.
+3. Pastikan nama file yang ditampilkan adalah `run.bat` dari proyek Anda.
+4. Klik **Run anyway** atau **Tetap jalankan**.
+5. Jika tombol tersebut tidak tersedia, klik kanan `run.bat`.
+6. Pilih **Properties**.
+7. Jika ada kotak **Unblock**, centang kotak tersebut.
+8. Klik **Apply**.
+9. Klik **OK**.
+10. Jalankan kembali `run.bat`.
+
+### Berapa lama proses pertama?
+
+Perkiraan bergantung pada kecepatan internet dan komputer:
+
+| Tahap | Perkiraan umum |
+|---|---:|
+| Membuat `venv` | 1–3 menit |
+| Memasang library | 5–20 menit |
+| Membuka aplikasi | 1–5 menit |
+| Download model saat fitur sentimen pertama digunakan | Dapat membutuhkan beberapa menit |
+
+> ⚠️ Waktu di atas bukan batas pasti. Komputer dengan internet lambat dapat membutuhkan waktu lebih lama.
+
+### Ciri launcher berhasil
+
+Terminal menampilkan informasi serupa:
 
 ```text
-[OK] Python ditemukan
-[OK] Virtual environment berhasil dibuat
-[OK] Seluruh dependency berhasil dipasang
-[INFO] Memulai dashboard
+[INFO] Memulai dashboard...
+[INFO] Alamat dashboard: http://localhost:8501
+[INFO] Browser akan dibuka otomatis.
 ```
 
-Teks gagal yang perlu dicatat:
-
-```text
-[GAGAL]
-ERROR
-FAILED
-No matching distribution found
-ModuleNotFoundError
-Traceback
-```
-
-Launcher sengaja menahan jendela ketika gagal agar pesan error tidak langsung hilang.
+Browser menampilkan halaman login dashboard.
 
 ---
 
-## Langkah 10 — Mencatat waktu instalasi
+## Windows — Cara Manual melalui Command Prompt
 
-Sebelum klik dua kali `run.bat`:
+Gunakan cara manual apabila `run.bat` bermasalah atau Anda perlu melihat proses satu per satu.
 
-1. Lihat jam Windows di pojok kanan bawah.
-2. Catat jam mulai pada tabel berikut.
-3. Setelah browser menampilkan halaman login dan siap digunakan, catat jam selesai.
-4. Hitung selisih waktunya.
+### A. Membuka Command Prompt pada folder yang benar
 
-| Catatan | Isi setelah pengujian |
-|---|---|
-| Tanggal pengujian |  |
-| Jam mulai `run.bat` |  |
-| Jam halaman login siap |  |
-| Total durasi |  |
-| Kecepatan internet |  |
-| Versi Windows |  |
-| Versi Python |  |
-
-Unduhan PyTorch dan dependency NLP dapat memerlukan waktu lama. Selama persentase unduhan atau aktivitas instalasi masih berubah dan tidak muncul `ERROR`, proses belum tentu bermasalah.
-
----
-
-# BAGIAN B — CHECKLIST VERIFIKASI WAJIB
-
-## CEK 1 — Clone GitHub berhasil
-
-1. Buka File Explorer.
-2. Masuk ke folder induk tempat clone dilakukan.
-3. Pastikan ada folder baru `dashboard-sna`.
-4. Buka folder tersebut.
-5. Pastikan `app.py` terlihat.
-6. Kembali ke terminal dan pastikan tidak ada teks `fatal:` pada proses clone.
-
-Status:
-
-- [ ] Berhasil
-- [ ] Gagal
-
-Catatan error:
-
-```text
-Tempel error di sini.
-```
-
----
-
-## CEK 2 — Versi Python benar
-
-1. Buka Command Prompt.
-2. Masuk ke folder proyek:
-
-```bat
-cd /d "LOKASI_FOLDER_ANDA\dashboard-sna"
-```
-
-3. Jalankan:
-
-```bat
-python --version
-```
-
-4. Pastikan hasil menunjukkan Python 3.10, 3.11, atau 3.12.
-
-Status:
-
-- [ ] Berhasil
-- [ ] Gagal
-
----
-
-## CEK 3 — `run.bat` berhasil dijalankan
-
-1. Buka folder `dashboard-sna` di File Explorer.
-2. Klik dua kali `run.bat`.
-3. Pastikan jendela terminal tidak langsung tertutup.
-4. Pastikan muncul teks pemeriksaan Python, virtual environment, atau dependency.
-
-Jika jendela langsung tertutup:
-
-1. Buka Command Prompt.
-2. Masuk ke folder proyek.
-3. Jalankan launcher dari terminal agar error tetap terlihat:
-
-```bat
-run.bat
-```
-
-Untuk membuka isi launcher tanpa menjalankannya:
-
-1. Klik kanan `run.bat`.
-2. Pilih **Show more options** jika tersedia.
-3. Pilih **Edit** atau **Open with > Notepad**.
-4. Jangan mengubah isinya jika hanya ingin membaca.
-
-Status:
-
-- [ ] Berhasil
-- [ ] Gagal
-
----
-
-## CEK 4 — Semua library terpasang tanpa error
-
-Saat `run.bat` berjalan:
-
-1. Biarkan terminal terbuka.
-2. Perhatikan baris instalasi.
-3. Jangan menganggap teks kuning sebagai error. Teks kuning biasanya hanya warning.
-4. Cari kata `ERROR`, `FAILED`, atau `No matching distribution found`.
-5. Jika tidak ada kata tersebut dan muncul `[OK] Seluruh dependency berhasil dipasang`, instalasi dependency berhasil.
-
-Cara menyalin error dari Command Prompt:
-
-1. Klik kanan bagian atas jendela Command Prompt.
-2. Pilih **Edit > Select All**, atau blok teks error menggunakan mouse.
-3. Tekan `Enter` untuk menyalin teks yang dipilih.
-4. Tempel error ke chat menggunakan `Ctrl + V`.
-
-Status:
-
-- [ ] Berhasil
-- [ ] Gagal
-
----
-
-## CEK 5 — Dashboard terbuka di browser
-
-1. Tunggu browser terbuka otomatis.
-2. Periksa kolom alamat browser.
-3. Alamat biasanya:
-
-```text
-http://localhost:8501
-```
-
-4. Jika port 8501 sedang dipakai, launcher menggunakan:
-
-```text
-http://localhost:8502
-```
-
-5. Jika browser tidak terbuka otomatis, buka Chrome atau Edge secara manual.
-6. Klik kolom alamat.
-7. Ketik salah satu alamat di atas.
-8. Tekan `Enter`.
-9. Alternatif alamat:
-
-```text
-http://127.0.0.1:8501
-```
-
-Ciri berhasil:
-
-- Halaman login dashboard tampil.
-- Tidak muncul pesan `This site can't be reached`.
-
-Status:
-
-- [ ] Berhasil
-- [ ] Gagal
-
----
-
-## CEK 6 — Login admin berhasil
-
-1. Pada halaman login, klik kolom **Username**.
-2. Ketik:
-
-```text
-admin
-```
-
-3. Klik kolom **Password**.
+1. Buka folder proyek di File Explorer.
+2. Pastikan file `app.py` terlihat.
+3. Klik kolom alamat di bagian atas File Explorer.
 4. Ketik:
 
-```text
-admin123
+   ```text
+   cmd
+   ```
+
+5. Tekan `Enter`.
+6. Command Prompt akan terbuka pada folder proyek.
+7. Ketik:
+
+   ```bat
+   dir
+   ```
+
+8. Tekan `Enter`.
+9. Pastikan `app.py` dan `requirements.txt` terlihat.
+
+### B. Membuat virtual environment
+
+1. Ketik:
+
+   ```bat
+   py -3.10 -m venv venv
+   ```
+
+2. Tekan `Enter`.
+3. Tunggu sampai kursor kembali muncul.
+4. Aktifkan virtual environment:
+
+   ```bat
+   venv\Scripts\activate
+   ```
+
+5. Tekan `Enter`.
+6. Jika berhasil, bagian awal baris Command Prompt akan memuat:
+
+   ```text
+   (venv)
+   ```
+
+### C. Memasang dependency
+
+1. Perbarui pip:
+
+   ```bat
+   python -m pip install --upgrade pip
+   ```
+
+2. Tekan `Enter` dan tunggu selesai.
+3. Pasang semua kebutuhan proyek:
+
+   ```bat
+   python -m pip install -r requirements.txt
+   ```
+
+4. Tekan `Enter`.
+5. Tunggu sampai proses selesai.
+6. Proses dapat mengunduh file berukuran besar.
+7. Jangan tutup Command Prompt saat instalasi berjalan.
+8. Instalasi berhasil apabila tidak berakhir dengan pesan `ERROR` atau `FAILED`.
+
+Perintah ringkas yang memiliki tujuan sama adalah:
+
+```bat
+pip install -r requirements.txt
 ```
 
-5. Klik tombol **Masuk** atau **Login**.
-6. Tunggu sampai halaman Beranda tampil.
+Namun bentuk `python -m pip` lebih aman karena memastikan pip yang digunakan berasal dari Python di dalam `venv`.
 
-Ciri berhasil:
+### D. Menjalankan Streamlit
 
-- Halaman login menghilang.
-- Sidebar dan halaman Beranda terlihat.
-- Tidak ada pesan kredensial salah.
+1. Pastikan tulisan `(venv)` masih terlihat di awal baris.
+2. Ketik:
 
-Status:
+   ```bat
+   python -m streamlit run app.py
+   ```
 
-- [ ] Berhasil
-- [ ] Gagal
+3. Tekan `Enter`.
+4. Tunggu sampai muncul:
 
----
+   ```text
+   Local URL: http://localhost:8501
+   ```
 
-## CEK 7 — Semua halaman utama dapat dibuka
+5. Jika browser tidak terbuka, buka browser manual.
+6. Ketik:
 
-Sidebar adalah panel navigasi yang berada di sebelah kiri layar dashboard. Jika sidebar tertutup, klik ikon panah atau menu di pojok kiri atas Streamlit.
+   ```text
+   http://localhost:8501
+   ```
 
-Buka menu berikut satu per satu:
-
-1. Klik **Beranda**. Pastikan ringkasan tampil dan tidak ada kotak error merah.
-2. Klik **Dataset**. Pastikan tabel atau fallback data tampil.
-3. Klik **Analisis Sentimen**. Pastikan grafik atau ringkasan sentimen tampil.
-4. Klik **Analisis Topik**. Pastikan WordCloud atau konten topik tampil.
-5. Klik **Social Network Analysis / SNA**. Pastikan statistik atau visualisasi jaringan tampil.
-6. Klik **Rekomendasi**. Pastikan konten rekomendasi tampil.
-7. Klik **Tentang / About**. Pastikan informasi penelitian tampil.
-8. Jika akun admin menampilkan **Admin Panel**, buka dan pastikan halaman tampil.
-
-Gunakan tabel berikut:
-
-| Halaman | Tampil | Tidak ada error merah | Catatan |
-|---|---:|---:|---|
-| Beranda | [ ] | [ ] |  |
-| Dataset | [ ] | [ ] |  |
-| Analisis Sentimen | [ ] | [ ] |  |
-| Analisis Topik | [ ] | [ ] |  |
-| SNA | [ ] | [ ] |  |
-| Rekomendasi | [ ] | [ ] |  |
-| About | [ ] | [ ] |  |
-| Admin Panel | [ ] | [ ] |  |
-
----
-
-## CEK 8 — Mode Demo aktif dan berfungsi
-
-1. Lihat sidebar sebelah kiri.
-2. Cari toggle bertuliskan **Mode Demo (Sidang)**.
-3. Klik toggle sampai aktif.
-4. Pastikan muncul penanda bahwa Mode Demo aktif.
-5. Buka halaman Beranda, Dataset, Analisis Sentimen, Analisis Topik, SNA, dan Rekomendasi.
-6. Pastikan setiap halaman menampilkan data sample dan tidak blank.
-
-Status:
-
-- [ ] Toggle Mode Demo dapat diaktifkan
-- [ ] Beranda menampilkan data demo
-- [ ] Dataset menampilkan data demo
-- [ ] Sentimen menampilkan data demo
-- [ ] Analisis Topik menampilkan data demo
-- [ ] SNA menampilkan data demo
-- [ ] Rekomendasi menampilkan data demo
-
----
-
-## CEK 9 — Tidak ada error terminal saat halaman dibuka
-
-1. Jangan tutup terminal launcher.
-2. Atur browser dan terminal berdampingan:
-   - Klik browser.
-   - Tekan `Windows + Panah Kiri`.
-   - Klik terminal.
-   - Tekan `Windows + Panah Kanan`.
-3. Klik setiap menu dashboard dari browser.
-4. Setelah setiap klik, lihat terminal.
-5. Cari kata `Traceback`, `ERROR`, `Exception`, atau baris merah.
-
-Ciri aman:
-
-- Tidak ada traceback baru.
-- Terminal hanya menampilkan log normal atau warning yang tidak menghentikan aplikasi.
-
-Status:
-
-- [ ] Berhasil
-- [ ] Gagal
-
----
-
-## CEK 10 — Console browser tidak menampilkan error JavaScript kritis
-
-1. Aktifkan browser dashboard.
-2. Tekan tombol `F12`.
-3. Jika F12 mengatur volume atau fungsi laptop lain, tekan `Fn + F12`.
-4. Panel Developer Tools akan terbuka di sisi kanan atau bawah browser.
-5. Klik tab **Console**.
-6. Klik ikon tempat sampah atau tombol **Clear console** agar log lama hilang.
-7. Muat ulang dashboard dengan `Ctrl + R`.
-8. Buka beberapa halaman dashboard.
-9. Periksa apakah ada baris merah dengan kata `Error`.
-
-Catatan:
-
-- Warning kuning belum tentu merusak aplikasi.
-- Error dari ekstensi browser dapat diuji ulang melalui jendela Incognito.
-- Salin error merah jika tampilan dashboard rusak atau kontrol tidak berfungsi.
-
-Status:
-
-- [ ] Tidak ada error JavaScript kritis
-- [ ] Ada error dan sudah dicatat
-
----
-
-## CEK 11 — Waktu instalasi tercatat
-
-Isi data berikut:
-
-| Data | Hasil |
-|---|---|
-| Jam mulai |  |
-| Jam selesai |  |
-| Total waktu |  |
-| Tahap paling lama |  |
-| Ada error instalasi | Ya / Tidak |
-
-Status:
-
-- [ ] Selesai dicatat
-
----
-
-## CEK 12 — Mengembalikan folder backup
-
-Jangan melakukan langkah ini sebelum pengujian selesai dan folder clone baru sudah diperiksa.
-
-Pilihan yang paling aman adalah mempertahankan dua folder dengan nama berbeda:
-
-```text
-dashboard-sna
- dashboard-sna_backup
-```
-
-Jika folder backup harus dikembalikan menjadi nama utama:
-
-1. Hentikan Streamlit dengan `Ctrl + C`.
-2. Tutup terminal dan editor.
-3. Di File Explorer, rename folder clone baru menjadi `dashboard-sna_fresh_test`.
-4. Klik kanan `dashboard-sna_backup`.
-5. Klik **Rename**.
-6. Ubah menjadi `dashboard-sna`.
 7. Tekan `Enter`.
 
-Status:
-
-- [ ] Backup tetap aman
-- [ ] Nama folder sudah sesuai kebutuhan
-
----
-
-## CEK 13 — Konfirmasi akhir
-
-Pengujian hanya dinyatakan selesai apabila semua pemeriksaan penting berhasil.
-
-Kalimat konfirmasi akhir:
-
-```text
-App berhasil diinstall dan dijalankan dari nol ✅
-```
-
-Jangan mengirim kalimat tersebut jika masih ada satu cek yang gagal. Kirim pesan error, screenshot, dan nama cek yang gagal untuk proses debug.
-
----
-
-# BAGIAN C — TROUBLESHOOTING
-
-## Error: Python tidak ditemukan
-
-Ciri pesan:
-
-```text
-Python was not found
-```
-
-atau:
-
-```text
-'python' is not recognized
-```
-
-Solusi:
-
-1. Instal Python 3.10 atau 3.11 dari situs resmi Python.
-2. Centang **Add Python to PATH**.
-3. Tutup dan buka kembali Command Prompt.
-4. Jalankan `python --version`.
-5. Jalankan `run.bat` kembali.
-
----
-
-## Error: Git tidak ditemukan
-
-Ciri pesan:
-
-```text
-'git' is not recognized
-```
-
-Solusi:
-
-1. Instal Git for Windows.
-2. Gunakan opsi instalasi default.
-3. Tutup dan buka kembali Command Prompt.
-4. Jalankan `git --version`.
-
----
-
-## Error: pip gagal atau tidak dikenali
-
-Launcher tidak menggunakan perintah `pip` langsung. Launcher menggunakan Python di dalam `venv`:
+Perintah alternatif:
 
 ```bat
-venv\Scripts\python.exe -m pip install -r requirements.txt
+streamlit run app.py
 ```
 
-Cara manual:
+### E. Menjalankan pada port 8502
+
+Jika port 8501 sedang digunakan:
 
 ```bat
-venv\Scripts\python.exe -m pip install --upgrade pip
-venv\Scripts\python.exe -m pip install -r requirements.txt
+python -m streamlit run app.py --server.port 8502
 ```
 
----
-
-## Error: `No module named streamlit`
-
-1. Buka Command Prompt pada folder proyek.
-2. Jalankan:
-
-```bat
-venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-3. Setelah selesai, jalankan:
-
-```bat
-venv\Scripts\python.exe -m streamlit run app.py
-```
-
----
-
-## Error: virtual environment rusak
-
-Ciri masalah:
-
-- `venv\Scripts\python.exe` tidak ditemukan.
-- Python lama sudah dihapus atau dipindahkan.
-- Import library gagal terus walaupun requirements tidak berubah.
-
-Solusi aman:
-
-1. Hentikan Streamlit.
-2. Tutup terminal.
-3. Buka folder proyek di File Explorer.
-4. Hapus hanya folder `venv`.
-5. Jangan menghapus `app.py`, `data`, `models`, `database`, atau file proyek lain.
-6. Klik dua kali `run.bat`.
-7. Launcher akan membuat `venv` baru.
-
----
-
-## Error: PyTorch atau dependency gagal diunduh
-
-Kemungkinan penyebab:
-
-- Koneksi internet putus.
-- Ruang penyimpanan kurang.
-- Versi Python tidak kompatibel.
-- Server package sedang lambat.
-
-Langkah:
-
-1. Pastikan Python adalah 3.10 atau 3.11.
-2. Pastikan ruang kosong masih tersedia.
-3. Jalankan kembali `run.bat`.
-4. Jika masih gagal, salin baris mulai dari `ERROR` sampai akhir pesan.
-
-Unduhan besar yang masih berjalan bukan error. Jangan menutup terminal selama ukuran unduhan masih bertambah.
-
----
-
-## Error: port 8501 sudah digunakan
-
-Launcher otomatis mencoba port 8502 jika 8501 terdeteksi sedang dipakai.
-
-Buka:
+Kemudian buka:
 
 ```text
 http://localhost:8502
 ```
 
-Jika kedua port bermasalah:
-
-1. Tutup terminal Streamlit lama.
-2. Buka Task Manager dengan `Ctrl + Shift + Esc`.
-3. Cari proses Python yang memang berasal dari dashboard lama.
-4. Akhiri proses hanya jika Anda yakin proses tersebut adalah server lama.
-5. Jalankan kembali `run.bat`.
-
 ---
 
-## Browser tidak terbuka otomatis
+## macOS / Linux — Menjalankan dengan `run.sh`
 
-1. Pastikan terminal menampilkan `[INFO] Alamat dashboard`.
-2. Buka Chrome atau Edge secara manual.
-3. Ketik alamat yang ditampilkan terminal.
-4. Coba `http://localhost:8501`.
-5. Jika launcher memilih port alternatif, coba `http://localhost:8502`.
-6. Coba juga `http://127.0.0.1:8501`.
+File `run.sh` adalah launcher otomatis untuk macOS dan Linux. Launcher akan mencari Python yang kompatibel, membuat `venv`, memasang dependency, memilih port, dan membuka browser jika sistem mendukung.
 
----
+### A. Membuka Terminal
 
-## Database terkunci atau login gagal
+#### macOS
 
-1. Pastikan hanya satu server Streamlit proyek yang berjalan.
-2. Hentikan server lama dengan `Ctrl + C`.
-3. Jalankan kembali `run.bat`.
-4. Coba akun awal `admin / admin123`.
-5. Jangan menghapus `database/users.db` tanpa backup karena akun pengguna tersimpan di dalamnya.
+1. Tekan `Command + Space`.
+2. Ketik `Terminal`.
+3. Tekan `Return`.
 
----
+#### Linux
 
-## Model IndoBERT tidak tersedia
+1. Tekan `Ctrl + Alt + T`.
+2. Terminal akan terbuka.
 
-Folder model besar dapat tidak ikut GitHub. Kondisi tersebut tidak boleh membuat seluruh dashboard gagal dibuka. Gunakan Mode Demo untuk memeriksa antarmuka dan fallback data.
+### B. Masuk ke folder proyek
 
-Untuk pengujian model aktual, salin folder model yang sesuai ke:
-
-```text
-models\indihome
-models\indibiz
-models\telkomsel
-```
-
-Jangan menganggap hasil Mode Demo sebagai hasil penelitian aktual.
-
----
-
-# BAGIAN D — MACOS DAN LINUX
-
-## Menjalankan launcher
-
-1. Buka Terminal.
-2. Masuk ke folder proyek. Contoh:
+Contoh apabila proyek berada di Desktop:
 
 ```bash
-cd ~/Documents/dashboard-sna
+cd ~/Desktop/dashboard-sna
 ```
 
-3. Berikan izin eksekusi satu kali:
+Jika nama folder hasil ZIP adalah `dashboard-sna-main`, gunakan:
+
+```bash
+cd ~/Desktop/dashboard-sna-main
+```
+
+Untuk memastikan lokasi benar, jalankan:
+
+```bash
+ls
+```
+
+Pastikan `app.py`, `requirements.txt`, dan `run.sh` terlihat.
+
+### C. Memberikan izin eksekusi
+
+Izin ini biasanya hanya perlu diberikan satu kali:
 
 ```bash
 chmod +x run.sh
 ```
 
+Tekan `Return`.
+
+### D. Menjalankan launcher
+
+Ketik:
+
+```bash
+./run.sh
+```
+
+Tekan `Return`.
+
+Launcher akan:
+
+1. memeriksa Python;
+2. membuat folder `venv` jika belum ada;
+3. memasang dependency;
+4. memilih port 8501 atau 8502;
+5. membuka browser apabila memungkinkan;
+6. menjalankan aplikasi.
+
+### E. Jika muncul `permission denied`
+
+Jalankan kembali:
+
+```bash
+chmod +x run.sh
+```
+
+Lalu:
+
+```bash
+./run.sh
+```
+
+### F. Cara manual di macOS/Linux
+
+Jika `run.sh` tidak dapat digunakan, jalankan perintah berikut satu per satu:
+
+```bash
+python3.10 -m venv venv
+```
+
+```bash
+source venv/bin/activate
+```
+
+```bash
+python -m pip install --upgrade pip
+```
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+```bash
+python -m streamlit run app.py
+```
+
+Jika `python3.10` tidak ditemukan tetapi `python3 --version` menunjukkan Python 3.10–3.12, perintah pertama dapat diganti dengan:
+
+```bash
+python3 -m venv venv
+```
+
+### G. Konfirmasi berhasil
+
+Dashboard berhasil berjalan apabila:
+
+- Terminal tetap terbuka tanpa error fatal;
+- alamat `http://localhost:8501` atau `http://localhost:8502` tampil;
+- browser menampilkan halaman login.
+
+---
+
+## Konfigurasi API Gemini — opsional
+
+Aplikasi memiliki fitur yang dapat menggunakan Google Gemini. Untuk membuka dashboard dan menggunakan fitur dasar, API key tidak selalu wajib karena proyek memiliki penanganan error atau fallback. Namun fitur AI yang benar-benar memanggil Gemini memerlukan API key.
+
+### Windows
+
+1. Buka folder proyek.
+2. Cari file `.env.template`.
+3. Salin file tersebut.
+4. Tempel salinannya pada folder yang sama.
+5. Ubah nama salinan menjadi:
+
+   ```text
+   .env
+   ```
+
+6. Buka `.env` menggunakan Notepad atau Visual Studio Code.
+7. Isi API key sesuai nama variabel yang sudah disediakan di template.
+8. Simpan dengan `Ctrl + S`.
+9. Jangan membagikan file `.env` kepada orang lain.
+10. Jangan upload `.env` ke GitHub.
+
+### macOS
+
+1. Buka Terminal pada folder proyek.
+2. Salin template:
+
+   ```bash
+   cp .env.template .env
+   ```
+
+3. Buka `.env` menggunakan editor teks.
+4. Isi API key sesuai template.
+5. Simpan file.
+6. Jangan commit `.env` ke GitHub.
+
+> ⚠️ Jangan pernah menulis API key langsung di `app.py`, file halaman, README, atau screenshot publik.
+
+---
+
+## Langkah 4: Login ke Dashboard
+
+1. Pastikan Command Prompt atau Terminal yang menjalankan Streamlit masih terbuka.
+2. Buka browser.
+3. Ketik salah satu alamat berikut sesuai yang ditampilkan terminal:
+
+   ```text
+   http://localhost:8501
+   ```
+
+   atau:
+
+   ```text
+   http://localhost:8502
+   ```
+
+4. Tekan `Enter`.
+5. Tunggu halaman login muncul.
+6. Pada kolom **Username**, ketik:
+
+   ```text
+   admin
+   ```
+
+7. Pada kolom **Password**, ketik:
+
+   ```text
+   admin123
+   ```
+
+8. Periksa kembali agar tidak ada spasi tambahan.
+9. Klik tombol **Login** atau **Masuk** sesuai teks yang tampil pada versi proyek.
+10. Tunggu proses autentikasi.
+11. Jika berhasil, halaman utama dashboard akan terbuka.
+
+### Konfirmasi login berhasil
+
+Login dinyatakan berhasil apabila:
+
+- halaman login tidak lagi tampil;
+- sidebar dashboard muncul;
+- nama atau profil akun tampil;
+- menu sesuai role **Data Analis** dapat dibuka.
+
+> ⚠️ Password `admin123` adalah password awal. Ganti password setelah instalasi, terutama sebelum dashboard dipublikasikan atau digunakan banyak orang.
+
+### Jika akun admin tidak dapat digunakan
+
+1. Hentikan dashboard dengan `Ctrl + C`.
+2. Pastikan Anda berada di folder proyek.
+3. Aktifkan `venv`.
+4. Windows:
+
+   ```bat
+   venv\Scripts\activate
+   ```
+
+5. macOS/Linux:
+
+   ```bash
+   source venv/bin/activate
+   ```
+
+6. Inisialisasi database:
+
+   ```bash
+   python -c "from auth.auth_utils import init_db; init_db(); print('Database siap')"
+   ```
+
+7. Pastikan muncul:
+
+   ```text
+   Database siap
+   ```
+
+8. Jalankan dashboard kembali.
+9. Coba login dengan `admin` dan `admin123`.
+
+---
+
+## Pemeriksaan Awal Setelah Login
+
+Setelah login pertama, lakukan pemeriksaan berikut:
+
+1. Buka halaman **Beranda**.
+2. Pastikan card dan grafik tampil tanpa area putih kosong yang tidak semestinya.
+3. Buka halaman **Dataset**.
+4. Pastikan data atau fallback dummy dapat dimuat.
+5. Buka halaman **Analisis Sentimen**.
+6. Tunggu jika model sedang dimuat untuk pertama kali.
+7. Buka halaman **Analisis Topik**.
+8. Periksa layanan IndiHome, IndiBiz, dan Telkomsel.
+9. Buka halaman **SNA**.
+10. Pastikan grafik jaringan dapat tampil.
+11. Buka halaman **Rekomendasi**.
+12. Pastikan halaman tidak berhenti pada loading tanpa akhir.
+13. Buka halaman **Tentang** atau halaman informasi proyek.
+14. Pastikan tidak ada error merah yang tidak dipahami.
+15. Jangan menutup terminal selama pengujian.
+
+---
+
+## Troubleshooting — Solusi Error Umum
+
+Bagian ini menjelaskan arti error dan langkah penyelesaiannya.
+
+---
+
+### ❌ Error: `python is not recognized as an internal or external command`
+
+**Artinya:** Windows tidak menemukan perintah Python melalui PATH.
+
+**Solusi:**
+
+1. Tutup Command Prompt.
+2. Buka Command Prompt baru.
+3. Coba:
+
+   ```bat
+   py -3.10 --version
+   ```
+
+4. Jika berhasil, gunakan `py -3.10` untuk membuat `venv`.
+5. Jika gagal, ulangi instalasi Python 3.10.11.
+6. Saat installer dibuka, centang **Add Python 3.10 to PATH**.
+7. Selesaikan instalasi.
+8. Restart komputer jika perlu.
+9. Buka Command Prompt baru.
+10. Jalankan lagi:
+
+    ```bat
+    py -3.10 --version
+    ```
+
+---
+
+### ❌ Error: `[GAGAL] Python 3.10 tidak ditemukan di komputer ini`
+
+**Artinya:** `run.bat` tidak menemukan Python 3.10. Launcher Windows proyek memang dikunci ke versi tersebut.
+
+**Solusi:**
+
+1. Jangan mengganti isi `run.bat`.
+2. Install Python 3.10.11 64-bit.
+3. Pastikan Python Launcher ikut terpasang.
+4. Buka Command Prompt baru.
+5. Jalankan:
+
+   ```bat
+   py -3.10 --version
+   ```
+
+6. Jika muncul Python 3.10.x, buka folder proyek.
+7. Jalankan kembali `run.bat`.
+
+---
+
+### ❌ Error: `Venv lama bukan dibuat dengan Python 3.10`
+
+**Artinya:** folder `venv` dibuat menggunakan versi Python lain.
+
+**Solusi aman tanpa menghapus langsung:**
+
+1. Tutup dashboard.
+2. Tutup semua Command Prompt yang memakai proyek.
+3. Buka folder proyek.
+4. Cari folder `venv`.
+5. Klik kanan folder tersebut.
+6. Klik **Rename**.
+7. Ubah nama menjadi:
+
+   ```text
+   venv_backup
+   ```
+
+8. Tekan `Enter`.
+9. Jalankan kembali `run.bat`.
+10. Launcher akan membuat `venv` baru dengan Python 3.10.
+11. Setelah dashboard dipastikan normal, folder `venv_backup` boleh dihapus untuk menghemat ruang.
+
+---
+
+### ❌ Error: `Port 8501 already in use`
+
+**Artinya:** port 8501 sedang dipakai dashboard lain atau proses lain.
+
+**Solusi:**
+
+1. Coba buka:
+
+   ```text
+   http://localhost:8501
+   ```
+
+2. Dashboard mungkin sebenarnya sudah berjalan.
+3. Jika menggunakan `run.bat` atau `run.sh`, periksa terminal karena launcher dapat otomatis memilih port 8502.
+4. Coba buka:
+
+   ```text
+   http://localhost:8502
+   ```
+
+5. Untuk menjalankan manual pada port 8502:
+
+   ```bat
+   python -m streamlit run app.py --server.port 8502
+   ```
+
+6. Jika ingin menghentikan proses lama, tutup terminal lama atau tekan `Ctrl + C` pada terminal tersebut.
+
+---
+
+### ❌ Error: `ModuleNotFoundError: No module named 'streamlit'`
+
+**Artinya:** library Streamlit belum terpasang pada Python yang sedang digunakan.
+
+**Solusi Windows:**
+
+1. Buka Command Prompt pada folder proyek.
+2. Aktifkan `venv`:
+
+   ```bat
+   venv\Scripts\activate
+   ```
+
+3. Pastikan `(venv)` tampil.
 4. Jalankan:
 
+   ```bat
+   python -m pip install -r requirements.txt
+   ```
+
+5. Tunggu selesai.
+6. Jalankan:
+
+   ```bat
+   python -m streamlit run app.py
+   ```
+
+**Solusi macOS/Linux:**
+
 ```bash
-./run.sh
+source venv/bin/activate
 ```
 
-Launcher akan mencari Python 3.11, 3.10, 3.12, `python3`, lalu `python`. Browser dibuka otomatis jika perintah sistem mendukungnya.
-
-Jika `python3 -m venv` gagal pada Ubuntu/Debian, jalankan:
-
 ```bash
-sudo apt update
-sudo apt install python3-venv
+python -m pip install -r requirements.txt
 ```
 
-Kemudian jalankan kembali:
-
 ```bash
-./run.sh
+python -m streamlit run app.py
 ```
 
 ---
 
-# BAGIAN E — CATATAN HASIL AUDIT FASE 15
+### ❌ Error: instalasi `torch` atau PyTorch gagal
 
-Audit kode dilakukan tanpa mengubah UI/UX dashboard.
+**Artinya:** PyTorch tidak berhasil diunduh atau versi Python tidak cocok.
 
-Temuan sebelum patch:
+**Solusi:**
 
-1. Launcher lama belum berhenti secara aman ketika pembuatan `venv` atau instalasi dependency gagal.
-2. Launcher lama menggunakan `pip` dan `streamlit` secara langsung sehingga lebih rentan memakai Python di luar `venv`.
-3. Launcher lama belum memeriksa versi Python yang kompatibel.
-4. Launcher lama belum memeriksa perubahan `requirements.txt`.
-5. Launcher lama belum memeriksa port 8501 sebelum menjalankan server.
-6. Folder `docs/` dan `docs/PANDUAN_INSTALASI.md` belum tersedia pada arsip yang diaudit.
-7. Fresh clone hanya dapat diuji setelah `run.bat`, `run.sh`, dan folder `docs/` benar-benar dipush ke GitHub.
+1. Pastikan menggunakan Python 3.10 64-bit.
+2. Pastikan internet stabil.
+3. Matikan VPN sementara.
+4. Aktifkan `venv`.
+5. Perbarui pip:
 
-Validasi teknis patch:
+   ```bat
+   python -m pip install --upgrade pip
+   ```
 
-- Pemeriksaan sintaks Python proyek: lulus `compileall`.
-- Pemeriksaan sintaks `run.sh`: wajib lulus `bash -n run.sh` sebelum rilis.
-- Pengujian penuh launcher Windows dan unduhan dependency tetap harus dilakukan pada komputer Windows dengan internet karena lingkungan audit bukan Windows dan tidak memiliki akses unduhan package.
+6. Jalankan kembali:
+
+   ```bat
+   python -m pip install -r requirements.txt
+   ```
+
+7. Jangan memasang versi PyTorch lain secara acak karena `requirements.txt` sudah menentukan versi CPU yang digunakan proyek.
+8. Jika masih gagal, salin bagian error mulai dari tulisan `ERROR` atau `FAILED` untuk proses debug.
 
 ---
 
-## Form hasil akhir pengujian pengguna
+### ❌ Error: model IndoBERT gagal download atau `Connection Error`
 
-| Pemeriksaan | Hasil | Catatan |
-|---|---|---|
-| Clone GitHub | Lulus / Gagal |  |
-| Python | Lulus / Gagal |  |
-| run.bat | Lulus / Gagal |  |
-| Dependency | Lulus / Gagal |  |
-| Browser | Lulus / Gagal |  |
-| Login admin | Lulus / Gagal |  |
-| Semua halaman | Lulus / Gagal |  |
-| Mode Demo | Lulus / Gagal |  |
-| Terminal | Lulus / Gagal |  |
-| DevTools Console | Lulus / Gagal |  |
-| Durasi tercatat | Lulus / Gagal |  |
-| Backup aman | Lulus / Gagal |  |
+**Artinya:** komputer gagal mengambil model dari Hugging Face, koneksi terputus, atau cache belum lengkap.
 
-Konfirmasi final hanya setelah semua pemeriksaan penting lulus:
+**Solusi:**
+
+1. Pastikan internet aktif.
+2. Coba membuka situs lain untuk memeriksa koneksi.
+3. Matikan VPN atau proxy sementara.
+4. Jangan gunakan jaringan kantor/kampus yang memblokir Hugging Face.
+5. Aktifkan `venv`.
+6. Jalankan perintah berikut pada Command Prompt atau Terminal:
+
+   ```bash
+   python -c "from transformers import AutoTokenizer, AutoModelForSequenceClassification; nama='mdhugol/indonesia-bert-sentiment-classification'; AutoTokenizer.from_pretrained(nama); AutoModelForSequenceClassification.from_pretrained(nama); print('Model IndoBERT berhasil disiapkan')"
+   ```
+
+7. Tunggu sampai selesai.
+8. Jika muncul `Model IndoBERT berhasil disiapkan`, jalankan dashboard kembali.
+9. Jika download terputus, ulangi perintah setelah koneksi stabil.
+
+---
+
+### ❌ Error: `FileNotFoundError: database/users.db`
+
+**Artinya:** database belum tersedia, folder tidak dapat ditulis, atau aplikasi dijalankan dari lokasi yang salah.
+
+**Catatan:** kode proyek dapat membuat folder database dan seed admin secara otomatis saat startup.
+
+**Solusi:**
+
+1. Pastikan Command Prompt berada di folder yang berisi `app.py`.
+2. Periksa dengan:
+
+   ```bat
+   dir
+   ```
+
+3. Pastikan folder `auth` terlihat.
+4. Aktifkan `venv`.
+5. Jalankan:
+
+   ```bash
+   python -c "from auth.auth_utils import init_db; init_db(); print('Database siap')"
+   ```
+
+6. Periksa folder:
+
+   ```text
+   database
+   ```
+
+7. Pastikan file `users.db` terbentuk.
+8. Jalankan dashboard kembali.
+
+---
+
+### ❌ Error: `Permission denied` saat menjalankan `run.sh`
+
+**Artinya:** macOS/Linux belum memberikan izin eksekusi pada file.
+
+**Solusi:**
+
+1. Buka Terminal pada folder proyek.
+2. Jalankan:
+
+   ```bash
+   chmod +x run.sh
+   ```
+
+3. Tekan `Return`.
+4. Jalankan:
+
+   ```bash
+   ./run.sh
+   ```
+
+---
+
+### ❌ Error: `No such file or directory` untuk `app.py` atau `requirements.txt`
+
+**Artinya:** terminal berada pada folder yang salah.
+
+**Solusi Windows:**
+
+1. Buka folder yang benar di File Explorer.
+2. Pastikan `app.py` terlihat.
+3. Klik address bar.
+4. Ketik `cmd`.
+5. Tekan `Enter`.
+6. Jalankan kembali perintah instalasi.
+
+**Solusi macOS:**
+
+1. Buka Finder.
+2. Temukan folder yang berisi `app.py`.
+3. Di Terminal, ketik `cd ` dengan satu spasi setelah `cd`.
+4. Tarik folder proyek dari Finder ke Terminal.
+5. Tekan `Return`.
+6. Jalankan:
+
+   ```bash
+   ls
+   ```
+
+7. Pastikan `app.py` terlihat.
+
+---
+
+### ❌ Dashboard sangat lambat saat pertama dibuka
+
+**Artinya:** library, data, model, atau cache sedang dipersiapkan.
+
+**Solusi:**
+
+1. Ini dapat menjadi kondisi normal pada penggunaan pertama.
+2. Jangan menutup terminal.
+3. Perhatikan apakah masih ada aktivitas download.
+4. Tunggu sampai proses selesai.
+5. Tutup aplikasi lain yang berat seperti game, editor video, atau banyak tab browser.
+6. Pastikan RAM minimal 8 GB.
+7. Pastikan ruang penyimpanan masih cukup.
+8. Penggunaan berikutnya biasanya lebih cepat karena dependency dan model sudah tersimpan.
+
+---
+
+### ❌ Browser menampilkan `This site can't be reached`
+
+**Artinya:** Streamlit belum berjalan, alamat salah, atau terminal sudah ditutup.
+
+**Solusi:**
+
+1. Periksa terminal.
+2. Pastikan terminal belum ditutup.
+3. Cari tulisan `Local URL` atau `Alamat dashboard`.
+4. Salin alamat tersebut.
+5. Tempel ke browser.
+6. Coba port 8501 dan 8502.
+7. Jika terminal sudah berhenti, jalankan kembali `run.bat`, `run.sh`, atau `python -m streamlit run app.py`.
+
+---
+
+### ❌ Instalasi berhenti dengan `Read timed out`, `Connection reset`, atau error jaringan
+
+**Artinya:** download dependency terputus.
+
+**Solusi:**
+
+1. Pastikan koneksi stabil.
+2. Matikan VPN sementara.
+3. Jangan hapus folder `venv` terlebih dahulu.
+4. Jalankan `run.bat` kembali.
+5. Launcher akan memeriksa dependency dan mencoba memasang yang belum lengkap.
+6. Untuk cara manual, aktifkan `venv`, lalu jalankan ulang:
+
+   ```bat
+   python -m pip install -r requirements.txt
+   ```
+
+---
+
+### ❌ Login admin gagal meskipun username dan password benar
+
+**Artinya:** database berbeda, password sudah pernah diubah, atau file database bermasalah.
+
+**Solusi:**
+
+1. Pastikan username ditulis huruf kecil:
+
+   ```text
+   admin
+   ```
+
+2. Pastikan password tanpa spasi:
+
+   ```text
+   admin123
+   ```
+
+3. Jika proyek pernah dipakai sebelumnya, password mungkin sudah diubah.
+4. Jangan langsung menghapus database karena data akun lain dapat hilang.
+5. Buat backup file `database/users.db` terlebih dahulu.
+6. Hubungi pengelola proyek untuk reset password secara aman.
+7. Untuk instalasi baru yang benar-benar belum memiliki data penting, database dapat diinisialisasi ulang setelah file lama dibackup.
+
+---
+
+### ❌ Fitur Gemini tidak bekerja
+
+**Artinya:** API key belum diisi, tidak valid, kuota habis, atau internet bermasalah.
+
+**Solusi:**
+
+1. Pastikan file `.env` ada pada folder yang sama dengan `app.py`.
+2. Pastikan nama variabel mengikuti `.env.template`.
+3. Pastikan tidak ada tanda kutip atau spasi yang tidak diperlukan.
+4. Simpan file.
+5. Hentikan dashboard.
+6. Jalankan kembali dashboard agar `.env` dibaca ulang.
+7. Jangan tampilkan API key di screenshot atau pesan publik.
+
+---
+
+## Cara Menghentikan Dashboard
+
+### Windows
+
+1. Cari jendela Command Prompt yang menjalankan dashboard.
+2. Klik jendela tersebut agar aktif.
+3. Tekan `Ctrl + C`.
+4. Tunggu server berhenti.
+5. Jika launcher menampilkan pilihan:
+
+   ```text
+   [R] Jalankan dashboard lagi
+   [C] Tutup launcher
+   ```
+
+6. Tekan `C` untuk menutup launcher.
+7. Jika menggunakan cara manual dan muncul pertanyaan `Terminate batch job (Y/N)?`, ketik `Y`, lalu tekan `Enter`.
+
+### macOS/Linux
+
+1. Klik jendela Terminal yang menjalankan dashboard.
+2. Tekan `Control + C`.
+3. Tunggu kursor Terminal kembali muncul.
+4. Tutup Terminal jika tidak digunakan lagi.
+
+### Konfirmasi dashboard sudah berhenti
+
+1. Kembali ke browser.
+2. Refresh halaman dashboard.
+3. Jika browser tidak lagi dapat terhubung, server sudah berhenti.
+
+---
+
+## Menjalankan Dashboard Kembali
+
+### Windows
+
+1. Buka folder proyek.
+2. Klik dua kali `run.bat`.
+3. Launcher akan memakai ulang `venv` yang sudah ada.
+4. Dependency tidak dipasang ulang jika sudah lengkap dan `requirements.txt` tidak berubah.
+
+### macOS/Linux
+
+1. Buka Terminal.
+2. Masuk ke folder proyek.
+3. Jalankan:
+
+   ```bash
+   ./run.sh
+   ```
+
+---
+
+## Uninstall / Hapus Bersih
+
+Lakukan bagian ini hanya jika benar-benar ingin menghapus aplikasi dari komputer.
+
+### A. Hapus folder proyek
+
+#### Windows
+
+1. Hentikan dashboard.
+2. Tutup Command Prompt, Cursor, Visual Studio Code, dan File Explorer yang sedang membuka file proyek.
+3. Buka lokasi folder proyek.
+4. Klik kanan folder `dashboard-sna`.
+5. Klik **Delete**.
+6. Buka Recycle Bin.
+7. Hapus permanen hanya jika yakin tidak memerlukan backup.
+
+#### macOS
+
+1. Hentikan dashboard.
+2. Buka Finder.
+3. Cari folder proyek.
+4. Klik kanan folder.
+5. Klik **Move to Bin**.
+6. Kosongkan Bin hanya jika yakin.
+
+### B. Hapus cache Hugging Face
+
+Cache menyimpan model yang pernah diunduh.
+
+#### Windows
+
+Lokasi umum:
 
 ```text
-App berhasil diinstall dan dijalankan dari nol ✅
+C:\Users\NAMA_PENGGUNA\.cache\huggingface
 ```
 
+Langkah:
 
-## Pesan Error dan Peringatan
+1. Tekan `Windows + R`.
+2. Ketik:
 
-Dashboard menggunakan pesan Bahasa Indonesia yang mudah dipahami. Jika aplikasi
-menampilkan bahwa suatu proses belum berhasil, lakukan langkah berikut:
+   ```text
+   %USERPROFILE%\.cache
+   ```
 
-1. Tutup tab dashboard, tetapi jangan menghapus folder proyek.
-2. Pada launcher, tekan `Ctrl+C`, lalu pilih `R` untuk menjalankan kembali.
-3. Pastikan koneksi internet stabil jika proses memerlukan model atau API.
-4. Jika masalah tetap muncul, catat halaman dan tindakan terakhir yang dilakukan.
+3. Tekan `Enter`.
+4. Cari folder `huggingface`.
+5. Klik kanan.
+6. Klik **Delete**.
 
-Peringatan lama mengenai `st.components.v1.html` sudah diperbaiki dan tidak boleh
-muncul lagi pada Command Prompt maupun Streamlit Community Cloud.
+Jika folder tidak ada, tidak ada cache yang perlu dihapus pada lokasi tersebut.
+
+#### macOS/Linux
+
+Lokasi umum:
+
+```text
+~/.cache/huggingface
+```
+
+Untuk menghapus melalui Terminal:
+
+```bash
+rm -rf ~/.cache/huggingface
+```
+
+> ⚠️ Perintah `rm -rf` menghapus tanpa Recycle Bin. Pastikan path diketik persis.
+
+### C. Uninstall Python — opsional
+
+Python tidak perlu dihapus hanya karena proyek dihapus. Hapus Python hanya jika tidak digunakan aplikasi lain.
+
+#### Windows
+
+1. Tekan tombol Windows.
+2. Ketik **Add or remove programs**.
+3. Buka menu tersebut.
+4. Cari **Python 3.10.11**.
+5. Klik item Python.
+6. Klik **Uninstall**.
+7. Ikuti instruksi sampai selesai.
+
+#### macOS
+
+Untuk instalasi dari python.org, penghapusan manual dapat memengaruhi symlink dan aplikasi lain. Pengguna pemula disarankan tidak menghapus Python tanpa bantuan orang yang memahami macOS.
+
+### D. Hapus Git — opsional
+
+Git tidak perlu dihapus karena kecil dan berguna untuk pembaruan proyek. Jika ingin menghapusnya di Windows:
+
+1. Buka **Add or remove programs**.
+2. Cari **Git**.
+3. Klik **Uninstall**.
+
+---
+
+# Panduan Pengecekan Manual Setelah File Selesai Dibuat
+
+Bagian berikut digunakan untuk memastikan file dokumentasi benar-benar berada di lokasi yang tepat dan isinya lengkap.
+
+---
+
+## BAGIAN 1 — Cara Membuat File `docs/PANDUAN_INSTALASI.md`
+
+### A. Memeriksa apakah folder `docs` sudah ada
+
+1. Buka File Explorer dengan `Windows + E`.
+2. Masuk ke folder proyek.
+3. Pastikan file `app.py` terlihat.
+4. Cari folder bernama:
+
+   ```text
+   docs
+   ```
+
+5. Jika folder `docs` terlihat, klik dua kali untuk membukanya.
+6. Jika tidak terlihat, ikuti bagian membuat folder di bawah.
+
+### B. Membuat folder `docs` di Windows jika belum ada
+
+1. Pastikan File Explorer berada di folder proyek, yaitu folder yang berisi `app.py`.
+2. Klik kanan area kosong di dalam folder.
+3. Pilih **New** atau **Baru**.
+4. Pilih **Folder**.
+5. Ketik:
+
+   ```text
+   docs
+   ```
+
+6. Tekan `Enter`.
+7. Pastikan folder baru bernama tepat `docs`, seluruhnya huruf kecil.
+
+### C. Menampilkan ekstensi file di Windows
+
+Langkah ini penting agar file tidak tersimpan sebagai `PANDUAN_INSTALASI.md.txt`.
+
+#### Windows 11
+
+1. Buka File Explorer.
+2. Klik menu **View**.
+3. Klik **Show**.
+4. Centang **File name extensions**.
+
+#### Windows 10
+
+1. Buka File Explorer.
+2. Klik tab **View**.
+3. Centang **File name extensions**.
+
+### D. Membuat file menggunakan Notepad
+
+1. Buka folder `docs`.
+2. Klik kanan area kosong.
+3. Pilih **New**.
+4. Pilih **Text Document**.
+5. Ubah nama file menjadi:
+
+   ```text
+   PANDUAN_INSTALASI.md
+   ```
+
+6. Tekan `Enter`.
+7. Jika Windows memberi peringatan perubahan ekstensi, klik **Yes**.
+8. Klik kanan file tersebut.
+9. Pilih **Open with**.
+10. Pilih **Notepad**.
+11. Tempel seluruh isi dokumen dengan `Ctrl + V`.
+12. Tekan `Ctrl + S` untuk menyimpan.
+13. Tutup Notepad.
+
+### E. Membuat file menggunakan Visual Studio Code
+
+1. Install Visual Studio Code dari situs resmi jika belum ada.
+2. Buka Visual Studio Code.
+3. Klik **File**.
+4. Klik **Open Folder...**.
+5. Pilih folder proyek.
+6. Klik **Select Folder**.
+7. Pada panel Explorer di sebelah kiri, cari folder `docs`.
+8. Klik kanan folder `docs`.
+9. Klik **New File**.
+10. Ketik:
+
+    ```text
+    PANDUAN_INSTALASI.md
+    ```
+
+11. Tekan `Enter`.
+12. Tempel isi dokumen.
+13. Tekan `Ctrl + S` pada Windows atau `Command + S` pada macOS.
+
+### F. Memastikan file tersimpan di lokasi yang benar
+
+Lokasi yang benar adalah:
+
+```text
+project/docs/PANDUAN_INSTALASI.md
+```
+
+Pada repository ini, contoh lengkapnya:
+
+```text
+dashboard-sna/docs/PANDUAN_INSTALASI.md
+```
+
+Struktur yang benar:
+
+```text
+dashboard-sna/
+├── app.py
+├── requirements.txt
+├── run.bat
+├── run.sh
+└── docs/
+    ├── PANDUAN_INSTALASI.md
+    └── PANDUAN_PENGGUNAAN.md
+```
+
+Struktur yang salah:
+
+```text
+dashboard-sna/PANDUAN_INSTALASI.md
+```
+
+atau:
+
+```text
+dashboard-sna/docs/PANDUAN_INSTALASI.md.txt
+```
+
+---
+
+## BAGIAN 2 — Cara Memverifikasi File Benar
+
+### A. Membuka file `.md` dengan Notepad
+
+1. Buka folder `docs`.
+2. Klik kanan `PANDUAN_INSTALASI.md`.
+3. Klik **Open with**.
+4. Pilih **Notepad**.
+5. Pastikan isi dimulai dengan:
+
+   ```text
+   # Panduan Instalasi Dashboard Analisis Sentimen & SNA
+   ```
+
+6. Gulir sampai bagian akhir.
+7. Pastikan isi tidak terpotong.
+
+### B. Preview Markdown menggunakan Visual Studio Code
+
+Visual Studio Code memiliki preview Markdown bawaan dan tidak membutuhkan extension tambahan.
+
+1. Buka file `PANDUAN_INSTALASI.md` di Visual Studio Code.
+2. Tekan:
+
+   ```text
+   Ctrl + Shift + V
+   ```
+
+3. Preview Markdown akan terbuka.
+4. Untuk preview di samping editor, tekan:
+
+   ```text
+   Ctrl + K
+   ```
+
+5. Lepaskan tombol, lalu tekan:
+
+   ```text
+   V
+   ```
+
+6. Periksa judul, tabel, daftar, dan blok perintah.
+7. Pastikan tidak ada paragraf yang berubah menjadi satu baris panjang tanpa format.
+
+### C. Memeriksa path melalui Command Prompt
+
+1. Buka Command Prompt pada folder proyek.
+2. Ketik:
+
+   ```bat
+   dir docs
+   ```
+
+3. Tekan `Enter`.
+4. Pastikan `PANDUAN_INSTALASI.md` tampil.
+5. Pemeriksaan lebih spesifik:
+
+   ```bat
+   if exist "docs\PANDUAN_INSTALASI.md" (echo FILE ADA) else (echo FILE TIDAK ADA)
+   ```
+
+6. Hasil yang benar:
+
+   ```text
+   FILE ADA
+   ```
+
+### D. Memeriksa path melalui Terminal macOS/Linux
+
+1. Buka Terminal pada folder proyek.
+2. Jalankan:
+
+   ```bash
+   ls -l docs/PANDUAN_INSTALASI.md
+   ```
+
+3. Jika file ada, Terminal akan menampilkan informasi file.
+4. Pemeriksaan sederhana:
+
+   ```bash
+   test -f docs/PANDUAN_INSTALASI.md && echo "FILE ADA" || echo "FILE TIDAK ADA"
+   ```
+
+### E. Memastikan Git mengenali perubahan
+
+Jika proyek di-clone dengan Git:
+
+```bash
+git status
+```
+
+Hasil seharusnya menampilkan salah satu kondisi:
+
+```text
+modified: docs/PANDUAN_INSTALASI.md
+```
+
+atau jika file benar-benar baru:
+
+```text
+untracked files: docs/PANDUAN_INSTALASI.md
+```
+
+---
+
+## BAGIAN 3 — Checklist Kelengkapan Dokumen
+
+Beri tanda centang setelah setiap poin diperiksa.
+
+- [ ] Ada judul **Panduan Instalasi Dashboard Analisis Sentimen & SNA**.
+- [ ] Ada subjudul **Telkom Group — Skripsi ULBI Bandung 2026**.
+- [ ] Ada bagian **Prasyarat Sistem**.
+- [ ] Sistem operasi Windows 10/11 dan macOS 11+ disebutkan.
+- [ ] RAM minimal 8 GB dan rekomendasi 16 GB disebutkan.
+- [ ] Penyimpanan kosong minimal 5 GB disebutkan.
+- [ ] Kebutuhan internet untuk download model pertama disebutkan.
+- [ ] Ada instruksi install Python untuk Windows.
+- [ ] Instruksi Windows menjelaskan `Add Python 3.10 to PATH`.
+- [ ] Ada cara memverifikasi Python menggunakan Command Prompt.
+- [ ] Ada solusi untuk `python is not recognized`.
+- [ ] Ada instruksi install Python untuk macOS.
+- [ ] Ada cara memverifikasi Python melalui Terminal macOS.
+- [ ] Ada dua opsi download proyek: Git dan ZIP.
+- [ ] Ada tutorial install Git.
+- [ ] Ada perintah clone repository yang benar.
+- [ ] Ada cara extract ZIP di Windows.
+- [ ] Ada cara extract ZIP di macOS.
+- [ ] Ada cara menjalankan `run.bat` di Windows.
+- [ ] Dijelaskan bahwa `run.bat` memakai Python 3.10.
+- [ ] Dijelaskan bahwa launcher membuat `venv`.
+- [ ] Ada cara menjalankan manual melalui Command Prompt.
+- [ ] Ada cara memasang dependency dari `requirements.txt`.
+- [ ] Ada cara menjalankan dengan `python -m streamlit run app.py`.
+- [ ] Ada cara menjalankan `run.sh` di macOS/Linux.
+- [ ] Ada instruksi `chmod +x run.sh`.
+- [ ] Ada alamat `http://localhost:8501`.
+- [ ] Ada penjelasan alternatif port 8502.
+- [ ] Ada instruksi login dengan username `admin`.
+- [ ] Ada instruksi login dengan password `admin123`.
+- [ ] Ada peringatan untuk mengganti password awal.
+- [ ] Ada minimal lima solusi troubleshooting.
+- [ ] Setiap error memiliki penjelasan arti error.
+- [ ] Setiap error memiliki langkah solusi bernomor.
+- [ ] Ada solusi error model IndoBERT.
+- [ ] Ada solusi error Streamlit belum terpasang.
+- [ ] Ada solusi error database.
+- [ ] Ada solusi port 8501 digunakan.
+- [ ] Ada cara menghentikan dashboard.
+- [ ] Ada cara menjalankan dashboard kembali.
+- [ ] Ada cara uninstall atau hapus bersih.
+- [ ] Ada cara menghapus cache Hugging Face.
+- [ ] Ada cara membuat folder `docs`.
+- [ ] Ada cara membuat file `.md`.
+- [ ] Ada cara menyimpan file dengan `Ctrl + S`.
+- [ ] Ada cara memeriksa path file.
+- [ ] Ada rekomendasi Visual Studio Code untuk preview Markdown.
+- [ ] Semua langkah menggunakan Bahasa Indonesia yang mudah dipahami.
+- [ ] Istilah teknis dijelaskan ketika pertama digunakan.
+- [ ] Tidak ada API key asli di dalam dokumen.
+- [ ] Tidak ada bagian yang masih kosong atau belum dilengkapi.
+
+---
+
+## BAGIAN 4 — Cara Mengenali Masalah Saat Testing Panduan
+
+### A. Minta pengguna nonteknis mencoba
+
+1. Pilih seseorang yang belum pernah menjalankan Python atau Streamlit.
+2. Jangan langsung memberi bantuan lisan.
+3. Berikan hanya file panduan ini.
+4. Minta orang tersebut memulai dari bagian Prasyarat.
+5. Amati langkah yang membuat mereka berhenti.
+6. Catat kata atau istilah yang mereka tidak pahami.
+7. Catat nomor langkah yang dilewati tanpa sengaja.
+8. Catat pesan error secara utuh.
+9. Jangan hanya mencatat “tidak bisa”; salin teks error yang tampil.
+10. Minta mereka menjelaskan dengan kalimat sendiri apa yang mereka pikir harus dilakukan.
+
+### B. Format catatan testing
+
+Gunakan tabel berikut:
+
+| Nomor | Bagian panduan | Apa yang dilakukan | Masalah yang muncul | Teks error lengkap | Solusi yang berhasil | Perlu revisi panduan? |
+|---:|---|---|---|---|---|---|
+| 1 | Contoh: Install Python | Lupa centang PATH | Python tidak dikenali | `python is not recognized...` | Install ulang dan centang PATH | Ya |
+| 2 |  |  |  |  |  |  |
+| 3 |  |  |  |  |  |  |
+
+### C. Bagian yang biasanya membingungkan
+
+1. Memilih installer Python yang benar.
+2. Lupa mencentang **Add Python to PATH**.
+3. Menjalankan perintah pada folder yang salah.
+4. Membuka folder luar hasil ZIP, bukan folder yang berisi `app.py`.
+5. Menyimpan file sebagai `.md.txt`.
+6. Menutup terminal ketika dashboard masih dipakai.
+7. Mengira proses download model yang lama sebagai aplikasi hang.
+8. Menggunakan Python selain 3.10 pada Windows.
+9. Menggunakan port 8501 ketika launcher sudah memilih 8502.
+10. Menyalin perintah bersama tanda prompt atau nomor langkah.
+
+### D. Jika langkah tidak bekerja pada komputer lain
+
+1. Jangan langsung mengubah kode proyek.
+2. Catat sistem operasi dan versinya.
+3. Catat versi Python:
+
+   ```bash
+   python --version
+   ```
+
+   dan pada Windows:
+
+   ```bat
+   py -3.10 --version
+   ```
+
+4. Catat versi Git:
+
+   ```bash
+   git --version
+   ```
+
+5. Catat versi Streamlit setelah `venv` aktif:
+
+   ```bash
+   python -m streamlit --version
+   ```
+
+6. Salin teks error lengkap dari terminal.
+7. Ambil screenshot yang mencakup seluruh jendela terminal.
+8. Catat perintah terakhir yang dijalankan.
+9. Periksa apakah internet, antivirus, VPN, atau jaringan kantor memblokir download.
+10. Bandingkan dengan komputer yang berhasil.
+11. Lakukan perbaikan paling kecil dan terarah.
+12. Jangan mengubah UI/UX dashboard untuk menyelesaikan masalah instalasi.
+
+---
+
+## Regression Test Dokumentasi dan Proyek
+
+Karena fase ini hanya mengubah dokumentasi, file aplikasi tidak boleh ikut berubah.
+
+### A. Periksa file yang berubah
+
+Jalankan:
+
+```bash
+git status --short
+```
+
+Hasil yang diharapkan untuk patch ini:
+
+```text
+M docs/PANDUAN_INSTALASI.md
+```
+
+Tidak boleh ada perubahan tidak sengaja pada:
+
+```text
+app.py
+pages/
+auth/
+utils/
+.streamlit/config.toml
+requirements.txt
+run.bat
+run.sh
+```
+
+### B. Pemeriksaan sintaks Python
+
+Perubahan dokumentasi tidak mengubah Python, tetapi smoke test dapat dijalankan:
+
+#### Windows
+
+```bat
+venv\Scripts\python.exe -m compileall app.py auth pages utils
+```
+
+#### macOS/Linux
+
+```bash
+venv/bin/python -m compileall app.py auth pages utils
+```
+
+Hasil tidak boleh menampilkan `SyntaxError`.
+
+### C. Smoke test aplikasi
+
+1. Jalankan dashboard.
+2. Login.
+3. Buka setiap menu utama satu kali.
+4. Pastikan tidak ada tampilan yang berubah akibat patch dokumentasi.
+5. Pastikan terminal tidak menampilkan import error baru.
+6. Hentikan dashboard dengan benar.
+
+---
+
+## Mengunggah Dokumentasi ke GitHub
+
+Bagian ini digunakan setelah file sudah diverifikasi.
+
+### A. Buka Command Prompt pada folder proyek
+
+1. Buka folder proyek di File Explorer.
+2. Klik address bar.
+3. Ketik `cmd`.
+4. Tekan `Enter`.
+
+### B. Periksa perubahan
+
+```bat
+git status
+```
+
+Pastikan yang berubah hanya:
+
+```text
+docs/PANDUAN_INSTALASI.md
+```
+
+### C. Tambahkan file ke commit
+
+```bat
+git add docs/PANDUAN_INSTALASI.md
+```
+
+### D. Buat commit
+
+```bat
+git commit -m "docs: lengkapi panduan instalasi lokal final fase 16"
+```
+
+### E. Push ke GitHub
+
+```bat
+git push origin main
+```
+
+Jika branch aktif bukan `main`, periksa dengan:
+
+```bat
+git branch --show-current
+```
+
+Kemudian ganti `main` dengan nama branch yang tampil.
+
+### F. Verifikasi di GitHub
+
+1. Buka repository GitHub.
+2. Buka folder `docs`.
+3. Klik `PANDUAN_INSTALASI.md`.
+4. Pastikan GitHub menampilkan Markdown dengan rapi.
+5. Pastikan commit terbaru terlihat.
+6. Pastikan tidak ada file `.env`, API key, atau folder `venv` yang ikut terunggah.
+
+---
+
+## Ringkasan Perintah Penting
+
+### Windows — launcher otomatis
+
+```text
+Double-click run.bat
+```
+
+### Windows — manual
+
+```bat
+py -3.10 -m venv venv
+venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+### macOS/Linux
+
+```bash
+cd ~/Desktop/dashboard-sna
+chmod +x run.sh
+./run.sh
+```
+
+### Login awal
+
+```text
+Username: admin
+Password: admin123
+```
+
+### Menghentikan server
+
+```text
+Ctrl + C
+```
+
+---
+
+## Konfirmasi Akhir
+
+Instalasi dinyatakan berhasil apabila seluruh kondisi berikut terpenuhi:
+
+- [ ] Python versi yang sesuai dapat dijalankan.
+- [ ] Folder proyek berisi `app.py`.
+- [ ] `run.bat` atau `run.sh` berhasil dijalankan.
+- [ ] Dependency terpasang tanpa error fatal.
+- [ ] Browser membuka localhost.
+- [ ] Halaman login tampil.
+- [ ] Akun admin dapat login.
+- [ ] Halaman utama dashboard dapat dibuka.
+- [ ] Terminal tetap berjalan selama dashboard digunakan.
+- [ ] Dashboard dapat dihentikan dengan `Ctrl + C`.
+
+---
+
+**Dokumen:** Panduan Instalasi Dashboard Analisis Sentimen & SNA Telkom Group  
+**Konteks:** Skripsi S1 Sains Data — ULBI Bandung 2026  
+**Repository:** `github.com/SaefudinZuhri1/dashboard-sna`  
+**Perintah utama:** `streamlit run app.py`
