@@ -1040,7 +1040,7 @@ def load_css(dark_mode: bool = False, hide_sidebar: bool = False) -> None:
                 [data-testid="stDataFrame"],
                 [data-testid="stTable"],
                 [data-testid="stIFrame"],
-                iframe[title="streamlit.components.v1.html"] {{
+                [data-testid="stIFrame"] iframe {{
                     max-width: 100% !important;
                     width: 100% !important;
                 }}

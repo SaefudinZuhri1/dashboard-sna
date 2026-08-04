@@ -15,7 +15,6 @@ import sys
 import time
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 LOGGER = logging.getLogger(__name__)
 
@@ -24,6 +23,11 @@ LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from utils.error_messages import install_friendly_runtime_messages
+from utils.streamlit_compat import render_html_iframe
+
+install_friendly_runtime_messages()
 
 st.set_page_config(
     page_title="Dashboard Analisis Telkom Group",
@@ -67,7 +71,7 @@ def _install_persistent_startup_overlay() -> bool:
     cookie, atau pemulihan sesi.
     """
     try:
-        components.html(
+        render_html_iframe(
             dedent(
                 r"""
                 <!doctype html>
@@ -458,7 +462,7 @@ def _selesaikan_loading_awal() -> None:
         pass
 
     try:
-        components.html(
+        render_html_iframe(
             dedent(
                 r"""
                 <!doctype html>
@@ -1468,7 +1472,7 @@ def _install_logout_click_overlay() -> None:
     """Pasang overlay di browser tepat ketika tombol konfirmasi ditekan."""
     try:
         overlay_html = _logout_transition_html().replace("`", "\\`")
-        components.html(
+        render_html_iframe(
             dedent(
                 f"""
                 <!doctype html>
@@ -1539,7 +1543,7 @@ def _install_logout_click_overlay() -> None:
 def _remove_client_logout_overlay() -> None:
     """Hapus overlay DOM tambahan setelah halaman masuk selesai dirender."""
     try:
-        components.html(
+        render_html_iframe(
             """
             <script>
                 (() => {
@@ -2511,7 +2515,7 @@ def _normalise_selected_route(selected_value: str | None) -> str:
 def _inject_sidebar_open_button_fix() -> None:
     """Pastikan ikon pembuka sidebar selalu terlihat pada mode terang/gelap."""
     try:
-        components.html(
+        render_html_iframe(
             r"""
             <script>
             (() => {
@@ -2688,7 +2692,7 @@ def _inject_sidebar_open_button_fix() -> None:
 def _inject_option_menu_hover_fallback() -> None:
     """Pastikan hover option-menu berwarna merah di dalam iframe komponen."""
     try:
-        components.html(
+        render_html_iframe(
             r"""
             <script>
             (() => {
@@ -3103,7 +3107,7 @@ def route_page(selected: str) -> None:
 def render_footer() -> None:
     """Tampilkan footer global interaktif pada seluruh halaman dashboard."""
     try:
-        components.html(
+        render_html_iframe(
             dedent(
                 f"""
                 <!doctype html>

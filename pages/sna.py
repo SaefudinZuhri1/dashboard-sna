@@ -20,7 +20,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
+from utils.streamlit_compat import render_html_iframe
 
 try:
     from utils.loading_screen import mulai_loading_aksi, selesaikan_loading_aksi
@@ -2124,7 +2124,7 @@ def _inject_sna_css() -> None:
                 }
 
                 .sna-v9-graph-frame iframe,
-                iframe[title="streamlit.components.v1.html"] {
+                [data-testid="stIFrame"] iframe {
                     border-radius: 16px !important;
                     border: 1px solid #2A2A2A !important;
                     background: #0D0D0D !important;
@@ -2139,7 +2139,7 @@ def _inject_sna_css() -> None:
                 }
 
                 div[data-testid="stIFrame"],
-                div[data-testid="stElementContainer"]:has(iframe[title="streamlit.components.v1.html"]) {
+                div[data-testid="stElementContainer"]:has([data-testid="stIFrame"]) {
                     border-radius: 16px !important;
                     max-width: 100% !important;
                     overflow-x: auto !important;
@@ -6968,11 +6968,11 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
                 if not html:
                     raise RuntimeError("HTML PyVis kosong.")
                 st.markdown('<div class="sna-v9-graph-frame">', unsafe_allow_html=True)
-                components.html(html, height=930, scrolling=False)
+                render_html_iframe(html, height=930, scrolling=False)
                 st.markdown('</div>', unsafe_allow_html=True)
             except Exception as pyvis_exc:
                 st.warning("Visualisasi interaktif PyVis tidak berhasil dimuat. Dashboard menampilkan graf statis sebagai pengganti.")
-                st.caption(f"Detail teknis: {pyvis_exc}")
+                LOGGER.warning("Visualisasi PyVis memakai graf pengganti karena komponen interaktif belum siap: %s", pyvis_exc)
                 _render_networkx_fallback(visual_graph, visual_nodes)
 
             _render_graph_legend()

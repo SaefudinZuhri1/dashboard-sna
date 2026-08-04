@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import extra_streamlit_components as stx
 import streamlit as st
-import streamlit.components.v1 as components
+from utils.streamlit_compat import render_html_iframe
 
 LOGGER = logging.getLogger(__name__)
 
@@ -767,7 +767,7 @@ def _install_login_click_overlay() -> None:
     """Pasang overlay sebelum submit agar form tidak berkedip saat rerun."""
     try:
         overlay_json = json.dumps(_login_transition_html())
-        components.html(
+        render_html_iframe(
             f"""
             <!doctype html>
             <html>
@@ -896,7 +896,7 @@ def _install_login_click_overlay() -> None:
 def remove_login_transition_overlay() -> None:
     """Hilangkan overlay setelah dashboard atau pesan error selesai dirender."""
     try:
-        components.html(
+        render_html_iframe(
             f"""
             <script>
                 (() => {{

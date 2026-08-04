@@ -19,6 +19,8 @@ enableStaticServing = false
 
 [client]
 showSidebarNavigation = false
+# Tampilkan pesan umum kepada pengguna; detail teknis tetap ditangani melalui log aplikasi.
+showErrorDetails = "none"
 
 [browser]
 serverAddress = "localhost"

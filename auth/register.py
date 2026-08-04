@@ -4,10 +4,10 @@ import re
 import time
 
 import streamlit as st
+from utils.streamlit_compat import render_html_iframe
 
 from utils.audit_logger import log_activity
 from utils.app_version import get_auth_footer_text
-import streamlit.components.v1 as components
 
 from auth.auth_utils import register_user
 
@@ -799,7 +799,7 @@ def _render_password_strength_tracker() -> None:
         </script>
     """
 
-    components.html(
+    render_html_iframe(
         tracker_script,
         height=0,
         scrolling=False,

@@ -12,7 +12,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
+from utils.streamlit_compat import render_html_iframe
 
 from utils.access_control import (
     DEFAULT_ROLE,
@@ -1870,7 +1870,7 @@ def _validate_new_user(fullname: str, username: str, email: str, password: str) 
 def _scroll_ke_konfirmasi_hapus() -> None:
     """Gulirkan area utama ke card konfirmasi hapus setelah tombol diklik."""
     try:
-        components.html(
+        render_html_iframe(
             """
             <script>
                 (() => {

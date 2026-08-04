@@ -19,7 +19,7 @@ from typing import Any
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
+from utils.streamlit_compat import render_html_iframe
 
 from utils.audit_logger import log_activity
 from utils.data_loader import load_indibiz_sentiment, load_indibiz_sna
@@ -8589,7 +8589,7 @@ def _render_penjaga_interaksi_tombol_filter() -> None:
     JavaScript hanya memblokir pointer dan keyboard sampai pengguna mengubah
     minimal satu kontrol filter di dalam form.
     """
-    components.html(
+    render_html_iframe(
         r"""
         <script>
         (() => {

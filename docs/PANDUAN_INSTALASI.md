@@ -950,3 +950,17 @@ Konfirmasi final hanya setelah semua pemeriksaan penting lulus:
 ```text
 App berhasil diinstall dan dijalankan dari nol ✅
 ```
+
+
+## Pesan Error dan Peringatan
+
+Dashboard menggunakan pesan Bahasa Indonesia yang mudah dipahami. Jika aplikasi
+menampilkan bahwa suatu proses belum berhasil, lakukan langkah berikut:
+
+1. Tutup tab dashboard, tetapi jangan menghapus folder proyek.
+2. Pada launcher, tekan `Ctrl+C`, lalu pilih `R` untuk menjalankan kembali.
+3. Pastikan koneksi internet stabil jika proses memerlukan model atau API.
+4. Jika masalah tetap muncul, catat halaman dan tindakan terakhir yang dilakukan.
+
+Peringatan lama mengenai `st.components.v1.html` sudah diperbaiki dan tidak boleh
+muncul lagi pada Command Prompt maupun Streamlit Community Cloud.

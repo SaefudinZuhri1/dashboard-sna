@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import streamlit as st
-import streamlit.components.v1 as components
+from utils.streamlit_compat import render_html_iframe
 
 
 @st.cache_data(show_spinner=False, max_entries=2)
@@ -50,7 +50,7 @@ def render_fase13_tutorial_widget() -> None:
                 "Tutorial ini hanya membahas dashboard Streamlit. "
                 "Notebook Google Colab tidak diubah."
             )
-            components.html(
+            render_html_iframe(
                 _load_tutorial_html(signature),
                 height=820,
                 scrolling=True,

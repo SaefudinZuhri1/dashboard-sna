@@ -22,7 +22,7 @@ import networkx as nx
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
+from utils.streamlit_compat import render_html_iframe
 
 from utils.audit_logger import log_activity
 from utils.gemini_client import (
@@ -8048,7 +8048,7 @@ def _render_matrix_rank_cards(
             ).strip()
         )
 
-    # Memakai components.html agar HTML kartu benar-benar dirender sebagai UI,
+    # Memakai iframe HTML internal agar HTML kartu benar-benar dirender sebagai UI,
     # bukan terbaca sebagai teks/kode oleh Markdown Streamlit.
     rank_html = dedent(
         f"""
@@ -8286,7 +8286,7 @@ def _render_matrix_rank_cards(
         """
     ).strip()
 
-    components.html(rank_html, height=112, scrolling=False)
+    render_html_iframe(rank_html, height=112, scrolling=False)
 
 
 
@@ -9472,7 +9472,7 @@ def _show_service_filter_loading() -> None:
 def _render_strategic_summary(points: list[str]) -> None:
     """Tampilkan ringkasan strategis dalam panel visual interaktif dan berwarna.
 
-    Bagian ini sengaja dirender melalui components.html supaya seluruh elemen HTML,
+    Bagian ini sengaja dirender melalui iframe HTML internal supaya seluruh elemen HTML,
     animasi, dan dekorasi card tampil sebagai UI, bukan sebagai teks kode.
     """
     item_meta = [
@@ -9911,7 +9911,7 @@ def _render_strategic_summary(points: list[str]) -> None:
     </body>
     </html>
     """
-    components.html(html, height=560, scrolling=True)
+    render_html_iframe(html, height=560, scrolling=True)
 
 
 # -----------------------------------------------------------------------------
