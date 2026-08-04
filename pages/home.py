@@ -3135,9 +3135,32 @@ def _inject_home_css() -> None:
                 .home-v5-influencer-table-v23 {
                     border-collapse: separate;
                     border-spacing: 0;
+                    box-sizing: border-box;
+                    display: table !important;
                     min-width: 780px;
-                    width: 100%;
+                    table-layout: fixed;
+                    width: 100% !important;
                 }
+
+                /*
+                   PATCH FASE 15 — tabel Top 5 influencer memenuhi card.
+                   Selector lokal ini menimpa aturan tabel global tanpa
+                   memengaruhi tabel atau komponen lain di dashboard.
+                */
+                .home-v5-influencer-table-v23 th:nth-child(1),
+                .home-v5-influencer-table-v23 td:nth-child(1) { width: 12%; }
+
+                .home-v5-influencer-table-v23 th:nth-child(2),
+                .home-v5-influencer-table-v23 td:nth-child(2) { width: 27%; }
+
+                .home-v5-influencer-table-v23 th:nth-child(3),
+                .home-v5-influencer-table-v23 td:nth-child(3) { width: 15%; }
+
+                .home-v5-influencer-table-v23 th:nth-child(4),
+                .home-v5-influencer-table-v23 td:nth-child(4) { width: 20%; }
+
+                .home-v5-influencer-table-v23 th:nth-child(5),
+                .home-v5-influencer-table-v23 td:nth-child(5) { width: 26%; }
 
                 .home-v5-influencer-table-v23 th {
                     background: linear-gradient(180deg, rgba(35, 49, 73, 0.98), rgba(28, 40, 61, 0.98));
