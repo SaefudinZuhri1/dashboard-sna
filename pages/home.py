@@ -3679,6 +3679,33 @@ def _inject_home_css() -> None:
                     width: 100% !important;
                 }
 
+                /* Patch v2.9 — samakan tinggi dan lebar empat card panduan secara presisi. */
+                div[data-testid="stHorizontalBlock"]:has(.home-v5-guide-card-marker-v25)
+                    > div[data-testid="stColumn"]
+                    > div[data-testid="stVerticalBlock"] {
+                    height: 100% !important;
+                }
+
+                div[data-testid="stHorizontalBlock"]:has(.home-v5-guide-card-marker-v25)
+                    > div[data-testid="stColumn"]
+                    > div[data-testid="stVerticalBlock"]
+                    > div[data-testid="stElementContainer"]:has(.home-v5-guide-card-marker-v25) {
+                    display: flex !important;
+                    flex: 1 1 auto !important;
+                    height: 100% !important;
+                    min-height: 0 !important;
+                    width: 100% !important;
+                }
+
+                div[data-testid="stHorizontalBlock"]:has(.home-v5-guide-card-marker-v25)
+                    > div[data-testid="stColumn"]
+                    > div[data-testid="stVerticalBlock"]
+                    > div[data-testid="stElementContainer"]:has(.home-v5-guide-card-marker-v25)
+                    > div[data-testid="stVerticalBlockBorderWrapper"] {
+                    height: 100% !important;
+                    width: 100% !important;
+                }
+
                 @media (max-width: 1180px) {
                     div[data-testid="stVerticalBlockBorderWrapper"]:has(.home-v5-guide-card-marker-v25) {
                         min-height: 386px !important;
