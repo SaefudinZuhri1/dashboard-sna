@@ -1,3 +1,4 @@
+# pages/topic_analysis.py
 """Halaman Analisis Topik — WordCloud, kata dominan, topik, dan heatmap."""
 
 from __future__ import annotations
@@ -200,6 +201,147 @@ def _show_filter_loading() -> None:
         )
     except Exception as exc:
         st.error(f"Filter belum dapat diterapkan: {exc}")
+
+
+def _topic_is_dark_mode() -> bool:
+    """Baca tema aktif tanpa mengubah state global dashboard."""
+    try:
+        return bool(st.session_state.get("dark_mode", False))
+    except Exception as exc:
+        st.error(f"Status tema Analisis Topik belum dapat dibaca: {exc}")
+        return False
+
+
+def _topic_plotly_tokens() -> dict[str, str]:
+    """Siapkan token warna Plotly khusus halaman Analisis Topik."""
+    try:
+        if _topic_is_dark_mode():
+            return {
+                "template": "plotly_dark",
+                "text": "#EDEDED",
+                "muted": "#AAAAAA",
+                "grid": "rgba(255,255,255,0.08)",
+                "axis": "#3A3A3A",
+                "hover_bg": "#171717",
+                "hover_border": "#343434",
+                "legend_bg": "rgba(23,23,23,0.92)",
+                "menu_bg": "#17191F",
+                "menu_border": "#3A3D45",
+                "menu_text": "#EDEDED",
+            }
+        return {
+            "template": "plotly_white",
+            "text": "#172033",
+            "muted": "#64748B",
+            "grid": "rgba(100,116,139,0.16)",
+            "axis": "#CBD5E1",
+            "hover_bg": "#FFFFFF",
+            "hover_border": "#E2E8F0",
+            "legend_bg": "rgba(255,255,255,0.94)",
+            "menu_bg": "#FFFFFF",
+            "menu_border": "#D6DEE9",
+            "menu_text": "#334155",
+        }
+    except Exception as exc:
+        st.error(f"Token warna Analisis Topik belum dapat disiapkan: {exc}")
+        return {
+            "template": "plotly_white",
+            "text": "#172033",
+            "muted": "#64748B",
+            "grid": "rgba(100,116,139,0.16)",
+            "axis": "#CBD5E1",
+            "hover_bg": "#FFFFFF",
+            "hover_border": "#E2E8F0",
+            "legend_bg": "rgba(255,255,255,0.94)",
+            "menu_bg": "#FFFFFF",
+            "menu_border": "#D6DEE9",
+            "menu_text": "#334155",
+        }
+
+
+def _apply_topic_plotly_theme(figure: go.Figure | None) -> go.Figure | None:
+    """Sesuaikan chart dengan tema aktif tanpa mengubah data atau struktur chart."""
+    try:
+        if figure is None:
+            return None
+
+        tokens = _topic_plotly_tokens()
+        dark_mode = _topic_is_dark_mode()
+        figure.update_layout(
+            template=tokens["template"],
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font={"family": "Inter", "color": tokens["text"]},
+            hoverlabel={
+                "bgcolor": tokens["hover_bg"],
+                "bordercolor": tokens["hover_border"],
+                "font": {"family": "Inter", "color": tokens["text"]},
+            },
+            legend={
+                "bgcolor": tokens["legend_bg"],
+                "bordercolor": tokens["hover_border"],
+                "font": {"family": "Inter", "color": tokens["text"]},
+            },
+        )
+        figure.update_xaxes(
+            color=tokens["muted"],
+            gridcolor=tokens["grid"],
+            linecolor=tokens["axis"],
+            tickfont={"family": "Inter", "color": tokens["muted"]},
+            title_font={"family": "Inter", "color": tokens["muted"]},
+        )
+        figure.update_yaxes(
+            color=tokens["muted"],
+            gridcolor=tokens["grid"],
+            linecolor=tokens["axis"],
+            tickfont={"family": "Inter", "color": tokens["muted"]},
+            title_font={"family": "Inter", "color": tokens["muted"]},
+        )
+
+        for menu in list(figure.layout.updatemenus or []):
+            menu.bgcolor = tokens["menu_bg"]
+            menu.bordercolor = tokens["menu_border"]
+            menu.font = {"family": "Inter", "color": tokens["menu_text"], "size": 11}
+
+        for annotation in list(figure.layout.annotations or []):
+            annotation.font = {
+                "family": "Inter",
+                "color": tokens["muted"],
+                "size": getattr(annotation.font, "size", None) or 11,
+            }
+
+        for trace in figure.data:
+            if str(getattr(trace, "type", "")).lower() != "heatmap":
+                continue
+
+            if not dark_mode:
+                trace.colorscale = [
+                    [0.00, "#FFF8F8"],
+                    [0.08, "#FDECEC"],
+                    [0.45, "#F5A3A0"],
+                    [1.00, "#EF3B36"],
+                ]
+                if getattr(trace, "textfont", None) is not None:
+                    trace.textfont.color = "#172033"
+
+            if getattr(trace, "colorbar", None) is not None:
+                trace.colorbar.tickfont = {
+                    "family": "Inter",
+                    "color": tokens["muted"],
+                    "size": 11,
+                }
+                trace.colorbar.outlinecolor = tokens["axis"]
+                if getattr(trace.colorbar, "title", None) is not None:
+                    trace.colorbar.title.font = {
+                        "family": "Inter",
+                        "color": tokens["muted"],
+                        "size": 11,
+                    }
+
+        return figure
+    except Exception as exc:
+        st.error(f"Tema chart Analisis Topik belum dapat diterapkan: {exc}")
+        return figure
 
 
 def _inject_topic_css() -> None:
@@ -1164,6 +1306,265 @@ def _inject_topic_css() -> None:
             """,
             unsafe_allow_html=True,
         )
+
+        if not _topic_is_dark_mode():
+            st.markdown(
+                """
+                <style>
+                    /* Light Mode Analisis Topik. Hanya override warna, tanpa mengubah layout. */
+                    div[data-testid="stAppViewContainer"] {
+                        background: #F6F8FB !important;
+                    }
+
+                    div[data-testid="stAppViewContainer"] .main .block-container {
+                        color: #172033 !important;
+                    }
+
+                    .topic-v8-section-title,
+                    .topic-v8-topic-name,
+                    .topic-v8-topic-overview-title,
+                    .topic-v8-sentiment-stat-value,
+                    .topic-v8-heatmap-insight-value,
+                    .topic-v8-table-stat-value,
+                    .topic-v8-table-detail-item strong {
+                        color: #172033 !important;
+                        -webkit-text-fill-color: #172033 !important;
+                    }
+
+                    .topic-v8-section-subtitle,
+                    .topic-v8-topic-meta,
+                    .topic-v8-topic-overview-meta,
+                    .topic-v8-stat-label,
+                    .topic-v8-sentiment-stat-label,
+                    .topic-v8-sentiment-stat-sub,
+                    .topic-v8-comment-meta,
+                    .topic-v8-heatmap-insight-label,
+                    .topic-v8-heatmap-insight-note,
+                    .topic-v8-table-stat-label,
+                    .topic-v8-table-meta,
+                    .topic-v8-table-detail-item span {
+                        color: #64748B !important;
+                        -webkit-text-fill-color: #64748B !important;
+                    }
+
+                    .topic-v8-table-meta strong {
+                        color: #334155 !important;
+                    }
+
+                    .topic-v8-card,
+                    .topic-v8-stat,
+                    .topic-v8-topic-card,
+                    .topic-v8-topic-overview,
+                    .topic-v8-sentiment-stat,
+                    .topic-v8-comment-card,
+                    .topic-v8-heatmap-insight,
+                    .topic-v8-table-stat,
+                    .topic-v8-table-detail {
+                        background: #FFFFFF !important;
+                        border-color: #DCE3EC !important;
+                        box-shadow: 0 10px 28px rgba(15,23,42,.07) !important;
+                    }
+
+                    div[data-testid="stVerticalBlockBorderWrapper"]:has(.topic-v8-control-marker),
+                    div[data-testid="stVerticalBlockBorderWrapper"]:has(.topic-v8-section-marker) {
+                        background: #FFFFFF !important;
+                        border-color: #DCE3EC !important;
+                        box-shadow: 0 10px 28px rgba(15,23,42,.06) !important;
+                    }
+
+                    .topic-v8-topic-example {
+                        background: #F8FAFC !important;
+                        border-color: #E2E8F0 !important;
+                        color: #334155 !important;
+                    }
+
+                    .topic-v8-comment-text {
+                        color: #334155 !important;
+                        -webkit-text-fill-color: #334155 !important;
+                    }
+
+                    .topic-v8-sentiment-stat-negative:hover {
+                        background: #FFF5F5 !important;
+                    }
+
+                    .topic-v8-sentiment-stat-neutral:hover {
+                        background: #FFF9ED !important;
+                    }
+
+                    .topic-v8-sentiment-stat-positive:hover {
+                        background: #F2FBF3 !important;
+                    }
+
+                    .topic-v8-sentiment-stat:hover .topic-v8-sentiment-stat-label,
+                    .topic-v8-sentiment-stat:hover .topic-v8-sentiment-stat-sub {
+                        color: #334155 !important;
+                        -webkit-text-fill-color: #334155 !important;
+                    }
+
+                    .topic-v8-chip-positive {
+                        background: #EAF7EC !important;
+                        border-color: #B7DFBD !important;
+                        color: #1B6A27 !important;
+                    }
+
+                    .topic-v8-chip-neutral {
+                        background: #FFF4DE !important;
+                        border-color: #FFD18A !important;
+                        color: #8A5200 !important;
+                    }
+
+                    .topic-v8-chip-negative {
+                        background: #FFE9E8 !important;
+                        border-color: #FFC0BD !important;
+                        color: #A6231F !important;
+                    }
+
+                    .topic-v8-heatmap-source {
+                        background: #FFF7F7 !important;
+                        border-color: #F6C9C7 !important;
+                        color: #64748B !important;
+                    }
+
+                    .topic-v8-heatmap-source strong {
+                        color: #334155 !important;
+                    }
+
+                    div[data-testid="stExpander"] {
+                        background: #FFFFFF !important;
+                        border-color: #DCE3EC !important;
+                        box-shadow: 0 8px 24px rgba(15,23,42,.055) !important;
+                    }
+
+                    div[data-testid="stExpander"] summary {
+                        background: #FFFFFF !important;
+                        color: #172033 !important;
+                        -webkit-text-fill-color: #172033 !important;
+                    }
+
+                    div[data-testid="stExpander"] summary svg {
+                        fill: #475569 !important;
+                        color: #475569 !important;
+                    }
+
+                    div[data-baseweb="tab-list"] {
+                        background: #FFFFFF !important;
+                        border-color: #DCE3EC !important;
+                        box-shadow: 0 8px 22px rgba(15,23,42,.055) !important;
+                    }
+
+                    button[data-baseweb="tab"] {
+                        background: #F8FAFC !important;
+                        border-color: #DCE3EC !important;
+                        color: #475569 !important;
+                        -webkit-text-fill-color: #475569 !important;
+                    }
+
+                    button[data-baseweb="tab"]:hover {
+                        color: #172033 !important;
+                        -webkit-text-fill-color: #172033 !important;
+                    }
+
+                    button[data-baseweb="tab"]:nth-of-type(1)[aria-selected="true"] {
+                        background: #FFEDEC !important;
+                        border-color: #F44336 !important;
+                        color: #9F211D !important;
+                        -webkit-text-fill-color: #9F211D !important;
+                    }
+
+                    button[data-baseweb="tab"]:nth-of-type(2)[aria-selected="true"] {
+                        background: #FFF4DF !important;
+                        border-color: #FF9800 !important;
+                        color: #855000 !important;
+                        -webkit-text-fill-color: #855000 !important;
+                    }
+
+                    button[data-baseweb="tab"]:nth-of-type(3)[aria-selected="true"] {
+                        background: #EAF7EC !important;
+                        border-color: #4CAF50 !important;
+                        color: #1E6728 !important;
+                        -webkit-text-fill-color: #1E6728 !important;
+                    }
+
+                    div[data-testid="stSelectbox"] label,
+                    div[data-testid="stMultiSelect"] label,
+                    div[data-testid="stTextInput"] label,
+                    div[data-testid="stSlider"] label,
+                    div[data-testid="stToggle"] label {
+                        color: #475569 !important;
+                        -webkit-text-fill-color: #475569 !important;
+                    }
+
+                    div[data-baseweb="select"] > div,
+                    div[data-testid="stTextInput"] input {
+                        background: #FFFFFF !important;
+                        border-color: #D6DEE9 !important;
+                        color: #172033 !important;
+                        -webkit-text-fill-color: #172033 !important;
+                    }
+
+                    div[data-baseweb="select"] svg {
+                        fill: #475569 !important;
+                        color: #475569 !important;
+                    }
+
+                    div[data-testid="stDataFrame"] {
+                        background: #FFFFFF !important;
+                        border-color: #DCE3EC !important;
+                        box-shadow: 0 10px 26px rgba(15,23,42,.055) !important;
+                    }
+
+                    div[data-testid="stPlotlyChart"] {
+                        background: #FFFFFF !important;
+                        border-radius: 10px;
+                    }
+
+                    div[data-testid="stPlotlyChart"] .modebar {
+                        background: rgba(255,255,255,.94) !important;
+                    }
+
+                    div[data-testid="stPlotlyChart"] .modebar-btn path {
+                        fill: #475569 !important;
+                    }
+
+                    div[data-testid="stPlotlyChart"] .modebar-btn:hover path {
+                        fill: #E53935 !important;
+                    }
+
+                    div[data-testid="stPlotlyChart"] g.updatemenu-button rect.updatemenu-item-rect {
+                        fill: #FFFFFF !important;
+                        stroke: #D6DEE9 !important;
+                    }
+
+                    div[data-testid="stPlotlyChart"] g.updatemenu-button text.updatemenu-item-text {
+                        fill: #334155 !important;
+                    }
+
+                    div[data-testid="stPlotlyChart"] g.updatemenu-button:hover rect.updatemenu-item-rect {
+                        fill: #FFF1F0 !important;
+                        stroke: #E53935 !important;
+                    }
+
+                    div[data-testid="stPlotlyChart"] g.updatemenu-button:hover text.updatemenu-item-text {
+                        fill: #B42318 !important;
+                    }
+
+                    .topic-v8-table-detail {
+                        background: linear-gradient(135deg, #FFF7F7, #FFFFFF) !important;
+                        border-color: #F3C8C6 !important;
+                    }
+
+                    .topic-v8-table-stat:hover,
+                    .topic-v8-stat:hover,
+                    .topic-v8-card:hover,
+                    .topic-v8-topic-card:hover,
+                    .topic-v8-comment-card:hover,
+                    .topic-v8-heatmap-insight:hover {
+                        box-shadow: 0 12px 28px rgba(15,23,42,.09) !important;
+                    }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
     except Exception as exc:
         st.error(f"Gaya halaman Analisis Topik belum dapat dimuat: {exc}")
 
@@ -1726,15 +2127,16 @@ def _plotly_chart(fig: go.Figure | None, key: str) -> None:
         if fig is None:
             st.warning("Grafik tidak dapat ditampilkan.")
             return
+        themed_figure = _apply_topic_plotly_theme(fig)
         st.plotly_chart(
-            fig,
+            themed_figure,
             use_container_width=True,
             config={"displaylogo": False, "responsive": True},
             key=key,
         )
     except TypeError:
         st.plotly_chart(
-            fig,
+            _apply_topic_plotly_theme(fig),
             use_container_width=True,
             config={"displaylogo": False, "responsive": True},
         )
@@ -2369,14 +2771,14 @@ def _render_heatmap(matrix: pd.DataFrame, summary: pd.DataFrame, layanan: str) -
         }
         try:
             st.plotly_chart(
-                _heatmap_figure(matrix, top_topics),
+                _apply_topic_plotly_theme(_heatmap_figure(matrix, top_topics)),
                 use_container_width=True,
                 config=heatmap_config,
                 key=f"topic_v8_heatmap_{layanan}",
             )
         except TypeError:
             st.plotly_chart(
-                _heatmap_figure(matrix, top_topics),
+                _apply_topic_plotly_theme(_heatmap_figure(matrix, top_topics)),
                 use_container_width=True,
                 config=heatmap_config,
             )
@@ -2577,23 +2979,38 @@ def _render_frequency_table(table: pd.DataFrame, layanan: str) -> None:
             unsafe_allow_html=True,
         )
 
+        table_dark_mode = _topic_is_dark_mode()
+        table_background = "#111111" if table_dark_mode else "#FFFFFF"
+        table_text = "#F2F2F2" if table_dark_mode else "#172033"
+        table_border = "#292929" if table_dark_mode else "#E2E8F0"
+        table_header_background = "#1B1E26" if table_dark_mode else "#F8FAFC"
+        table_header_text = "#B7B7B7" if table_dark_mode else "#475569"
+        table_header_border = "#343434" if table_dark_mode else "#DCE3EC"
+        table_hover_text = "#FFFFFF" if table_dark_mode else "#172033"
+
         def _sentiment_style(value: Any) -> str:
             label = str(value).strip().lower()
             if label == "positif":
-                return "background-color: rgba(76,175,80,.16); color: #8FE49A; font-weight: 750;"
+                if table_dark_mode:
+                    return "background-color: rgba(76,175,80,.16); color: #8FE49A; font-weight: 750;"
+                return "background-color: #EAF7EC; color: #1B6A27; font-weight: 750;"
             if label == "negatif":
-                return "background-color: rgba(244,67,54,.16); color: #FF8A80; font-weight: 750;"
-            return "background-color: rgba(255,152,0,.16); color: #FFC46B; font-weight: 750;"
+                if table_dark_mode:
+                    return "background-color: rgba(244,67,54,.16); color: #FF8A80; font-weight: 750;"
+                return "background-color: #FFE9E8; color: #A6231F; font-weight: 750;"
+            if table_dark_mode:
+                return "background-color: rgba(255,152,0,.16); color: #FFC46B; font-weight: 750;"
+            return "background-color: #FFF4DE; color: #8A5200; font-weight: 750;"
 
         styled_page = (
             page_df.style
             .format({"Rank": "{:,.0f}", "Frekuensi": lambda value: _format_number(value)})
             .map(_sentiment_style, subset=["Sentimen Dominan"])
-            .bar(subset=["Frekuensi"], color="rgba(229,57,53,.30)", vmin=0)
+            .bar(subset=["Frekuensi"], color="rgba(229,57,53,.22)", vmin=0)
             .set_properties(**{
-                "background-color": "#111111",
-                "color": "#F2F2F2",
-                "border-color": "#292929",
+                "background-color": table_background,
+                "color": table_text,
+                "border-color": table_border,
                 "font-size": "14px",
             })
             .set_properties(subset=["Rank", "Frekuensi"], **{"text-align": "right"})
@@ -2602,17 +3019,17 @@ def _render_frequency_table(table: pd.DataFrame, layanan: str) -> None:
                 {
                     "selector": "thead th",
                     "props": [
-                        ("background-color", "#1B1E26"),
-                        ("color", "#B7B7B7"),
+                        ("background-color", table_header_background),
+                        ("color", table_header_text),
                         ("font-weight", "750"),
-                        ("border-color", "#343434"),
+                        ("border-color", table_header_border),
                     ],
                 },
                 {
                     "selector": "tbody tr:hover td",
                     "props": [
-                        ("background-color", "rgba(229,57,53,.10)"),
-                        ("color", "#FFFFFF"),
+                        ("background-color", "rgba(229,57,53,.08)"),
+                        ("color", table_hover_text),
                     ],
                 },
             ])
@@ -4217,14 +4634,14 @@ def _render_indibiz_topic_heatmap_output(
         }
         try:
             st.plotly_chart(
-                _heatmap_figure(matrix, topic_order),
+                _apply_topic_plotly_theme(_heatmap_figure(matrix, topic_order)),
                 use_container_width=True,
                 config=heatmap_config,
                 key=f"topic_v8_indibiz_heatmap_platform_{sentiment_filter}",
             )
         except TypeError:
             st.plotly_chart(
-                _heatmap_figure(matrix, topic_order),
+                _apply_topic_plotly_theme(_heatmap_figure(matrix, topic_order)),
                 use_container_width=True,
                 config=heatmap_config,
             )
