@@ -3654,6 +3654,36 @@ def _inject_css() -> None:
                     color: var(--dataset-light-title) !important;
                 }
 
+                /* Hero Dataset tetap memakai identitas merah, tetapi seluruh
+                   teks dan badge dibuat kontras saat Light Mode aktif. */
+                .dataset-v6-hero h1 {
+                    color: #FFFFFF !important;
+                    text-shadow: 0 2px 10px rgba(80, 8, 8, 0.18);
+                }
+
+                .dataset-v6-hero p {
+                    color: rgba(255, 255, 255, 0.96) !important;
+                }
+
+                .dataset-v6-source-badge {
+                    background: rgba(255, 255, 255, 0.94) !important;
+                    border-color: rgba(255, 255, 255, 0.88) !important;
+                    box-shadow: 0 6px 16px rgba(80, 8, 8, 0.14);
+                    color: #1F2937 !important;
+                }
+
+                .dataset-v6-source-real {
+                    background: #F0FDF4 !important;
+                    border-color: #86EFAC !important;
+                    color: #166534 !important;
+                }
+
+                .dataset-v6-source-dummy {
+                    background: #FFFBEB !important;
+                    border-color: #FCD34D !important;
+                    color: #92400E !important;
+                }
+
                 /* Form, selectbox, input pencarian, dan dropdown. */
                 div[data-testid="stForm"] {
                     background: var(--dataset-light-card) !important;
