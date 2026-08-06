@@ -1,3 +1,4 @@
+# utils/loading_screen.py
 # PATCH STARTUP V5.1: perbaikan atribut HTML multiline tampil sebagai kode
 # PATCH STARTUP V5: HTML compact untuk mencegah tag tampil mentah
 # PATCH LOADING V2: startup dedent + action overlay halus
@@ -429,18 +430,61 @@ def _buat_html_loading(judul: str, pesan: Iterable[str]) -> str:
             }}
 
             /*
-             * PATCH LIGHT MODE:
-             * CSS tema global memberi warna teks terang/gelap ke seluruh h2 dan span.
-             * Pada light mode selector tersebut lebih spesifik daripada selector loading,
-             * sehingga judul dan pesan menjadi gelap di atas panel gelap. Override ini
-             * hanya aktif pada light mode. Warna dark mode tetap memakai aturan lama.
+             * Tema terang hanya mengubah token visual loading.
+             * Struktur, ukuran, animasi, dan urutan elemen tetap sama.
              */
+            .telkom-loading-overlay.telkom-loading-light {{
+                background:
+                    radial-gradient(circle at 50% 42%, rgba(229,57,53,.12), transparent 28%),
+                    linear-gradient(rgba(15,23,42,.045) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(15,23,42,.045) 1px, transparent 1px),
+                    #F7F8FA;
+                background-size: auto, 34px 34px, 34px 34px, auto;
+            }}
+
+            .telkom-loading-overlay.telkom-loading-light::before {{
+                background: rgba(229,57,53,.14);
+            }}
+
+            .telkom-loading-overlay.telkom-loading-light::after {{
+                background: rgba(29,161,242,.10);
+            }}
+
+            .telkom-loading-overlay.telkom-loading-light .telkom-loading-panel {{
+                background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.98));
+                border-color: rgba(148,163,184,.30);
+                box-shadow:
+                    0 30px 90px rgba(15,23,42,.14),
+                    0 0 0 1px rgba(229,57,53,.05) inset;
+            }}
+
+            .telkom-loading-overlay.telkom-loading-light .telkom-loading-orbit {{
+                border-color: rgba(15,23,42,.16);
+            }}
+
+            .telkom-loading-overlay.telkom-loading-light .telkom-loading-orbit::after {{
+                border-color: #FFFFFF;
+            }}
+
+            .telkom-loading-overlay.telkom-loading-light .telkom-loading-orbit.orbit-two {{
+                border-color: rgba(229,57,53,.28);
+            }}
+
+            .telkom-loading-overlay.telkom-loading-light .telkom-loading-orbit.orbit-three {{
+                border-color: rgba(15,23,42,.12);
+            }}
+
+            .telkom-loading-overlay.telkom-loading-light .telkom-loading-orbit.orbit-three::after {{
+                background: #475569;
+                box-shadow: 0 0 14px rgba(71,85,105,.30);
+            }}
+
             .telkom-loading-overlay.telkom-loading-light .telkom-loading-title {{
                 background: none !important;
                 background-clip: border-box !important;
                 -webkit-background-clip: border-box !important;
-                color: #FFFFFF !important;
-                -webkit-text-fill-color: #FFFFFF !important;
+                color: #111827 !important;
+                -webkit-text-fill-color: #111827 !important;
                 filter: none !important;
                 mix-blend-mode: normal !important;
                 opacity: 1 !important;
@@ -448,11 +492,16 @@ def _buat_html_loading(judul: str, pesan: Iterable[str]) -> str:
             }}
 
             .telkom-loading-overlay.telkom-loading-light .telkom-loading-message-item {{
-                color: #D4D4D4 !important;
+                color: #64748B !important;
+            }}
+
+            .telkom-loading-overlay.telkom-loading-light .telkom-loading-progress {{
+                background: #E5E7EB;
+                border-color: #D7DEE8;
             }}
 
             .telkom-loading-overlay.telkom-loading-light .telkom-loading-brand {{
-                color: #9A9A9A !important;
+                color: #64748B !important;
             }}
 
             @keyframes telkom-orbit-spin {{
@@ -565,7 +614,8 @@ def _compact_html(markup: str) -> str:
 
 
 def _buat_html_loading_awal() -> str:
-    """Bangun loading awal full-screen yang hanya menampilkan animasi."""
+    """Bangun loading awal full-screen yang mengikuti tema aktif."""
+    kelas_tema = "telkom-startup-dark" if _is_dark_mode() else "telkom-startup-light"
     return _compact_html(
         """
         <style>
@@ -703,6 +753,41 @@ def _buat_html_loading_awal() -> str:
                 height: 100%;
             }
 
+            .telkom-startup-loader.telkom-startup-light {
+                background:
+                    radial-gradient(
+                        circle at 50% 50%,
+                        rgba(229, 57, 53, 0.12),
+                        transparent 25%
+                    ),
+                    #F7F8FA;
+            }
+
+            .telkom-startup-loader.telkom-startup-light::before {
+                background: rgba(229, 57, 53, 0.13);
+            }
+
+            .telkom-startup-loader.telkom-startup-light .telkom-startup-orbit {
+                border-color: rgba(15, 23, 42, 0.16);
+            }
+
+            .telkom-startup-loader.telkom-startup-light .telkom-startup-orbit::after {
+                border-color: #F7F8FA;
+            }
+
+            .telkom-startup-loader.telkom-startup-light .telkom-startup-orbit.orbit-two {
+                border-color: rgba(229, 57, 53, 0.30);
+            }
+
+            .telkom-startup-loader.telkom-startup-light .telkom-startup-orbit.orbit-three {
+                border-color: rgba(15, 23, 42, 0.12);
+            }
+
+            .telkom-startup-loader.telkom-startup-light .telkom-startup-orbit.orbit-three::after {
+                background: #475569;
+                box-shadow: 0 0 14px rgba(71, 85, 105, 0.30);
+            }
+
             @keyframes telkom-startup-spin {
                 to {
                     transform: rotate(360deg);
@@ -768,7 +853,7 @@ def _buat_html_loading_awal() -> str:
             }
         </style>
 
-        <section class="telkom-startup-loader" role="status" aria-label="Memuat aplikasi">
+        <section class="telkom-startup-loader __STARTUP_THEME_CLASS__" role="status" aria-label="Memuat aplikasi">
             <div class="telkom-startup-visual" aria-hidden="true">
                 <span class="telkom-startup-orbit orbit-one"></span>
                 <span class="telkom-startup-orbit orbit-two"></span>
@@ -782,7 +867,7 @@ def _buat_html_loading_awal() -> str:
             </div>
         </section>
         """
-    )
+    ).replace("__STARTUP_THEME_CLASS__", kelas_tema)
 
 def tampilkan_loading_awal():
     """Tampilkan animasi loading awal tanpa teks selama pemeriksaan sesi."""
@@ -934,8 +1019,38 @@ def _buat_html_loading_aksi(label: str = "Menganalisis komentar") -> str:
                 text-align: center;
             }}
 
+            .telkom-action-loader.telkom-action-light {{
+                background: rgba(247, 248, 250, 0.82);
+            }}
+
+            .telkom-action-loader.telkom-action-light .telkom-action-panel {{
+                background:
+                    radial-gradient(
+                        circle at 50% 0%,
+                        rgba(229, 57, 53, 0.12),
+                        transparent 45%
+                    ),
+                    linear-gradient(180deg, #FFFFFF, #F8FAFC);
+                border-color: rgba(148, 163, 184, 0.30);
+                box-shadow:
+                    0 30px 80px rgba(15, 23, 42, 0.16),
+                    0 0 0 1px rgba(229, 57, 53, 0.05) inset;
+            }}
+
+            .telkom-action-loader.telkom-action-light .telkom-action-ring {{
+                border-color: rgba(15, 23, 42, 0.15);
+            }}
+
+            .telkom-action-loader.telkom-action-light .telkom-action-ring::after {{
+                border-color: #FFFFFF;
+            }}
+
+            .telkom-action-loader.telkom-action-light .telkom-action-ring.ring-two {{
+                border-color: rgba(229, 57, 53, 0.28);
+            }}
+
             .telkom-action-loader.telkom-action-light .telkom-action-label {{
-                color: #F5F5F5 !important;
+                color: #111827 !important;
             }}
 
             @keyframes telkom-action-fade-in {{
