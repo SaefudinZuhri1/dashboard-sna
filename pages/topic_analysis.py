@@ -362,7 +362,17 @@ def _inject_topic_css() -> None:
                 .topic-v8-page,
                 .topic-v8-page * { box-sizing: border-box; font-family: 'Inter', sans-serif; }
 
+                /* Hero wajib tetap terlihat pada seluruh tema dan rerun Streamlit. */
+                div[data-testid="stMarkdownContainer"]:has(.topic-v8-hero) {
+                    display: block !important;
+                    visibility: visible !important;
+                    opacity: 1 !important;
+                }
+
                 .topic-v8-hero {
+                    display: block !important;
+                    visibility: visible !important;
+                    opacity: 1 !important;
                     background:
                         radial-gradient(circle at 92% 8%, rgba(255,255,255,0.16), transparent 30%),
                         linear-gradient(135deg, #B71C1C 0%, #E53935 56%, #F05A56 100%);
@@ -1320,28 +1330,6 @@ def _inject_topic_css() -> None:
                         color: #172033 !important;
                     }
 
-                    /* Hero tetap merah sebagai identitas halaman. Pada Light Mode,
-                       paksa judul/deskripsi tetap putih dan ubah badge menjadi terang
-                       agar tidak kalah oleh CSS global tema terang. */
-                    html body .stApp .topic-v8-hero h1 {
-                        color: #FFFFFF !important;
-                        -webkit-text-fill-color: #FFFFFF !important;
-                        text-shadow: 0 2px 10px rgba(80, 8, 8, 0.18);
-                    }
-
-                    html body .stApp .topic-v8-hero p {
-                        color: rgba(255, 255, 255, 0.96) !important;
-                        -webkit-text-fill-color: rgba(255, 255, 255, 0.96) !important;
-                    }
-
-                    html body .stApp .topic-v8-hero .topic-v8-badge {
-                        background: rgba(255, 255, 255, 0.94) !important;
-                        border-color: rgba(255, 255, 255, 0.88) !important;
-                        box-shadow: 0 6px 16px rgba(80, 8, 8, 0.14);
-                        color: #7F1D1D !important;
-                        -webkit-text-fill-color: #7F1D1D !important;
-                    }
-
                     .topic-v8-section-title,
                     .topic-v8-topic-name,
                     .topic-v8-topic-overview-title,
@@ -1613,36 +1601,68 @@ def _normalize_platform(value: Any) -> str:
 
 def _render_hero(data_source: str, layanan: str) -> None:
     """Render hero banner dengan judul yang mengikuti layanan aktif."""
-    if "Real" in data_source:
-        source_badge = "Data Real"
-    elif "Belum Lengkap" in data_source:
-        source_badge = "Output Belum Lengkap"
-    elif "Belum Tersedia" in data_source:
-        source_badge = "Output Belum Tersedia"
-    else:
-        source_badge = "Data Dummy"
+    try:
+        if "Real" in data_source:
+            source_badge = "Data Real"
+        elif "Belum Lengkap" in data_source:
+            source_badge = "Output Belum Lengkap"
+        elif "Belum Tersedia" in data_source:
+            source_badge = "Output Belum Tersedia"
+        else:
+            source_badge = "Data Dummy"
 
-    layanan_aman = escape(str(layanan or "IndiHome"))
-    st.markdown(
-        f"""
-        <div class="topic-v8-page">
-            <section class="topic-v8-hero">
-                <h1>Analisis Topik {layanan_aman}</h1>
-                <p>
-                    Menjelajahi kata dominan, pola topik, dan distribusi isu publik
-                    untuk layanan {layanan_aman} pada Twitter/X, Instagram, dan TikTok.
-                </p>
-                <div class="topic-v8-badges">
-                    <span class="topic-v8-badge">IndiHome • Aktif</span>
-                    <span class="topic-v8-badge">IndiBiz • Aktif</span>
-                    <span class="topic-v8-badge">Telkomsel • Aktif</span>
-                    <span class="topic-v8-badge">{escape(source_badge)}</span>
-                </div>
-            </section>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        layanan_aman = escape(str(layanan or "IndiHome"))
+        dark_mode = _topic_is_dark_mode()
+
+        # Warna penting hero ditetapkan langsung pada elemen agar CSS global
+        # Light Mode tidak dapat menghilangkan atau mengubah keterbacaannya.
+        title_style = (
+            "color:#FFFFFF !important;"
+            "-webkit-text-fill-color:#FFFFFF !important;"
+            "text-shadow:0 2px 10px rgba(80,8,8,0.18);"
+        )
+        description_style = (
+            "color:rgba(255,255,255,0.96) !important;"
+            "-webkit-text-fill-color:rgba(255,255,255,0.96) !important;"
+        )
+        if dark_mode:
+            badge_style = (
+                "background:rgba(100,20,20,0.30);"
+                "border-color:rgba(255,255,255,0.22);"
+                "color:#FFFFFF !important;"
+                "-webkit-text-fill-color:#FFFFFF !important;"
+            )
+        else:
+            badge_style = (
+                "background:rgba(255,255,255,0.94) !important;"
+                "border-color:rgba(255,255,255,0.88) !important;"
+                "box-shadow:0 6px 16px rgba(80,8,8,0.14);"
+                "color:#7F1D1D !important;"
+                "-webkit-text-fill-color:#7F1D1D !important;"
+            )
+
+        st.markdown(
+            f"""
+            <div class="topic-v8-page">
+                <section class="topic-v8-hero" aria-label="Hero Analisis Topik">
+                    <h1 style="{title_style}">Analisis Topik {layanan_aman}</h1>
+                    <p style="{description_style}">
+                        Menjelajahi kata dominan, pola topik, dan distribusi isu publik
+                        untuk layanan {layanan_aman} pada Twitter/X, Instagram, dan TikTok.
+                    </p>
+                    <div class="topic-v8-badges">
+                        <span class="topic-v8-badge" style="{badge_style}">IndiHome • Aktif</span>
+                        <span class="topic-v8-badge" style="{badge_style}">IndiBiz • Aktif</span>
+                        <span class="topic-v8-badge" style="{badge_style}">Telkomsel • Aktif</span>
+                        <span class="topic-v8-badge" style="{badge_style}">{escape(source_badge)}</span>
+                    </div>
+                </section>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception as exc:
+        st.error(f"Hero Analisis Topik belum dapat ditampilkan: {exc}")
 
 
 DEFAULT_PLATFORMS = tuple(PLATFORM_LABELS.keys())
