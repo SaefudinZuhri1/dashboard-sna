@@ -239,15 +239,25 @@ def _normalize_sentiment(value: Any) -> str:
 
 
 def _normalize_platform(value: Any) -> str:
-    """Normalisasi nama platform untuk kebutuhan filter dan tampilan."""
+    """Normalisasi variasi nama platform untuk filter dan tampilan."""
     key = str(value or "").lower().strip().replace("'", "")
-    if key in {"twitter", "x", "twitter/x"}:
+    compact = key.replace("_", " ").replace("-", " ")
+    compact = " ".join(compact.split())
+    if compact in {
+        "twitter",
+        "x",
+        "twitter/x",
+        "x/twitter",
+        "twitter x",
+        "twitter (x)",
+        "x.com",
+    } or "twitter" in compact:
         return "twitter"
-    if "instagram" in key:
+    if "instagram" in compact or compact == "ig":
         return "instagram"
-    if "tiktok" in key:
+    if "tiktok" in compact.replace(" ", ""):
         return "tiktok"
-    return key or "lainnya"
+    return compact or "lainnya"
 
 
 def _plotly_chart(fig: go.Figure | None, key: str) -> None:
@@ -3920,15 +3930,25 @@ def _prepare_dataframe(layanan: str) -> pd.DataFrame:
             return pd.DataFrame()
 
         if df is None or df.empty:
-            # Perlindungan tingkat halaman. Jika cache atau file aktual bermasalah,
-            # Analisis Sentimen tetap dirender memakai fallback lokal.
+            # Perlindungan tingkat halaman. Loader IndiBiz seharusnya sudah
+            # mengembalikan dummy khusus, tetapi fallback ini tetap dipertahankan.
             st.warning(
                 f"Data {layanan_label} tidak menghasilkan baris valid. "
                 "Dashboard memakai data dummy sementara agar halaman tetap dapat dibuka."
             )
             df = get_dummy_sentiment_data(layanan_label).copy()
+            df.attrs.update(
+                {
+                    "data_source": "dummy",
+                    "is_dummy": True,
+                    "source_file": "utils/dummy_data.py",
+                    "fallback_reason": "Loader tidak menghasilkan baris valid.",
+                }
+            )
         if df is None or df.empty:
             return pd.DataFrame()
+
+        source_metadata = dict(getattr(df, "attrs", {}))
 
         required_defaults: dict[str, Any] = {
             "content": "",
@@ -3973,7 +3993,9 @@ def _prepare_dataframe(layanan: str) -> pd.DataFrame:
         ).fillna(0).astype(int)
 
         df = df[df["content"].str.strip().ne("")].copy()
-        return df.reset_index(drop=True)
+        result = df.reset_index(drop=True)
+        result.attrs.update(source_metadata)
+        return result
     except Exception as exc:
         st.error(f"Data sentimen belum dapat disiapkan: {exc}")
         return pd.DataFrame()
@@ -6760,14 +6782,11 @@ def render_sentiment() -> None:
             )
             return
 
-        if layanan == "IndiBiz":
-            label_platform_aktif = str(
-                st.session_state.get(_INDIBIZ_FILTER_APPLIED_KEY, "Semua Platform")
-            )
-            indibiz_filtered_df = _filter_indibiz_platform(df, label_platform_aktif)
-        else:
-            indibiz_filtered_df = df.copy()
-        data_analisis = indibiz_filtered_df if layanan == "IndiBiz" else df
+        # Data penuh dipakai untuk ringkasan, tren, perbandingan platform, dan
+        # WordCloud. Filter IndiBiz hanya berlaku pada tiga grafik Fase 17 dan
+        # tabel 10 komentar, sesuai keterangan filter pada antarmuka.
+        indibiz_filtered_df = df.copy()
+        data_analisis = df.copy()
 
         if layanan == "IndiBiz":
             _render_indibiz_phase11_status()
@@ -6777,7 +6796,7 @@ def render_sentiment() -> None:
             "Ringkasan Sentimen",
             f"Empat indikator utama dari seluruh komentar {layanan}.",
         )
-        _render_overview_metrics(data_analisis)
+        _render_overview_metrics(df)
 
         _section_heading(
             "03",
@@ -6790,7 +6809,6 @@ def render_sentiment() -> None:
         )
         if layanan == "IndiBiz":
             indibiz_filtered_df = _render_indibiz_phase17_visualization(df)
-            data_analisis = indibiz_filtered_df
         else:
             _render_main_visualizations(df)
 
@@ -6799,14 +6817,14 @@ def render_sentiment() -> None:
             "Tren Waktu",
             "Hover pada garis untuk melihat jumlah komentar setiap tanggal.",
         )
-        _render_timeline(data_analisis)
+        _render_timeline(df)
 
         _section_heading(
             "05",
             "Analisis per Platform",
             "Klik tab untuk membandingkan profil sentimen Twitter/X, Instagram, dan TikTok.",
         )
-        _render_platform_tabs(data_analisis)
+        _render_platform_tabs(df)
 
         if layanan == "IndiBiz":
             _section_heading(
@@ -6835,7 +6853,7 @@ def render_sentiment() -> None:
             "WordCloud per Sentimen",
             "Positif hijau, netral biru, dan negatif merah menggunakan Matplotlib WordCloud.",
         )
-        _render_service_wordclouds(data_analisis, layanan)
+        _render_service_wordclouds(df, layanan)
 
         prediction_section_number = "08"
         _section_heading(

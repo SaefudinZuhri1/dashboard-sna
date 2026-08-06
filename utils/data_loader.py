@@ -721,10 +721,95 @@ def _clean_string_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _normalize_platform_series(series: pd.Series) -> pd.Series:
+    """Normalisasi variasi nama platform media sosial secara defensif."""
+    try:
+        normalized = (
+            series.astype("string")
+            .fillna("")
+            .str.lower()
+            .str.replace("'", "", regex=False)
+            .str.replace(r"[_\-]+", " ", regex=True)
+            .str.replace(r"\s+", " ", regex=True)
+            .str.strip()
+        )
+
+        exact_mapping = {
+            "x": "twitter",
+            "twitter": "twitter",
+            "twitter x": "twitter",
+            "twitter/x": "twitter",
+            "x/twitter": "twitter",
+            "twitter (x)": "twitter",
+            "x.com": "twitter",
+            "instagram": "instagram",
+            "ig": "instagram",
+            "instagram comments": "instagram",
+            "instagram comment": "instagram",
+            "tiktok": "tiktok",
+            "tik tok": "tiktok",
+            "tiktok comments": "tiktok",
+            "tiktok comment": "tiktok",
+        }
+        normalized = normalized.replace(exact_mapping)
+
+        twitter_mask = normalized.str.contains(
+            r"(?:^|[ /])twitter(?:$|[ /])|(?:^|[ /])x(?:$|[ /])",
+            regex=True,
+            na=False,
+        )
+        instagram_mask = normalized.str.contains(
+            "instagram", regex=False, na=False
+        )
+        tiktok_mask = (
+            normalized.str.replace(" ", "", regex=False)
+            .str.contains("tiktok", regex=False, na=False)
+        )
+
+        normalized = normalized.mask(twitter_mask, "twitter")
+        normalized = normalized.mask(instagram_mask, "instagram")
+        normalized = normalized.mask(tiktok_mask, "tiktok")
+        return normalized.astype("string")
+    except Exception:
+        return series.astype("string").fillna("").str.lower().str.strip()
+
+
+def _repair_sentiment_platform_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Pulihkan platform dari kolom alias jika kolom utama tidak valid."""
+    try:
+        result = df.copy()
+        if "platform" not in result.columns:
+            return result
+
+        valid_platforms = {"twitter", "instagram", "tiktok"}
+        repaired = _normalize_platform_series(result["platform"])
+        valid_mask = repaired.isin(valid_platforms)
+
+        for alias in (
+            "specific_resource_type",
+            "source_platform",
+            "media",
+            "channel",
+        ):
+            if alias not in result.columns or bool(valid_mask.all()):
+                continue
+            alias_values = _normalize_platform_series(result[alias])
+            recover_mask = (~valid_mask) & alias_values.isin(valid_platforms)
+            if bool(recover_mask.any()):
+                repaired.loc[recover_mask] = alias_values.loc[recover_mask]
+                valid_mask = repaired.isin(valid_platforms)
+
+        result["platform"] = repaired
+        return result
+    except Exception:
+        return df.copy()
+
+
 def _normalize_sentiment_df(df: pd.DataFrame, layanan: str) -> pd.DataFrame:
     """Bersihkan dan normalisasi DataFrame sentimen."""
     df = _normalize_columns(df, CANONICAL_SENTIMENT_COLS)
     df = _clean_string_columns(df)
+    df = _repair_sentiment_platform_column(df)
 
     for col in REQUIRED_SENTIMENT_COLS:
         if col not in df.columns:
@@ -742,21 +827,7 @@ def _normalize_sentiment_df(df: pd.DataFrame, layanan: str) -> pd.DataFrame:
         .clip(lower=0.0, upper=1.0)
         .astype("float32")
     )
-    df["platform"] = (
-        df["platform"]
-        .astype(str)
-        .str.lower()
-        .str.strip()
-        .replace(
-            {
-                "x": "twitter",
-                "twitter/x": "twitter",
-                "twitter (x)": "twitter",
-                "x/twitter": "twitter",
-                "ig": "instagram",
-            }
-        )
-    )
+    df["platform"] = _normalize_platform_series(df["platform"])
     df = df[df["platform"].isin(["twitter", "instagram", "tiktok"])].copy()
 
     df["content"] = df["content"].astype("string").fillna("").str.strip()
@@ -1089,8 +1160,15 @@ def _enrich_indibiz_sna_followers(df_sna: pd.DataFrame) -> pd.DataFrame:
     dipakai untuk memperbarui followers penelitian aktual.
     """
     try:
-        source = _resolve_sentiment_source("IndiBiz")
-        if source is None or not source.exists():
+        source = _resolve_indibiz_output_path(
+            None,
+            INDIBIZ_OUTPUT_SENTIMENT_PATH,
+            legacy_relative_paths=(
+                "data/indibiz_sentiment.csv",
+                "data/indibiz_sentiment.xlsx",
+            ),
+        )
+        if not source.exists():
             return df_sna.copy()
 
         raw_pred = _read_sentiment_source_flexible(str(source))
@@ -1879,6 +1957,12 @@ def summarize_indibiz_prediction_dataframe(
         result["total_rows_file"] = int(len(raw_copy))
 
         canonical_preview = _normalize_columns(raw_copy.copy(), CANONICAL_SENTIMENT_COLS)
+        canonical_preview = _clean_string_columns(canonical_preview)
+        canonical_preview = _repair_sentiment_platform_column(canonical_preview)
+        # Output batch IndiBiz resmi memiliki enam kolom utama. Tanggal bersifat
+        # opsional dan diisi NaT oleh dashboard untuk kompatibilitas timeline.
+        if "date" not in canonical_preview.columns:
+            canonical_preview["date"] = pd.NaT
         missing = [
             column for column in REQUIRED_SENTIMENT_COLS
             if column not in canonical_preview.columns
@@ -1906,7 +1990,7 @@ def summarize_indibiz_prediction_dataframe(
         invalid_confidence = raw_confidence.isna() | raw_confidence.lt(0) | raw_confidence.gt(1)
         result["invalid_confidence_count"] = int(invalid_confidence.sum())
 
-        normalized = _normalize_sentiment_df(raw_copy, "IndiBiz")
+        normalized = _normalize_sentiment_df(canonical_preview, "IndiBiz")
         result["total_rows_dashboard"] = int(len(normalized))
         result["removed_rows"] = max(
             0, int(result["total_rows_file"]) - int(result["total_rows_dashboard"])
@@ -1980,8 +2064,15 @@ def _get_indibiz_prediction_status_cached(file_signature: str) -> dict[str, obje
     """Baca dan validasi output Fase 11 dengan cache berdasarkan versi file."""
     del file_signature
     try:
-        source = _resolve_sentiment_source("IndiBiz")
-        if source is None or not source.exists():
+        source = _resolve_indibiz_output_path(
+            None,
+            INDIBIZ_OUTPUT_SENTIMENT_PATH,
+            legacy_relative_paths=(
+                "data/indibiz_sentiment.csv",
+                "data/indibiz_sentiment.xlsx",
+            ),
+        )
+        if not source.exists():
             return {
                 "file_found": False,
                 "source_name": "Tidak ditemukan",
@@ -2006,7 +2097,10 @@ def _get_indibiz_prediction_status_cached(file_signature: str) -> dict[str, obje
                 ),
             }
 
-        raw = _read_sentiment_source_flexible(str(source))
+        try:
+            raw = _baca_csv_indibiz(source)
+        except Exception:
+            raw = None
         if raw is None:
             return {
                 **summarize_indibiz_prediction_dataframe(pd.DataFrame(), source.name),
@@ -2023,11 +2117,22 @@ def _get_indibiz_prediction_status_cached(file_signature: str) -> dict[str, obje
 
 
 def get_indibiz_prediction_status() -> dict[str, object]:
-    """Kembalikan status aman output prediksi batch IndiBiz untuk antarmuka."""
+    """Kembalikan status output IndoBERT IndiBiz, bukan workbook mentah."""
     try:
-        return _get_indibiz_prediction_status_cached(
-            get_sentiment_file_signature("IndiBiz")
+        source = _resolve_indibiz_output_path(
+            None,
+            INDIBIZ_OUTPUT_SENTIMENT_PATH,
+            legacy_relative_paths=(
+                "data/indibiz_sentiment.csv",
+                "data/indibiz_sentiment.xlsx",
+            ),
         )
+        if source.exists():
+            stat = source.stat()
+            signature = f"{source.name}:{stat.st_size}:{stat.st_mtime_ns}"
+        else:
+            signature = "indibiz_output:missing"
+        return _get_indibiz_prediction_status_cached(signature)
     except Exception as error:
         st.error(f"Gagal membaca status prediksi batch IndiBiz: {error}")
         return {
@@ -2561,42 +2666,56 @@ def _pastikan_kolom_indibiz(
 
 
 def _indibiz_dashboard_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalisasi sentimen IndiBiz ke kolom yang dipakai halaman dashboard."""
-    working = _pastikan_kolom_indibiz(
-        df.copy(), INDIBIZ_SENTIMENT_COLUMNS, "data sentimen IndiBiz"
-    )
+    """Normalisasi output sentimen IndiBiz ke kolom halaman dashboard."""
+    try:
+        working = _normalize_columns(df.copy(), CANONICAL_SENTIMENT_COLS)
+        working = _clean_string_columns(working)
+        working = _repair_sentiment_platform_column(working)
 
-    # Pipeline Fase 14 hanya mewajibkan enam kolom. Kolom tanggal dan teks bersih
-    # ditambahkan secara aman untuk kompatibilitas dengan visualisasi existing.
-    if not any(
-        column in working.columns
-        for column in ("date", "date_created", "created_at", "timestamp")
-    ):
-        working["date_created"] = pd.NaT
-    if "content_clean" not in working.columns:
-        working["content_clean"] = working["content"].map(clean_text)
+        if "date" not in working.columns:
+            working["date"] = pd.NaT
+        if "content" in working.columns and "content_clean" not in working.columns:
+            working["content_clean"] = working["content"].map(clean_text)
 
-    normalized = _normalize_sentiment_df(working, "IndiBiz")
-    result = pd.DataFrame(
-        {
-            "date_created": normalized["date_created"],
-            "platform": normalized["platform"],
-            "username": normalized["username"],
-            "followers": normalized["followers"],
-            "content": normalized["content"],
-            "content_clean": normalized["content_clean"],
-            "predicted_sentiment": normalized["predicted_sentiment"],
-            "confidence_score": normalized["confidence_score"],
-        }
-    )
-    return result.reset_index(drop=True)
+        normalized = _normalize_sentiment_df(working, "IndiBiz")
+        if normalized.empty:
+            raw_platforms: list[str] = []
+            if "platform" in working.columns:
+                raw_platforms = sorted(
+                    {
+                        str(value).strip()
+                        for value in working["platform"].dropna().head(20).tolist()
+                        if str(value).strip()
+                    }
+                )
+            detail = ", ".join(raw_platforms[:6]) or "kosong/tidak dikenali"
+            raise ValueError(
+                "Tidak ada baris IndiBiz yang lolos normalisasi platform. "
+                f"Contoh nilai platform: {detail}."
+            )
+
+        result = pd.DataFrame(
+            {
+                "date_created": normalized["date_created"],
+                "platform": normalized["platform"],
+                "username": normalized["username"],
+                "followers": normalized["followers"],
+                "content": normalized["content"],
+                "content_clean": normalized["content_clean"],
+                "predicted_sentiment": normalized["predicted_sentiment"],
+                "confidence_score": normalized["confidence_score"],
+            }
+        )
+        return result.reset_index(drop=True)
+    except Exception:
+        raise
 
 
 @st.cache_data(show_spinner=False, max_entries=8)
 def load_indibiz_sentiment(
     file_path: str | Path | None = None,
 ) -> pd.DataFrame:
-    """Muat indibiz_output_sentiment.csv atau gunakan dummy khusus IndiBiz."""
+    """Muat output IndoBERT IndiBiz dan gunakan dummy jika output belum valid."""
     try:
         resolved = _resolve_indibiz_output_path(
             file_path,
@@ -2607,17 +2726,49 @@ def load_indibiz_sentiment(
             ),
         )
         dataframe = _baca_csv_indibiz(resolved)
-        return _indibiz_dashboard_columns(dataframe)
-    except FileNotFoundError:
-        st.warning(
-            "File data/indibiz_output_sentiment.csv belum tersedia. "
-            "Dashboard menggunakan data dummy IndiBiz sementara."
+        normalized = _indibiz_dashboard_columns(dataframe)
+        normalized.attrs.update(
+            {
+                "data_source": "real",
+                "is_dummy": False,
+                "source_file": resolved.name,
+                "fallback_reason": "",
+            }
         )
-        return get_dummy_indibiz_sentiment()
+        return normalized
+    except FileNotFoundError:
+        message = (
+            "File data/indibiz_output_sentiment.csv belum tersedia. "
+            "Dashboard menggunakan 50 data dummy IndiBiz sementara."
+        )
+        st.warning(message)
+        fallback = get_dummy_indibiz_sentiment()
+        fallback.attrs.update(
+            {
+                "data_source": "dummy",
+                "is_dummy": True,
+                "source_file": "utils/dummy_data.py",
+                "fallback_reason": message,
+            }
+        )
+        return fallback
     except Exception as error:
-        st.error(f"Gagal memuat data sentimen IndiBiz: {error}")
-        st.warning("Dashboard menggunakan data dummy IndiBiz agar halaman tetap dapat dibuka.")
-        return get_dummy_indibiz_sentiment()
+        message = f"Output sentimen IndiBiz tidak valid: {error}"
+        st.error(message)
+        st.warning(
+            "Dashboard menggunakan 50 data dummy IndiBiz agar analisis per platform "
+            "tidak tampil kosong atau menyesatkan."
+        )
+        fallback = get_dummy_indibiz_sentiment()
+        fallback.attrs.update(
+            {
+                "data_source": "dummy",
+                "is_dummy": True,
+                "source_file": "utils/dummy_data.py",
+                "fallback_reason": message,
+            }
+        )
+        return fallback
 
 
 @st.cache_data(show_spinner=False, max_entries=8)
