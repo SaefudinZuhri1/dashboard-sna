@@ -24,9 +24,7 @@ from utils.streamlit_compat import render_html_iframe
 from utils.audit_logger import log_activity
 from utils.data_loader import load_indibiz_sentiment, load_indibiz_sna
 from utils.indibiz_config import INDIBIZ_SENTIMENT_CANDIDATES, INDIBIZ_SNA_CANDIDATES
-from utils.gemini_client import check_data_relevance
 from utils.dummy_data import get_demo_sentiment
-from utils.topic_classifier import classify_topic
 from utils.loading_screen import (
     batalkan_layar_loading,
     mulai_layar_loading,
@@ -34,7 +32,6 @@ from utils.loading_screen import (
     selesaikan_layar_loading,
     selesaikan_loading_aksi,
 )
-from utils.model_loader import load_indobert, predict_sentiment_batch
 
 LOGGER = logging.getLogger(__name__)
 
@@ -997,53 +994,97 @@ def _muat_semua_dataset_cached(
     return gabungan.reset_index(drop=True), metadata
 
 
+def _metadata_dataset_ringkas(
+    layanan_aktif: str,
+    metadata_aktif: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Susun badge semua layanan tanpa membaca seluruh isi semua CSV."""
+    metadata: list[dict[str, Any]] = []
+    for layanan in LAYANAN_OPTIONS:
+        if layanan == layanan_aktif:
+            metadata.append(dict(metadata_aktif))
+            continue
+
+        kandidat_aktual = next(
+            (path for path in _kandidat_file(layanan) if path.is_file()),
+            None,
+        )
+        metadata.append(
+            {
+                "layanan": layanan,
+                "aktual": kandidat_aktual is not None,
+                "sumber": (
+                    kandidat_aktual.name
+                    if kandidat_aktual is not None
+                    else "Data dummy bawaan"
+                ),
+                # Jumlah layanan lain baru dihitung saat layanan tersebut dipilih.
+                "jumlah": 0,
+                "error": None,
+            }
+        )
+    return metadata
+
+
 def _muat_semua_dataset() -> tuple[pd.DataFrame, list[dict[str, Any]]]:
-    """Muat gabungan dataset dan pulihkan cache lama yang tidak kompatibel."""
+    """Muat hanya layanan aktif; layanan lain dibaca ketika benar-benar dipilih.
+
+    Nama fungsi dipertahankan agar integrasi halaman tidak berubah. Optimasi ini
+    menghindari pembacaan dan normalisasi tiga dataset besar sekaligus setiap
+    pengguna pertama kali membuka halaman Dataset.
+    """
+    layanan_aktif = str(
+        st.session_state.get(STATE_LAYANAN, "IndiHome")
+    ).strip()
+    if layanan_aktif not in LAYANAN_OPTIONS:
+        layanan_aktif = "IndiHome"
+
     if bool(st.session_state.get("demo_mode", False)):
         try:
-            kumpulan: list[pd.DataFrame] = []
-            metadata: list[dict[str, Any]] = []
-            for layanan in LAYANAN_OPTIONS:
-                data_demo = _normalisasi_dataset(
-                    get_demo_sentiment(layanan),
-                    layanan,
-                )
-                kumpulan.append(data_demo)
-                metadata.append(
-                    {
-                        "layanan": layanan,
-                        "aktual": False,
-                        "sumber": "Mode Demo · 500 data sample",
-                        "jumlah": int(len(data_demo)),
-                        "error": None,
-                    }
-                )
-            gabungan = pd.concat(kumpulan, ignore_index=True)
-            gabungan["tanggal"] = _paksa_datetime_ns(gabungan["tanggal"])
-            gabungan = gabungan.sort_values(
-                "tanggal", ascending=False, na_position="last"
+            data_demo = _normalisasi_dataset(
+                get_demo_sentiment(layanan_aktif),
+                layanan_aktif,
             )
-            return gabungan.reset_index(drop=True), metadata
+            data_demo["tanggal"] = _paksa_datetime_ns(data_demo["tanggal"])
+            data_demo = data_demo.sort_values(
+                "tanggal", ascending=False, na_position="last"
+            ).reset_index(drop=True)
+            metadata_aktif = {
+                "layanan": layanan_aktif,
+                "aktual": False,
+                "sumber": "Mode Demo · 500 data sample",
+                "jumlah": int(len(data_demo)),
+                "error": None,
+            }
+            return data_demo, _metadata_dataset_ringkas(
+                layanan_aktif, metadata_aktif
+            )
         except Exception as exc:
             LOGGER.exception("Data Mode Demo halaman Dataset gagal disiapkan")
             st.error(f"Data Mode Demo belum dapat disiapkan: {exc}")
             return pd.DataFrame(columns=KOLOM_KANONIK), []
 
-    signature = _tanda_tangan_semua_dataset()
     try:
-        return _muat_semua_dataset_cached(signature)
-    except Exception as exc_awal:
-        LOGGER.exception("Cache gabungan dataset tidak kompatibel; cache akan dibangun ulang")
-        try:
-            # FIX: Cache disk dari environment lama dapat menyimpan datetime64[us].
-            # Bersihkan hanya cache loader Dataset, bukan cache model atau halaman lain.
-            _muat_semua_dataset_cached.clear()
-            _baca_dataset_aktual.clear()
-            return _muat_semua_dataset_cached(signature)
-        except Exception as exc_ulang:
-            LOGGER.exception("Gagal memuat gabungan dataset setelah cache dibangun ulang")
-            st.error(f"Gabungan dataset belum dapat dimuat: {exc_ulang}")
-            return pd.DataFrame(columns=KOLOM_KANONIK), []
+        data, aktual, sumber, error = _muat_layanan(layanan_aktif)
+        if not data.empty and "tanggal" in data.columns:
+            data = data.copy()
+            data["tanggal"] = _paksa_datetime_ns(data["tanggal"])
+            data = data.sort_values(
+                "tanggal", ascending=False, na_position="last"
+            ).reset_index(drop=True)
+
+        metadata_aktif = {
+            "layanan": layanan_aktif,
+            "aktual": aktual,
+            "sumber": sumber,
+            "jumlah": int(len(data)),
+            "error": error,
+        }
+        return data, _metadata_dataset_ringkas(layanan_aktif, metadata_aktif)
+    except Exception as exc:
+        LOGGER.exception("Dataset aktif %s gagal dimuat", layanan_aktif)
+        st.error(f"Dataset {layanan_aktif} belum dapat dimuat: {exc}")
+        return pd.DataFrame(columns=KOLOM_KANONIK), []
 
 
 def _inisialisasi_state() -> None:
@@ -3516,6 +3557,578 @@ def _inject_css() -> None:
         unsafe_allow_html=True,
     )
 
+    # Patch tema terang halaman Dataset. Seluruh selector ditempatkan setelah
+    # CSS baseline agar Dark Mode tetap identik dengan versi UI/UX terkunci.
+    if not bool(st.session_state.get("dark_mode", False)):
+        st.markdown(
+            """
+            <style>
+                :root {
+                    --dataset-light-bg: #F6F7F9;
+                    --dataset-light-card: #FFFFFF;
+                    --dataset-light-soft: #F8FAFC;
+                    --dataset-light-soft-2: #F1F5F9;
+                    --dataset-light-border: #E2E8F0;
+                    --dataset-light-border-strong: #CBD5E1;
+                    --dataset-light-text: #1F2937;
+                    --dataset-light-title: #111827;
+                    --dataset-light-muted: #64748B;
+                    --dataset-light-subtle: #94A3B8;
+                    --dataset-light-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+                }
+
+                div[data-testid="stAppViewContainer"] {
+                    background: var(--dataset-light-bg) !important;
+                }
+
+                div[data-testid="stAppViewContainer"] .main .block-container {
+                    color: var(--dataset-light-text) !important;
+                }
+
+                .dataset-v6-filter-title,
+                .dataset-v6-section-title,
+                .dataset-v6-table-title,
+                .dataset-v16-upload-title,
+                .dataset-v16-preview-title,
+                .dataset-v16-columns-title,
+                .dataset-v18-output-heading-title,
+                .dataset-v18-platform-title,
+                .dataset-v18-platform-name,
+                .dataset-v18-sentiment-section-title,
+                .dataset-v18-chart-card-title,
+                .dataset-v20-wordcloud-title,
+                .dataset-v20-wordcloud-canvas-title,
+                .dataset-v21-topic-title,
+                .dataset-v21-topic-name,
+                .dataset-v21-topic-chart-title,
+                .dataset-v22-title,
+                .dataset-v22-card-value,
+                .dataset-v22-section-title,
+                .dataset-v22-sub-title {
+                    color: var(--dataset-light-title) !important;
+                }
+
+                .dataset-v6-metric-label,
+                .dataset-v6-metric-note,
+                .dataset-v6-pagination-info,
+                .dataset-v6-info-text,
+                .dataset-v6-active-source-name,
+                .dataset-v6-sna-note,
+                .dataset-v6-sna-note-body,
+                .dataset-v16-upload-subtitle,
+                .dataset-v16-file-detail,
+                .dataset-v16-analysis-ready-note,
+                .dataset-v16-preview-note,
+                .dataset-v16-metric-label,
+                .dataset-v16-metric-note,
+                .dataset-v18-output-heading-note,
+                .dataset-v18-metric-label,
+                .dataset-v18-metric-note,
+                .dataset-v18-platform-subtitle,
+                .dataset-v18-platform-share,
+                .dataset-v18-sentiment-section-note,
+                .dataset-v18-chart-card-subtitle,
+                .dataset-v18-chart-card-hint,
+                .dataset-v19-signal-label,
+                .dataset-v19-lab-hint,
+                .dataset-v20-wordcloud-subtitle,
+                .dataset-v20-wordcloud-stat small,
+                .dataset-v20-wordcloud-canvas-note,
+                .dataset-v20-wordcloud-chip-label,
+                .dataset-v21-topic-subtitle,
+                .dataset-v21-topic-share,
+                .dataset-v21-topic-chart-note,
+                .dataset-v21-topic-hint,
+                .dataset-v22-subtitle,
+                .dataset-v22-card-kicker,
+                .dataset-v22-card-note,
+                .dataset-v22-section-note,
+                .dataset-v22-sub-note {
+                    color: var(--dataset-light-muted) !important;
+                }
+
+                div[data-testid="stMarkdownContainer"] h1,
+                div[data-testid="stMarkdownContainer"] h2,
+                div[data-testid="stMarkdownContainer"] h3,
+                div[data-testid="stMarkdownContainer"] h4 {
+                    color: var(--dataset-light-title) !important;
+                }
+
+                /* Form, selectbox, input pencarian, dan dropdown. */
+                div[data-testid="stForm"] {
+                    background: var(--dataset-light-card) !important;
+                    border: 1px solid var(--dataset-light-border) !important;
+                    box-shadow: var(--dataset-light-shadow) !important;
+                }
+
+                div[data-testid="stSelectbox"] label,
+                div[data-testid="stTextInput"] label,
+                div[data-testid="stNumberInput"] label,
+                div[data-testid="stSlider"] label,
+                div[data-testid="stRadio"] label,
+                div[data-testid="stFileUploader"] label {
+                    color: #475569 !important;
+                }
+
+                div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+                div[data-testid="stTextInput"] input,
+                div[data-testid="stNumberInput"] input {
+                    background: var(--dataset-light-card) !important;
+                    border-color: var(--dataset-light-border-strong) !important;
+                    color: var(--dataset-light-text) !important;
+                    box-shadow: none !important;
+                }
+
+                div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover,
+                div[data-testid="stTextInput"] input:hover,
+                div[data-testid="stNumberInput"] input:hover {
+                    background: var(--dataset-light-soft) !important;
+                    border-color: #94A3B8 !important;
+                }
+
+                div[data-testid="stTextInput"] input::placeholder,
+                div[data-testid="stNumberInput"] input::placeholder {
+                    color: #94A3B8 !important;
+                }
+
+                div[data-testid="stSelectbox"] svg {
+                    fill: #64748B !important;
+                }
+
+                div[data-testid="stSelectbox"]:hover svg {
+                    fill: #1F2937 !important;
+                }
+
+                [data-testid="stSelectboxVirtualDropdown"],
+                [data-testid="stSelectboxVirtualDropdown"] > *,
+                [data-testid="stSelectboxVirtualDropdown"] > * > *,
+                [data-testid="stSelectboxVirtualDropdown"] [style*="overflow"],
+                [data-testid="stSelectboxVirtualDropdown"] [style*="height"],
+                [data-baseweb="popover"],
+                [data-baseweb="popover"] > *,
+                [data-baseweb="popover"] > * > *,
+                [data-baseweb="menu"],
+                [data-baseweb="menu"] > *,
+                [data-baseweb="menu"] > * > *,
+                [role="listbox"] {
+                    background: var(--dataset-light-card) !important;
+                    background-color: var(--dataset-light-card) !important;
+                    background-image: none !important;
+                    color: var(--dataset-light-text) !important;
+                }
+
+                [data-baseweb="popover"],
+                [data-testid="stSelectboxVirtualDropdown"] {
+                    border-color: var(--dataset-light-border) !important;
+                    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14) !important;
+                }
+
+                [data-baseweb="popover"] [role="listbox"],
+                [data-testid="stSelectboxVirtualDropdown"] [role="listbox"],
+                ul[role="listbox"],
+                div[role="listbox"] {
+                    scrollbar-color: #CBD5E1 #F8FAFC !important;
+                }
+
+                [data-baseweb="popover"] [role="option"],
+                [data-testid="stSelectboxVirtualDropdown"] [role="option"],
+                li[role="option"],
+                div[role="option"] {
+                    background: var(--dataset-light-card) !important;
+                    color: var(--dataset-light-text) !important;
+                }
+
+                [data-baseweb="popover"] [role="option"]:hover,
+                [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover,
+                li[role="option"]:hover,
+                div[role="option"]:hover {
+                    background: var(--dataset-light-soft-2) !important;
+                    border-color: var(--dataset-light-border) !important;
+                    color: var(--dataset-light-title) !important;
+                }
+
+                [data-baseweb="popover"] [role="option"][aria-selected="true"],
+                [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"],
+                li[role="option"][aria-selected="true"],
+                div[role="option"][aria-selected="true"] {
+                    background: linear-gradient(90deg, rgba(229,57,53,0.12), #FFF7F7 38%) !important;
+                    border-color: rgba(229,57,53,0.24) !important;
+                    color: #991B1B !important;
+                }
+
+                /* Tombol reset menjadi tombol netral pada latar terang. */
+                div[data-testid="stColumn"]:has(.dataset-v10-reset-marker)
+                div[data-testid="stFormSubmitButton"] button {
+                    background: #F1F5F9 !important;
+                    border-color: #CBD5E1 !important;
+                    color: #1F2937 !important;
+                }
+
+                div[data-testid="stColumn"]:has(.dataset-v10-reset-marker)
+                div[data-testid="stFormSubmitButton"] button p,
+                div[data-testid="stColumn"]:has(.dataset-v10-reset-marker)
+                div[data-testid="stFormSubmitButton"] button span {
+                    color: #1F2937 !important;
+                }
+
+                div[data-testid="stColumn"]:has(.dataset-v10-reset-marker)
+                div[data-testid="stFormSubmitButton"] button:hover {
+                    background: #E2E8F0 !important;
+                    border-color: #94A3B8 !important;
+                    box-shadow: 0 8px 18px rgba(15,23,42,0.08) !important;
+                }
+
+                /* Ringkasan data. */
+                .dataset-v6-metric-card,
+                .dataset-v6-sna-note {
+                    background: var(--dataset-light-card) !important;
+                    border-color: var(--dataset-light-border) !important;
+                    box-shadow: 0 10px 24px rgba(15,23,42,0.06) !important;
+                }
+
+                .dataset-v6-metric-label {
+                    color: #475569 !important;
+                }
+
+                .dataset-v6-metric-note,
+                .dataset-v6-sna-note-body {
+                    color: #64748B !important;
+                }
+
+                .dataset-v6-sna-note-title {
+                    color: var(--dataset-light-title) !important;
+                }
+
+                /* Tabel utama. */
+                .dataset-v6-table-shell {
+                    background: var(--dataset-light-card) !important;
+                    border-color: var(--dataset-light-border) !important;
+                    box-shadow: var(--dataset-light-shadow) !important;
+                }
+
+                .dataset-v6-table {
+                    color: var(--dataset-light-text) !important;
+                }
+
+                .dataset-v6-table thead th {
+                    background: #F1F5F9 !important;
+                    border-bottom-color: #CBD5E1 !important;
+                    color: #334155 !important;
+                }
+
+                .dataset-v6-table tbody td {
+                    background: var(--dataset-light-card) !important;
+                    border-bottom-color: #E2E8F0 !important;
+                    color: #334155 !important;
+                }
+
+                .dataset-v6-table tbody tr:hover td,
+                .dataset-v6-table tbody tr.dataset-v6-row-positive:hover td,
+                .dataset-v6-table tbody tr.dataset-v6-row-neutral:hover td,
+                .dataset-v6-table tbody tr.dataset-v6-row-negative:hover td {
+                    background: #F8FAFC !important;
+                }
+
+                .dataset-v6-table tbody tr.dataset-v6-row-positive td {
+                    background: rgba(76,175,80,0.055) !important;
+                }
+
+                .dataset-v6-table tbody tr.dataset-v6-row-neutral td {
+                    background: rgba(255,152,0,0.055) !important;
+                }
+
+                .dataset-v6-table tbody tr.dataset-v6-row-negative td {
+                    background: rgba(244,67,54,0.055) !important;
+                }
+
+                .dataset-v6-empty-row,
+                .dataset-v6-pagination-info,
+                .dataset-v6-info-text {
+                    color: var(--dataset-light-muted) !important;
+                }
+
+                .dataset-v6-legend-item {
+                    background: var(--dataset-light-card) !important;
+                    border-color: var(--dataset-light-border) !important;
+                }
+
+                .dataset-v6-legend-label {
+                    color: #475569 !important;
+                }
+
+                /* Expander Dataset dan Upload Dataset. */
+                [data-testid="stExpander"],
+                [data-testid="stExpander"] > details,
+                details[data-testid="stExpander"] {
+                    background: var(--dataset-light-card) !important;
+                    background-color: var(--dataset-light-card) !important;
+                    border-color: var(--dataset-light-border) !important;
+                    box-shadow: 0 10px 26px rgba(15,23,42,0.07) !important;
+                }
+
+                [data-testid="stExpander"] summary,
+                [data-testid="stExpander"] > details > summary,
+                details[data-testid="stExpander"] > summary {
+                    background: var(--dataset-light-soft) !important;
+                    background-color: var(--dataset-light-soft) !important;
+                    border-bottom-color: var(--dataset-light-border) !important;
+                    color: var(--dataset-light-title) !important;
+                }
+
+                [data-testid="stExpander"] summary:hover,
+                [data-testid="stExpander"] summary:focus-visible {
+                    background: var(--dataset-light-soft-2) !important;
+                    background-color: var(--dataset-light-soft-2) !important;
+                }
+
+                [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"],
+                [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] p,
+                [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] span {
+                    color: var(--dataset-light-title) !important;
+                }
+
+                [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+                    background: var(--dataset-light-card) !important;
+                    color: var(--dataset-light-text) !important;
+                }
+
+                div[data-baseweb="popover"]:has([data-testid="stTooltipContent"]) > div,
+                div[data-baseweb="popover"]:has([data-testid="stTooltipContent"]) > div > div,
+                div[data-testid="stTooltipContent"],
+                .stTooltipContent {
+                    background: var(--dataset-light-card) !important;
+                    background-color: var(--dataset-light-card) !important;
+                    border-color: var(--dataset-light-border) !important;
+                    color: var(--dataset-light-text) !important;
+                    box-shadow: 0 12px 28px rgba(15,23,42,0.14) !important;
+                }
+
+                div[data-testid="stTooltipContent"] *,
+                .stTooltipContent * {
+                    color: var(--dataset-light-text) !important;
+                }
+
+                /* Upload Dataset Sendiri. */
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor),
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor) details > summary,
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                div[data-testid="stExpanderDetails"] {
+                    background: var(--dataset-light-card) !important;
+                    border-color: var(--dataset-light-border) !important;
+                    color: var(--dataset-light-text) !important;
+                }
+
+                .dataset-v16-upload-intro,
+                .dataset-v16-empty-state,
+                .dataset-v16-analysis-ready,
+                .dataset-v16-columns-section {
+                    background: var(--dataset-light-soft) !important;
+                    border-color: var(--dataset-light-border) !important;
+                    box-shadow: 0 10px 24px rgba(15,23,42,0.05) !important;
+                }
+
+                .dataset-v16-upload-title,
+                .dataset-v16-file-name,
+                .dataset-v16-analysis-ready-title,
+                .dataset-v16-preview-title,
+                .dataset-v16-columns-title,
+                .dataset-v16-empty-state strong {
+                    color: var(--dataset-light-title) !important;
+                }
+
+                .dataset-v16-upload-subtitle,
+                .dataset-v16-file-detail,
+                .dataset-v16-analysis-ready-note,
+                .dataset-v16-preview-note,
+                .dataset-v16-metric-note {
+                    color: var(--dataset-light-muted) !important;
+                }
+
+                .dataset-v16-upload-chip,
+                .dataset-v16-column-badge {
+                    background: var(--dataset-light-card) !important;
+                    border-color: var(--dataset-light-border) !important;
+                    color: #475569 !important;
+                }
+
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                [data-testid="stFileUploaderDropzone"] {
+                    background: var(--dataset-light-card) !important;
+                    border-color: #CBD5E1 !important;
+                    color: var(--dataset-light-text) !important;
+                }
+
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                [data-testid="stFileUploaderDropzone"] * {
+                    color: #475569 !important;
+                }
+
+                .dataset-v16-file-strip,
+                .dataset-v16-success {
+                    background: linear-gradient(90deg, #F0FDF4, #ECFDF5) !important;
+                    border-color: #BBF7D0 !important;
+                    box-shadow: 0 10px 24px rgba(22,101,52,0.07) !important;
+                }
+
+                .dataset-v16-success-title {
+                    color: #166534 !important;
+                }
+
+                .dataset-v16-success-note {
+                    color: #4D7C5C !important;
+                }
+
+                .dataset-v16-metric-card {
+                    background: var(--dataset-light-card) !important;
+                    border-color: var(--dataset-light-border) !important;
+                    box-shadow: 0 10px 24px rgba(15,23,42,0.06) !important;
+                }
+
+                .dataset-v16-metric-label {
+                    color: #475569 !important;
+                }
+
+                /* Hasil analisis file upload. */
+                .dataset-v18-metric-card,
+                .dataset-v18-platform-shell,
+                .dataset-v18-platform-card,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v18-chart-card-marker),
+                .dataset-v19-sentiment-lab,
+                .dataset-v19-signal-card,
+                .dataset-v20-wordcloud-section,
+                .dataset-v20-wordcloud-stat,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v20-wordcloud-controls-marker),
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v20-wordcloud-canvas-marker),
+                .dataset-v21-topic-section,
+                .dataset-v21-topic-card,
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v21-topic-chart-marker) {
+                    background: var(--dataset-light-card) !important;
+                    background-color: var(--dataset-light-card) !important;
+                    background-image: none !important;
+                    border-color: var(--dataset-light-border) !important;
+                    box-shadow: 0 12px 28px rgba(15,23,42,0.07) !important;
+                }
+
+                .dataset-v18-metric-value,
+                .dataset-v18-platform-name,
+                .dataset-v18-sentiment-section-title,
+                .dataset-v18-chart-card-title,
+                .dataset-v19-signal-value,
+                .dataset-v20-wordcloud-stat strong,
+                .dataset-v21-topic-name,
+                .dataset-v21-topic-chart-title {
+                    color: var(--dataset-light-title) !important;
+                }
+
+                .dataset-v18-metric-label,
+                .dataset-v18-metric-note,
+                .dataset-v18-platform-subtitle,
+                .dataset-v18-platform-share,
+                .dataset-v18-sentiment-section-note,
+                .dataset-v18-chart-card-subtitle,
+                .dataset-v18-chart-card-hint,
+                .dataset-v19-signal-label,
+                .dataset-v19-lab-hint,
+                .dataset-v20-wordcloud-subtitle,
+                .dataset-v20-wordcloud-stat small,
+                .dataset-v20-wordcloud-canvas-note,
+                .dataset-v20-wordcloud-chip-label,
+                .dataset-v21-topic-subtitle,
+                .dataset-v21-topic-share,
+                .dataset-v21-topic-chart-note,
+                .dataset-v21-topic-hint {
+                    color: var(--dataset-light-muted) !important;
+                }
+
+                .dataset-v18-platform-track,
+                .dataset-v19-signal-track,
+                .dataset-v20-wordcloud-chip-row,
+                .dataset-v21-topic-track {
+                    background-color: #E2E8F0 !important;
+                    border-color: var(--dataset-light-border) !important;
+                }
+
+                .dataset-v20-wordcloud-chip {
+                    background: #F8FAFC !important;
+                    border-color: #CBD5E1 !important;
+                    color: #334155 !important;
+                }
+
+                .dataset-v20-wordcloud-chip b {
+                    color: #B91C1C !important;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v20-wordcloud-canvas-marker) img {
+                    border-color: var(--dataset-light-border) !important;
+                    box-shadow: 0 12px 26px rgba(15,23,42,0.08) !important;
+                }
+
+                /* Panel file nonrelevan dan warning. */
+                .dataset-v22-shell,
+                .dataset-v22-subsection {
+                    background: linear-gradient(135deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 14px 32px rgba(15,23,42,0.08) !important;
+                }
+
+                .dataset-v22-card {
+                    background: #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 8px 20px rgba(15,23,42,0.05) !important;
+                }
+
+                .dataset-v22-title,
+                .dataset-v22-card-value,
+                .dataset-v22-section-title,
+                .dataset-v22-sub-title {
+                    color: var(--dataset-light-title) !important;
+                }
+
+                .dataset-v22-subtitle,
+                .dataset-v22-card-kicker,
+                .dataset-v22-card-note,
+                .dataset-v22-section-note,
+                .dataset-v22-sub-note {
+                    color: var(--dataset-light-muted) !important;
+                }
+
+                .dataset-v22-badge,
+                .dataset-v22-sub-pill {
+                    background: #F8FAFC !important;
+                    border-color: #E2E8F0 !important;
+                    color: #334155 !important;
+                }
+
+                .dataset-v18-warning-card {
+                    background: linear-gradient(135deg, #FFFBEB, #FFF7ED) !important;
+                    border-color: #FDE68A !important;
+                    color: #78350F !important;
+                    box-shadow: 0 12px 28px rgba(120,53,15,0.08) !important;
+                }
+
+                .dataset-v18-warning-title,
+                .dataset-v18-warning-copy,
+                .dataset-v18-warning-card strong {
+                    color: #78350F !important;
+                }
+
+                .dataset-v18-warning-note {
+                    color: #92400E !important;
+                }
+
+                /* Dialog chart dan WordCloud pada tema terang. */
+                div[data-testid="stDialog"] div[data-testid="stVerticalBlock"]:has(.dataset-v19-fullscreen-marker),
+                div[data-baseweb="modal"] div[data-testid="stVerticalBlock"]:has(.dataset-v19-fullscreen-marker),
+                div[data-testid="stDialog"] div[data-testid="stVerticalBlock"]:has(.dataset-v20-wordcloud-fullscreen-marker),
+                div[data-baseweb="modal"] div[data-testid="stVerticalBlock"]:has(.dataset-v20-wordcloud-fullscreen-marker) {
+                    background: var(--dataset-light-card) !important;
+                    color: var(--dataset-light-text) !important;
+                }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
 
 
 def _deteksi_pemisah_csv(file_bytes: bytes) -> tuple[str, str]:
@@ -3730,6 +4343,10 @@ def _deteksi_relevansi_dataset_upload(data: pd.DataFrame) -> tuple[bool, str]:
         if not bahan_relevansi:
             return False, "tanpa-konten"
 
+        # Import SDK Gemini hanya saat pengguna benar-benar menganalisis file upload.
+        # Membuka halaman Dataset tidak lagi memuat dependency Google yang berat.
+        from utils.gemini_client import check_data_relevance
+
         hasil_gemini = check_data_relevance(bahan_relevansi)
         if hasil_gemini is None:
             return False, "keyword"
@@ -3914,6 +4531,10 @@ def _deteksi_kolom_sentimen_upload(data: pd.DataFrame) -> str | None:
 def _muat_model_sentimen_upload() -> dict[str, Any]:
     """Muat runtime IndoBERT terpusat untuk klasifikasi dataset upload."""
     try:
+        # IndoBERT hanya dimuat ketika analisis upload membutuhkannya.
+        # Ini mencegah import model ikut memperlambat perpindahan ke Dataset.
+        from utils.model_loader import load_indobert
+
         tokenizer, model, perangkat = load_indobert()
         if tokenizer is None or model is None or perangkat is None:
             raise RuntimeError(
@@ -3943,6 +4564,8 @@ def _prediksi_sentimen_batch_upload(
             return []
 
         _muat_model_sentimen_upload()
+        from utils.model_loader import predict_sentiment_batch
+
         hasil_model = predict_sentiment_batch(
             daftar_teks,
             batch_size=max(1, int(ukuran_batch)),
@@ -4006,6 +4629,10 @@ def _siapkan_hasil_analisis_upload(
                 predicted.loc[mask_kosong] = _prediksi_sentimen_batch_upload(teks_prediksi)
 
             hasil["predicted_sentiment"] = predicted.replace("", "neutral")
+
+            # Klasifikator topik baru diimpor saat analisis upload dijalankan.
+            from utils.topic_classifier import classify_topic
+
             hasil["topik"] = [
                 classify_topic(teks, sentimen)
                 for teks, sentimen in zip(
@@ -4058,10 +4685,13 @@ def _render_wordcloud_upload(
         lebar_wordcloud = 1900 if mode_layar_penuh else 1600
         tinggi_wordcloud = 820 if mode_layar_penuh else 680
 
+        mode_gelap = bool(st.session_state.get("dark_mode", False))
+        warna_latar_wordcloud = "#111722" if mode_gelap else "#F8FAFC"
+
         wordcloud = WordCloud(
             width=lebar_wordcloud,
             height=tinggi_wordcloud,
-            background_color="#111722",
+            background_color=warna_latar_wordcloud,
             max_words=max_words,
             colormap=colormap,
             collocations=False,
@@ -4072,10 +4702,10 @@ def _render_wordcloud_upload(
         ).generate(gabungan_teks)
 
         ukuran_figur = (19, 8.2) if mode_layar_penuh else (10, 5)  # FIX: rasio WordCloud 2:1 agar stabil di tablet
-        figur, axes = plt.subplots(figsize=ukuran_figur, facecolor="#111722")
+        figur, axes = plt.subplots(figsize=ukuran_figur, facecolor=warna_latar_wordcloud)
         axes.imshow(wordcloud, interpolation="bilinear")
         axes.axis("off")
-        figur.patch.set_facecolor("#111722")
+        figur.patch.set_facecolor(warna_latar_wordcloud)
         figur.tight_layout(pad=0.12)
         _pyplot_aman(figur, clear_figure=True, **_opsi_lebar_penuh(st.pyplot))
         plt.close(figur)
