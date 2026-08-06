@@ -4959,14 +4959,98 @@ def _siapkan_hasil_analisis_upload(
 
 
 def _konfigurasi_chart_upload(figur: go.Figure) -> go.Figure:
-    """Terapkan latar transparan tanpa menyentuh CSS halaman Dataset."""
-    figur.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font={"color": "#FFFFFF"},
-        margin={"l": 20, "r": 20, "t": 50, "b": 30},
-    )
-    return figur
+    """Sesuaikan chart hasil upload dengan tema aktif tanpa mengubah datanya."""
+    try:
+        mode_gelap = bool(st.session_state.get("dark_mode", False))
+        warna_teks = "#F8FAFF" if mode_gelap else "#111827"
+        warna_teks_sekunder = "#CDD2DE" if mode_gelap else "#475569"
+        warna_grid = "rgba(255,255,255,0.065)" if mode_gelap else "rgba(148,163,184,0.24)"
+        warna_garis = "rgba(255,255,255,0.11)" if mode_gelap else "#CBD5E1"
+        warna_hover = "#151A24" if mode_gelap else "#FFFFFF"
+        warna_hover_border = "rgba(255,255,255,0.14)" if mode_gelap else "#CBD5E1"
+        warna_menu = "rgba(17,21,30,0.94)" if mode_gelap else "rgba(255,255,255,0.98)"
+        warna_menu_border = "rgba(142,114,255,0.34)" if mode_gelap else "#CBD5E1"
+        warna_menu_teks = "#F4F1FF" if mode_gelap else "#1F2937"
+
+        figur.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font={"color": warna_teks},
+            margin={"l": 20, "r": 20, "t": 50, "b": 30},
+            hoverlabel={
+                "bgcolor": warna_hover,
+                "bordercolor": warna_hover_border,
+                "font": {"color": warna_teks, "size": 12},
+            },
+            legend={
+                "font": {"color": warna_teks_sekunder},
+                "bgcolor": "rgba(0,0,0,0)",
+            },
+        )
+        figur.update_xaxes(
+            tickfont={"color": warna_teks_sekunder},
+            title_font={"color": warna_teks_sekunder},
+            gridcolor=warna_grid,
+            linecolor=warna_garis,
+            zerolinecolor=warna_garis,
+        )
+        figur.update_yaxes(
+            tickfont={"color": warna_teks_sekunder},
+            title_font={"color": warna_teks_sekunder},
+            gridcolor=warna_grid,
+            linecolor=warna_garis,
+            zerolinecolor=warna_garis,
+        )
+
+        for menu in list(figur.layout.updatemenus or []):
+            ukuran_font = 10
+            try:
+                ukuran_font = int(menu.font.size or 10)
+            except (TypeError, ValueError):
+                ukuran_font = 10
+            menu.update(
+                bgcolor=warna_menu,
+                bordercolor=warna_menu_border,
+                borderwidth=1,
+                font={"color": warna_menu_teks, "size": ukuran_font},
+            )
+
+        for anotasi in list(figur.layout.annotations or []):
+            teks_anotasi = str(anotasi.text or "")
+            if mode_gelap:
+                teks_anotasi = (
+                    teks_anotasi
+                    .replace("#64748B", "#8B93A2")
+                    .replace("#111827", "#FFFFFF")
+                )
+            else:
+                teks_anotasi = (
+                    teks_anotasi
+                    .replace("#8B93A2", "#64748B")
+                    .replace("#FFFFFF", "#111827")
+                )
+            anotasi.text = teks_anotasi
+            anotasi.font = {
+                "color": warna_teks,
+                "size": int(getattr(anotasi.font, "size", None) or 12),
+            }
+
+        for jejak in figur.data:
+            if getattr(jejak, "type", "") == "pie":
+                jejak.marker.line.color = "#111620" if mode_gelap else "#FFFFFF"
+                jejak.marker.line.width = 3
+            elif getattr(jejak, "type", "") in {"bar", "histogram"}:
+                jejak.marker.line.color = (
+                    "rgba(255,255,255,0.16)"
+                    if mode_gelap
+                    else "rgba(255,255,255,0.92)"
+                )
+                jejak.marker.line.width = 1
+
+        return figur
+    except Exception as exc:
+        st.error(f"Konfigurasi tema chart upload gagal diterapkan: {exc}")
+        return figur
 
 
 def _render_wordcloud_upload(
@@ -7546,6 +7630,372 @@ def _render_css_hasil_upload() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+    # CSS Light Mode disisipkan setelah CSS baseline output upload.
+    # Urutan ini penting agar seluruh panel di dalam expander tidak kembali
+    # memakai warna gelap saat hasil analisis dirender.
+    if not bool(st.session_state.get("dark_mode", False)):
+        st.markdown(
+            """
+            <style>
+                .dataset-v18-output-heading-icon {
+                    background: linear-gradient(135deg, #FEF2F2, #F5F3FF) !important;
+                    border-color: #FECACA !important;
+                    box-shadow: 0 8px 20px rgba(15,23,42,0.08) !important;
+                    color: #B91C1C !important;
+                }
+
+                .dataset-v18-output-heading-title,
+                .dataset-v18-metric-value,
+                .dataset-v18-platform-title,
+                .dataset-v18-platform-name,
+                .dataset-v18-sentiment-section-title,
+                .dataset-v18-chart-card-title,
+                .dataset-v19-signal-value,
+                .dataset-v20-wordcloud-title,
+                .dataset-v20-wordcloud-stat strong,
+                .dataset-v20-wordcloud-canvas-title,
+                .dataset-v21-topic-title,
+                .dataset-v21-topic-name,
+                .dataset-v21-topic-chart-title {
+                    color: #111827 !important;
+                    -webkit-text-fill-color: #111827 !important;
+                }
+
+                .dataset-v18-output-heading-note,
+                .dataset-v18-metric-label,
+                .dataset-v18-metric-note,
+                .dataset-v18-platform-subtitle,
+                .dataset-v18-platform-share,
+                .dataset-v18-sentiment-section-note,
+                .dataset-v18-chart-card-subtitle,
+                .dataset-v18-chart-card-hint,
+                .dataset-v19-signal-label,
+                .dataset-v19-lab-hint,
+                .dataset-v20-wordcloud-subtitle,
+                .dataset-v20-wordcloud-stat-top,
+                .dataset-v20-wordcloud-stat small,
+                .dataset-v20-wordcloud-canvas-note,
+                .dataset-v20-wordcloud-chip-label,
+                .dataset-v21-topic-subtitle,
+                .dataset-v21-topic-share,
+                .dataset-v21-topic-chart-note,
+                .dataset-v21-topic-hint {
+                    color: #64748B !important;
+                    -webkit-text-fill-color: #64748B !important;
+                }
+
+                .dataset-v18-metric-card {
+                    background:
+                        radial-gradient(circle at 96% 2%, var(--v18-accent-soft), transparent 44%),
+                        #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 12px 28px rgba(15,23,42,0.07) !important;
+                }
+
+                .dataset-v18-metric-card:hover,
+                .dataset-v18-metric-card:focus {
+                    border-color: var(--v18-accent-border) !important;
+                    box-shadow: 0 18px 36px rgba(15,23,42,0.11), 0 0 22px var(--v18-accent-glow) !important;
+                }
+
+                .dataset-v18-metric-progress,
+                .dataset-v18-platform-track,
+                .dataset-v19-signal-track,
+                .dataset-v21-topic-track {
+                    background: #E2E8F0 !important;
+                }
+
+                .dataset-v18-platform-shell {
+                    background:
+                        radial-gradient(circle at 96% 4%, rgba(29,161,242,0.08), transparent 36%),
+                        linear-gradient(145deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 14px 32px rgba(15,23,42,0.08) !important;
+                }
+
+                .dataset-v18-platform-card {
+                    background:
+                        radial-gradient(circle at 100% 0%, var(--platform-soft), transparent 50%),
+                        #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    color: #111827 !important;
+                    box-shadow: 0 8px 20px rgba(15,23,42,0.05) !important;
+                }
+
+                .dataset-v18-platform-card:hover,
+                .dataset-v18-platform-card:focus {
+                    border-color: var(--platform-border) !important;
+                    box-shadow: 0 14px 28px rgba(15,23,42,0.10), 0 0 20px var(--platform-soft) !important;
+                }
+
+                .dataset-v18-platform-badge {
+                    background: #F8FAFC !important;
+                    border-color: #CBD5E1 !important;
+                    color: #334155 !important;
+                }
+
+                .dataset-v18-sentiment-section {
+                    background:
+                        radial-gradient(circle at 8% 12%, rgba(142,114,255,0.10), transparent 34%),
+                        radial-gradient(circle at 95% 0%, rgba(229,57,53,0.09), transparent 34%),
+                        linear-gradient(135deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 14px 34px rgba(15,23,42,0.09) !important;
+                }
+
+                .dataset-v18-sentiment-section:hover,
+                .dataset-v18-sentiment-section:focus {
+                    border-color: #FCA5A5 !important;
+                    box-shadow: 0 18px 40px rgba(15,23,42,0.12), 0 0 24px rgba(142,114,255,0.09) !important;
+                }
+
+                .dataset-v18-sentiment-section-icon {
+                    background: linear-gradient(135deg, #FEF2F2, #F5F3FF) !important;
+                    border-color: #FECACA !important;
+                    color: #991B1B !important;
+                    box-shadow: 0 8px 18px rgba(15,23,42,0.07) !important;
+                }
+
+                .dataset-v18-sentiment-section-icon::after {
+                    border-color: #FFFFFF !important;
+                }
+
+                .dataset-v18-sentiment-dominant {
+                    background: #FFF1F2 !important;
+                    border-color: #FDA4AF !important;
+                    color: #9F1239 !important;
+                    -webkit-text-fill-color: #9F1239 !important;
+                    box-shadow: 0 6px 16px rgba(159,18,57,0.08) !important;
+                }
+
+                .dataset-v19-sentiment-lab {
+                    background:
+                        radial-gradient(circle at 0% 0%, rgba(142,114,255,0.07), transparent 42%),
+                        #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 12px 28px rgba(15,23,42,0.07) !important;
+                }
+
+                .dataset-v19-sentiment-lab::before {
+                    opacity: 0.34 !important;
+                }
+
+                .dataset-v19-signal-card {
+                    background:
+                        radial-gradient(circle at 100% 0%, var(--signal-soft), transparent 48%),
+                        #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    color: #111827 !important;
+                    box-shadow: 0 7px 18px rgba(15,23,42,0.04) !important;
+                }
+
+                .dataset-v19-signal-card:hover,
+                .dataset-v19-signal-card:focus-visible {
+                    background:
+                        radial-gradient(circle at 100% 0%, var(--signal-soft), transparent 58%),
+                        #F8FAFC !important;
+                    border-color: var(--signal-border) !important;
+                    box-shadow: 0 14px 30px rgba(15,23,42,0.10), 0 0 20px var(--signal-soft) !important;
+                }
+
+                .dataset-v19-signal-card::before {
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.82), transparent) !important;
+                }
+
+                .dataset-v19-signal-label,
+                .dataset-v19-signal-value {
+                    color: #1F2937 !important;
+                    -webkit-text-fill-color: #1F2937 !important;
+                }
+
+                .dataset-v19-spark span {
+                    background: linear-gradient(180deg, #FFFFFF, var(--signal-accent)) !important;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v18-chart-card-marker) {
+                    background:
+                        radial-gradient(circle at 100% 0%, var(--v18-chart-soft), transparent 42%),
+                        #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 14px 32px rgba(15,23,42,0.08) !important;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v18-chart-card-marker):hover {
+                    border-color: var(--v18-chart-accent) !important;
+                    box-shadow: 0 18px 40px rgba(15,23,42,0.12), 0 0 24px var(--v18-chart-soft) !important;
+                }
+
+                .dataset-v18-chart-card-icon {
+                    background: #F8FAFC !important;
+                    border-color: #CBD5E1 !important;
+                }
+
+                .dataset-v18-chart-card-badge {
+                    background: #F8FAFC !important;
+                    border-color: #CBD5E1 !important;
+                    color: #334155 !important;
+                    -webkit-text-fill-color: #334155 !important;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v18-chart-card-marker)
+                div[data-testid="stPlotlyChart"],
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v21-topic-chart-marker)
+                div[data-testid="stPlotlyChart"] {
+                    background: #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: none !important;
+                }
+
+                .dataset-v20-wordcloud-section {
+                    background:
+                        radial-gradient(circle at 7% 22%, rgba(244,67,54,0.08), transparent 31%),
+                        radial-gradient(circle at 94% 18%, rgba(182,124,255,0.08), transparent 32%),
+                        linear-gradient(115deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #FCA5A5 !important;
+                    box-shadow: 0 14px 34px rgba(15,23,42,0.08) !important;
+                }
+
+                .dataset-v20-wordcloud-section:hover,
+                .dataset-v20-wordcloud-section:focus {
+                    box-shadow: 0 18px 42px rgba(15,23,42,0.12), 0 0 24px rgba(244,67,54,0.08) !important;
+                }
+
+                .dataset-v20-wordcloud-icon,
+                .dataset-v21-topic-icon,
+                .dataset-v21-topic-chart-icon {
+                    background: #F8FAFC !important;
+                    box-shadow: 0 8px 18px rgba(15,23,42,0.06) !important;
+                }
+
+                .dataset-v20-wordcloud-live-badge,
+                .dataset-v21-topic-badge,
+                .dataset-v21-topic-chart-badge {
+                    background: #FFFFFF !important;
+                    border-color: #CBD5E1 !important;
+                    color: #334155 !important;
+                    -webkit-text-fill-color: #334155 !important;
+                }
+
+                .dataset-v20-wordcloud-stat {
+                    background:
+                        radial-gradient(circle at 95% 5%, var(--wc-stat-soft), transparent 46%),
+                        #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 8px 20px rgba(15,23,42,0.05) !important;
+                }
+
+                .dataset-v20-wordcloud-stat:hover,
+                .dataset-v20-wordcloud-stat:focus {
+                    box-shadow: 0 14px 30px rgba(15,23,42,0.10), 0 0 20px var(--wc-stat-soft) !important;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v20-wordcloud-controls-marker),
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v20-wordcloud-canvas-marker) {
+                    background: #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 12px 28px rgba(15,23,42,0.07) !important;
+                }
+
+                .dataset-v20-wordcloud-chip-row {
+                    background: #F8FAFC !important;
+                    border-color: #E2E8F0 !important;
+                }
+
+                .dataset-v20-wordcloud-chip {
+                    background: #FFFFFF !important;
+                    border-color: #CBD5E1 !important;
+                    color: #334155 !important;
+                    -webkit-text-fill-color: #334155 !important;
+                }
+
+                .dataset-v21-topic-section {
+                    background:
+                        radial-gradient(circle at 7% 18%, rgba(229,57,53,0.08), transparent 34%),
+                        radial-gradient(circle at 95% 12%, rgba(142,114,255,0.08), transparent 34%),
+                        linear-gradient(135deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 14px 34px rgba(15,23,42,0.08) !important;
+                }
+
+                .dataset-v21-topic-section:hover,
+                .dataset-v21-topic-section:focus {
+                    box-shadow: 0 18px 42px rgba(15,23,42,0.12) !important;
+                }
+
+                .dataset-v21-topic-card {
+                    background:
+                        radial-gradient(circle at 100% 0%, var(--topic-soft), transparent 48%),
+                        #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    color: #111827 !important;
+                    box-shadow: 0 8px 20px rgba(15,23,42,0.05) !important;
+                }
+
+                .dataset-v21-topic-card:hover,
+                .dataset-v21-topic-card:focus-visible {
+                    border-color: var(--topic-accent) !important;
+                    box-shadow: 0 14px 30px rgba(15,23,42,0.10), 0 0 20px var(--topic-soft) !important;
+                }
+
+                .dataset-v21-topic-count,
+                .dataset-v21-topic-rank {
+                    color: var(--topic-accent) !important;
+                    -webkit-text-fill-color: var(--topic-accent) !important;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v21-topic-chart-marker) {
+                    background:
+                        radial-gradient(circle at 50% -18%, rgba(142,114,255,0.08), transparent 44%),
+                        #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    box-shadow: 0 14px 34px rgba(15,23,42,0.08) !important;
+                }
+
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.dataset-v21-topic-chart-marker):hover {
+                    border-color: #A78BFA !important;
+                    box-shadow: 0 18px 42px rgba(15,23,42,0.12), 0 0 22px rgba(142,114,255,0.08) !important;
+                }
+
+                div[data-testid="stColumn"]:has(.dataset-v21-topic-mode-marker)
+                div[data-testid="stButton"] > button {
+                    background: #FFFFFF !important;
+                    border-color: #CBD5E1 !important;
+                    box-shadow: 0 6px 16px rgba(15,23,42,0.06) !important;
+                    color: #334155 !important;
+                }
+
+                div[data-testid="stColumn"]:has(.dataset-v21-topic-mode-marker)
+                div[data-testid="stButton"] > button:hover {
+                    background: #F5F3FF !important;
+                    border-color: #8E72FF !important;
+                    color: #5B21B6 !important;
+                }
+
+                div[data-testid="stColumn"]:has(.dataset-v21-topic-mode-active)
+                div[data-testid="stButton"] > button {
+                    background: linear-gradient(135deg, #6547E8, #8E72FF) !important;
+                    border-color: #8E72FF !important;
+                    color: #FFFFFF !important;
+                }
+
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                div[data-testid="stDownloadButton"] > button {
+                    background: linear-gradient(135deg, #E53935, #EF4444) !important;
+                    border-color: #E53935 !important;
+                    color: #FFFFFF !important;
+                    box-shadow: 0 10px 24px rgba(229,57,53,0.18) !important;
+                }
+
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                div[data-testid="stDownloadButton"] > button:hover {
+                    background: linear-gradient(135deg, #C62828, #E53935) !important;
+                    border-color: #C62828 !important;
+                }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def _render_metric_hasil_upload(
