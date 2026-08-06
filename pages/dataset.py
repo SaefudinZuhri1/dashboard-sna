@@ -1456,19 +1456,62 @@ def _render_chart_legend(items: list[tuple[str, str]]) -> None:
     )
 
 
+def _tema_chart_layar_penuh() -> dict[str, str]:
+    """Ambil token warna dialog chart sesuai tema aktif secara aman."""
+    try:
+        if bool(st.session_state.get("dark_mode", False)):
+            return {
+                "template": "plotly_dark",
+                "text": "#F8FAFC",
+                "muted": "#A7B0BF",
+                "grid": "rgba(71,85,105,0.62)",
+                "axis": "rgba(167,176,191,0.30)",
+                "legend_bg": "rgba(21,27,38,0.94)",
+                "legend_border": "#334155",
+                "hover_bg": "#151B26",
+                "hover_border": "rgba(229,57,53,0.38)",
+            }
+        return {
+            "template": "plotly_white",
+            "text": "#1F2937",
+            "muted": "#64748B",
+            "grid": "rgba(148,163,184,0.24)",
+            "axis": "rgba(100,116,139,0.34)",
+            "legend_bg": "rgba(255,255,255,0.96)",
+            "legend_border": "#D9E1EA",
+            "hover_bg": "#FFFFFF",
+            "hover_border": "rgba(229,57,53,0.28)",
+        }
+    except Exception as exc:
+        LOGGER.exception("Tema chart layar penuh gagal dibaca: %s", exc)
+        st.error("Tema grafik layar penuh belum dapat dibaca.")
+        return {
+            "template": "plotly_white",
+            "text": "#1F2937",
+            "muted": "#64748B",
+            "grid": "rgba(148,163,184,0.24)",
+            "axis": "rgba(100,116,139,0.34)",
+            "legend_bg": "rgba(255,255,255,0.96)",
+            "legend_border": "#D9E1EA",
+            "hover_bg": "#FFFFFF",
+            "hover_border": "rgba(229,57,53,0.28)",
+        }
+
+
 @_DIALOG_DECORATOR(" ", width="large")
 def _tampilkan_chart_layar_penuh(
     judul: str,
     figur: go.Figure,
     legenda: list[tuple[str, str]],
 ) -> None:
-    """Tampilkan satu chart di tengah viewport dengan white space seimbang."""
+    """Tampilkan satu chart layar penuh yang mengikuti tema aktif."""
     try:
         st.markdown(
             '<span class="dataset-v19-fullscreen-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
 
+        tema = _tema_chart_layar_penuh()
         figur_besar = go.Figure(figur)
 
         # Beri ruang tambahan di sisi kanan agar label nilai yang berada di luar
@@ -1484,6 +1527,7 @@ def _tampilkan_chart_layar_penuh(
         nilai_maksimum = max(nilai_chart, default=1.0)
 
         figur_besar.update_layout(
+            template=tema["template"],
             # Judul dialog dan judul tambahan sengaja dihilangkan agar area
             # layar penuh hanya berfokus pada grafik.
             title=dict(text=""),
@@ -1492,6 +1536,7 @@ def _tampilkan_chart_layar_penuh(
             margin=dict(l=104, r=150, t=94, b=118),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Inter, sans-serif", color=tema["text"]),
             bargap=0.38,
             legend=dict(
                 orientation="h",
@@ -1499,10 +1544,14 @@ def _tampilkan_chart_layar_penuh(
                 y=1.035,
                 xanchor="center",
                 x=0.5,
-                bgcolor="rgba(26,26,26,0.92)",
-                bordercolor="#343434",
+                bgcolor=tema["legend_bg"],
+                bordercolor=tema["legend_border"],
                 borderwidth=1,
-                font=dict(family="Inter, sans-serif", color="#EAEAEA", size=14),
+                font=dict(
+                    family="Inter, sans-serif",
+                    color=tema["text"],
+                    size=14,
+                ),
                 itemclick="toggle",
                 itemdoubleclick=False,
                 traceorder="normal",
@@ -1510,18 +1559,25 @@ def _tampilkan_chart_layar_penuh(
             xaxis=dict(
                 title=dict(text="Jumlah Data", standoff=14),
                 automargin=True,
-                gridcolor="#2A2A2A",
-                zerolinecolor="#2A2A2A",
-                tickfont=dict(color="#AAAAAA", size=13),
-                title_font=dict(color="#EAEAEA", size=15),
+                gridcolor=tema["grid"],
+                linecolor=tema["axis"],
+                zerolinecolor=tema["axis"],
+                tickfont=dict(color=tema["muted"], size=13),
+                title_font=dict(color=tema["muted"], size=15),
                 rangemode="tozero",
                 range=[0, nilai_maksimum * 1.20],
             ),
             yaxis=dict(
                 automargin=True,
                 gridcolor="rgba(0,0,0,0)",
-                tickfont=dict(color="#FFFFFF", size=14),
+                linecolor=tema["axis"],
+                tickfont=dict(color=tema["text"], size=14),
                 categoryorder="trace",
+            ),
+            hoverlabel=dict(
+                bgcolor=tema["hover_bg"],
+                bordercolor=tema["hover_border"],
+                font=dict(family="Inter, sans-serif", color=tema["text"]),
             ),
             transition=dict(duration=360, easing="cubic-in-out"),
         )
@@ -4281,12 +4337,68 @@ def _inject_css() -> None:
                 }
 
                 /* Dialog chart dan WordCloud pada tema terang. */
+                div[data-testid="stDialog"],
+                div[data-baseweb="modal"] {
+                    background: var(--dataset-light-bg) !important;
+                    background-color: var(--dataset-light-bg) !important;
+                }
+
+                div[data-testid="stDialog"] [role="dialog"],
+                div[data-baseweb="modal"] [role="dialog"] {
+                    background: var(--dataset-light-bg) !important;
+                    background-color: var(--dataset-light-bg) !important;
+                    color: var(--dataset-light-text) !important;
+                }
+
                 div[data-testid="stDialog"] div[data-testid="stVerticalBlock"]:has(.dataset-v19-fullscreen-marker),
                 div[data-baseweb="modal"] div[data-testid="stVerticalBlock"]:has(.dataset-v19-fullscreen-marker),
                 div[data-testid="stDialog"] div[data-testid="stVerticalBlock"]:has(.dataset-v20-wordcloud-fullscreen-marker),
                 div[data-baseweb="modal"] div[data-testid="stVerticalBlock"]:has(.dataset-v20-wordcloud-fullscreen-marker) {
-                    background: var(--dataset-light-card) !important;
+                    background: var(--dataset-light-bg) !important;
+                    background-color: var(--dataset-light-bg) !important;
                     color: var(--dataset-light-text) !important;
+                }
+
+                div[data-testid="stDialog"] [data-testid="stPlotlyChart"],
+                div[data-baseweb="modal"] [data-testid="stPlotlyChart"] {
+                    background: #FFFFFF !important;
+                    background-color: #FFFFFF !important;
+                    border: 1px solid var(--dataset-light-border) !important;
+                    box-shadow: 0 18px 48px rgba(15,23,42,0.12) !important;
+                }
+
+                div[data-testid="stDialog"] [data-testid="stPlotlyChart"] .modebar,
+                div[data-baseweb="modal"] [data-testid="stPlotlyChart"] .modebar {
+                    background: rgba(255,255,255,0.96) !important;
+                    border: 1px solid var(--dataset-light-border) !important;
+                    border-radius: 8px !important;
+                    box-shadow: 0 6px 18px rgba(15,23,42,0.10) !important;
+                    padding: 3px 5px !important;
+                }
+
+                div[data-testid="stDialog"] [data-testid="stPlotlyChart"] .modebar-btn path,
+                div[data-baseweb="modal"] [data-testid="stPlotlyChart"] .modebar-btn path {
+                    fill: #475569 !important;
+                }
+
+                div[data-testid="stDialog"] [data-testid="stPlotlyChart"] .modebar-btn:hover path,
+                div[data-baseweb="modal"] [data-testid="stPlotlyChart"] .modebar-btn:hover path {
+                    fill: #E53935 !important;
+                }
+
+                div[data-testid="stDialog"] button[aria-label="Close"],
+                div[data-baseweb="modal"] button[aria-label="Close"] {
+                    background: #FFFFFF !important;
+                    border: 1px solid var(--dataset-light-border-strong) !important;
+                    box-shadow: 0 8px 20px rgba(15,23,42,0.12) !important;
+                    color: #334155 !important;
+                }
+
+                div[data-testid="stDialog"] button[aria-label="Close"]:hover,
+                div[data-baseweb="modal"] button[aria-label="Close"]:hover {
+                    background: #FEF2F2 !important;
+                    border-color: #E53935 !important;
+                    color: #B91C1C !important;
                 }
             </style>
             """,
