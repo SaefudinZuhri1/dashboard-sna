@@ -1338,6 +1338,10 @@ def _konfigurasi_chart(figur: go.Figure, judul_sumbu_x: str) -> go.Figure:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, sans-serif", color="#FFFFFF"),
+        # Judul chart sengaja dikosongkan. Judul section sudah ditampilkan
+        # melalui komponen HTML di atas chart, sehingga Plotly tidak membuat
+        # placeholder judul bernilai "undefined".
+        title=dict(text=""),
         barmode="group",
         bargap=0.30,
         transition=dict(duration=320, easing="cubic-in-out"),
@@ -3976,6 +3980,44 @@ def _inject_css() -> None:
 
                 .dataset-v6-legend-label {
                     color: #475569 !important;
+                }
+
+                /* Tombol Layar Penuh pada Distribusi Cepat mengikuti Light Mode. */
+                div[data-testid="stColumn"]:has(.dataset-v6-chart-action-marker)
+                div[data-testid="stButton"] button {
+                    background: #FFFFFF !important;
+                    border: 1px solid #CBD5E1 !important;
+                    box-shadow: 0 4px 12px rgba(15,23,42,0.08) !important;
+                    color: #334155 !important;
+                }
+
+                div[data-testid="stColumn"]:has(.dataset-v6-chart-action-marker)
+                div[data-testid="stButton"] button p,
+                div[data-testid="stColumn"]:has(.dataset-v6-chart-action-marker)
+                div[data-testid="stButton"] button span {
+                    color: #334155 !important;
+                }
+
+                div[data-testid="stColumn"]:has(.dataset-v6-chart-action-marker)
+                div[data-testid="stButton"] button:hover {
+                    background: #FEF2F2 !important;
+                    border-color: #E53935 !important;
+                    box-shadow: 0 6px 16px rgba(229,57,53,0.14) !important;
+                    color: #B91C1C !important;
+                }
+
+                div[data-testid="stColumn"]:has(.dataset-v6-chart-action-marker)
+                div[data-testid="stButton"] button:hover p,
+                div[data-testid="stColumn"]:has(.dataset-v6-chart-action-marker)
+                div[data-testid="stButton"] button:hover span {
+                    color: #B91C1C !important;
+                }
+
+                div[data-testid="stColumn"]:has(.dataset-v6-chart-action-marker)
+                div[data-testid="stButton"] button:focus-visible {
+                    border-color: #E53935 !important;
+                    box-shadow: 0 0 0 3px rgba(229,57,53,0.16) !important;
+                    outline: none !important;
                 }
 
                 /* Expander Dataset dan Upload Dataset. */

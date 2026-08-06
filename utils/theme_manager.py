@@ -103,24 +103,48 @@ def apply_plotly_theme(figure: Any, dark_mode: bool | None = None) -> Any:
             return figure
 
         theme = get_theme_tokens(dark_mode)
-        figure.update_layout(
-            template=theme["template"],
-            paper_bgcolor=TRANSPARENT,
-            plot_bgcolor=TRANSPARENT,
-            font={"family": FONT_FAMILY, "color": theme["text"]},
-            title_font={"family": FONT_FAMILY, "color": theme["text"]},
-            hoverlabel={
+        title_obj = getattr(figure.layout, "title", None)
+        title_text = getattr(title_obj, "text", None)
+        title_text_normalized = str(title_text or "").strip()
+        has_real_title = title_text_normalized.lower() not in {
+            "",
+            "undefined",
+            "none",
+            "null",
+        }
+
+        layout_updates = {
+            "template": theme["template"],
+            "paper_bgcolor": TRANSPARENT,
+            "plot_bgcolor": TRANSPARENT,
+            "font": {"family": FONT_FAMILY, "color": theme["text"]},
+            "hoverlabel": {
                 "bgcolor": theme["hover_bg"],
                 "bordercolor": theme["hover_border"],
                 "font": {"family": FONT_FAMILY, "color": theme["text"]},
             },
-            legend={
+            "legend": {
                 "bgcolor": theme["legend_bg"],
                 "bordercolor": theme["legend_border"],
                 "font": {"family": FONT_FAMILY, "color": theme["text"]},
-                "title": {"font": {"family": FONT_FAMILY, "color": theme["text"]}},
+                "title": {
+                    "font": {"family": FONT_FAMILY, "color": theme["text"]}
+                },
             },
-        )
+        }
+
+        if has_real_title:
+            layout_updates["title_font"] = {
+                "family": FONT_FAMILY,
+                "color": theme["text"],
+            }
+        else:
+            # Jangan membuat objek title.font pada chart tanpa judul. Pada
+            # kombinasi Plotly dan Streamlit tertentu, objek judul tanpa teks
+            # dirender sebagai tulisan literal "undefined".
+            layout_updates["title"] = {"text": ""}
+
+        figure.update_layout(**layout_updates)
 
         figure.update_xaxes(
             gridcolor=theme["grid"],
