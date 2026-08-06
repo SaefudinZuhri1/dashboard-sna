@@ -1,12 +1,13 @@
+# .streamlit/config.toml
 # Konfigurasi Streamlit Dashboard Telkom Group — Deployment Final
 # Nilai visual dipertahankan dari baseline UI/UX yang telah dikunci.
 
 [theme]
-base = "dark"
+base = "light"
 primaryColor = "#E53935"
-backgroundColor = "#0D0D0D"
-secondaryBackgroundColor = "#111111"
-textColor = "#FFFFFF"
+backgroundColor = "#F7F8FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1F1F1F"
 font = "sans serif"
 
 [server]

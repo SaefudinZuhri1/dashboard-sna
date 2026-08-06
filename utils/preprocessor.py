@@ -1,3 +1,4 @@
+# utils/preprocessor.py
 """Pipeline pembersihan teks Bahasa Indonesia untuk IndoBERT dan WordCloud."""
 
 from __future__ import annotations
@@ -55,6 +56,54 @@ STOPWORDS_ID: set[str] = {
     # Kata domain IndiBiz untuk WordCloud (sesuai Cell [12]/tahap lanjutan)
     "indibiz", "indibizid", "telkom", "internet",
 }
+
+# Stopword tambahan untuk WordCloud dan analisis topik pascasidang.
+# Semua nilai disimpan lowercase agar pencocokan bersifat case-insensitive.
+SERVICE_STOPWORDS = {
+    "indihome", "telkomsel", "indibiz", "telkom", "tsel",
+    "indihome_id", "telkomsel_id", "indibiz_id", "indihomecare",
+    "myindihome", "mytelkomsel",
+}
+
+CONNECTOR_STOPWORDS = {
+    "yang", "dan", "di", "ke", "dari", "ini", "itu", "dengan", "untuk",
+    "pada", "adalah", "ada", "juga", "atau", "tapi", "tetapi", "karena",
+    "jadi", "jika", "kalau", "sudah", "belum", "akan", "bisa", "dapat",
+    "harus", "mau", "ingin", "punya", "lagi", "masih", "baru", "pun",
+    "aja", "sih", "dong", "loh", "deh", "ya", "yah",
+}
+
+SOCIAL_MEDIA_STOPWORDS = {
+    "min", "mimin", "admin", "kak", "bang", "mas", "mbak", "bro", "sis",
+    "gan", "sob", "guys", "halo", "hai", "hi", "hello", "nih", "tuh",
+    "gimana", "kenapa", "knp", "gmn",
+}
+
+NONSTANDARD_STOPWORDS = {
+    "yg", "dg", "dgn", "utk", "lg", "jg", "tp", "dr", "pd", "krn",
+    "gak", "ga", "ngga", "nggak", "banget", "bgt", "sangat", "sekali",
+    "saya", "aku", "kamu", "anda", "dia", "mereka", "kami", "kita",
+}
+
+WORDCLOUD_FOCUS_WORDS = {
+    # Positif
+    "bagus", "baik", "murah", "cepat", "puas", "mantap", "oke", "lancar",
+    "stabil",
+    # Negatif
+    "lambat", "gangguan", "mahal", "jelek", "lemot", "down", "rusak",
+    "lama", "parah",
+    # Netral dan istilah domain
+    "paket", "kuota", "sinyal", "jaringan", "layanan", "internet", "wifi",
+}
+
+STOPWORDS_ID.update(
+    SERVICE_STOPWORDS
+    | CONNECTOR_STOPWORDS
+    | SOCIAL_MEDIA_STOPWORDS
+    | NONSTANDARD_STOPWORDS
+)
+# Kata fokus harus tetap tersedia untuk WordCloud, tabel frekuensi, dan LDA.
+STOPWORDS_ID.difference_update(WORDCLOUD_FOCUS_WORDS)
 
 # --- Normalisasi kata informal → formal ---
 # Daftar wajib diselaraskan dengan preprocessing Cell [12] IndiBiz.
@@ -243,15 +292,16 @@ def remove_stopwords(text: str, custom: set | None = None) -> str:
         return str(text) if text is not None else ""
 
 
-def prepare_for_wordcloud(text: str) -> str:
-    """
-    Pembersihan agresif khusus WordCloud.
+def clean_for_wordcloud(
+    text: str,
+    custom_stopwords: set[str] | None = None,
+) -> str:
+    """Bersihkan teks untuk WordCloud, frekuensi kata, dan analisis topik.
 
-    Hapus hashtag, filter kata > 2 karakter, hapus stopword.
-
-    Contoh uji:
-        >>> prepare_for_wordcloud("Internet #indihome lambat bgt min @admin")
-        'lambat'
+    Fungsi ini menghapus URL, mention, HTML, angka, emoji, nama layanan, kata
+    sambung, sapaan media sosial, dan singkatan tidak baku. Kata fokus sentimen
+    serta istilah domain seperti ``sinyal``, ``jaringan``, dan ``internet`` tetap
+    dipertahankan.
     """
     try:
         if _is_missing_value(text):
@@ -261,17 +311,45 @@ def prepare_for_wordcloud(text: str) -> str:
         result = _URL_PATTERN.sub(" ", result)
         result = _MENTION_PATTERN.sub(" ", result)
         result = _HTML_PATTERN.sub(" ", result)
-        result = _HASHTAG_PATTERN.sub(" ", result)
-        result = emoji.replace_emoji(result, replace=" ")
+        # Simbol hashtag dihapus, tetapi kata setelahnya tetap dipakai.
+        result = result.replace("#", " ")
+        try:
+            result = emoji.replace_emoji(result, replace=" ")
+        except Exception:
+            result = result.encode("ascii", "ignore").decode("ascii")
         result = _NUMBER_PATTERN.sub(" ", result)
         result = _SPECIAL_CHAR_PATTERN.sub(" ", result)
-        result = normalize_informal(result)
         result = _WHITESPACE_PATTERN.sub(" ", result).strip()
 
-        words = [w for w in result.split() if len(w) > 2]
-        return remove_stopwords(" ".join(words))
+        stopwords = set(STOPWORDS_ID)
+        if custom_stopwords:
+            stopwords.update(
+                str(word).lower().strip()
+                for word in custom_stopwords
+                if str(word).strip()
+            )
+
+        cleaned_words: list[str] = []
+        for raw_word in result.split():
+            normalized_word = NORMALIZATION_MAP.get(raw_word, raw_word)
+            if len(normalized_word) <= 2:
+                continue
+            if normalized_word in stopwords:
+                continue
+            cleaned_words.append(normalized_word)
+
+        return " ".join(cleaned_words)
     except Exception as exc:
-        logger.error("Gagal menyiapkan teks wordcloud: %s", exc)
+        _show_streamlit_error(f"Gagal membersihkan teks WordCloud: {exc}")
+        return ""
+
+
+def prepare_for_wordcloud(text: str) -> str:
+    """Pertahankan API lama dengan meneruskan proses ke clean_for_wordcloud."""
+    try:
+        return clean_for_wordcloud(text)
+    except Exception as exc:
+        _show_streamlit_error(f"Gagal menyiapkan teks WordCloud: {exc}")
         return ""
 
 

@@ -167,6 +167,21 @@ RECOMMENDATION_FILTER_ACTIVE_KEYS = {
 }
 RECOMMENDATION_FILTER_RESET_PENDING_KEY = "_recommendation_filter_reset_pending"
 RECOMMENDATION_FILTER_FEEDBACK_KEY = "_recommendation_filter_feedback"
+ACCOUNT_TYPE_FILTER_KEY = "recommendation_account_type_filter"
+
+# Kata kunci klasifikasi akun media. Daftar manual disediakan agar peneliti
+# dapat menambah pengecualian tanpa mengubah fungsi klasifikasi utama.
+MEDIA_ACCOUNT_KEYWORDS = (
+    "news", "media", "tv", "official", "id", "berita", "info",
+    "update", "kompas", "detik", "tribun", "cnbc",
+    "cnnindonesia", "tempo",
+)
+MEDIA_ACCOUNT_MANUAL: set[str] = set()
+INFLUENCER_ACCOUNT_MANUAL: set[str] = set()
+ACCOUNT_TYPE_LABELS = {
+    "media": "🟦 Media",
+    "influencer": "🟩 Influencer",
+}
 
 
 # CSS kecil untuk menyembunyikan indikator proses bawaan Streamlit pada halaman ini.
@@ -4610,6 +4625,136 @@ def _safe_key(value: Any) -> str:
     return re.sub(r"[^a-zA-Z0-9_]+", "_", str(value or "item"))
 
 
+def _classify_account_type(username: Any, account_name: Any = "") -> str:
+    """Klasifikasikan akun menjadi media atau influencer secara otomatis."""
+    try:
+        username_text = str(username or "").strip().lower().lstrip("@")
+        account_name_text = str(account_name or "").strip().lower()
+        normalized_username = re.sub(r"[^a-z0-9]+", "", username_text)
+        normalized_name = re.sub(r"[^a-z0-9]+", "", account_name_text)
+
+        manual_media = {
+            re.sub(r"[^a-z0-9]+", "", item.lower().lstrip("@"))
+            for item in MEDIA_ACCOUNT_MANUAL
+        }
+        manual_influencer = {
+            re.sub(r"[^a-z0-9]+", "", item.lower().lstrip("@"))
+            for item in INFLUENCER_ACCOUNT_MANUAL
+        }
+
+        if normalized_username in manual_influencer:
+            return "influencer"
+        if normalized_username in manual_media:
+            return "media"
+
+        searchable = f"{username_text} {account_name_text}"
+        compact_searchable = f"{normalized_username} {normalized_name}"
+        is_media = any(
+            keyword in searchable or keyword in compact_searchable
+            for keyword in MEDIA_ACCOUNT_KEYWORDS
+        )
+        return "media" if is_media else "influencer"
+    except Exception as error:
+        st.error(
+            "Tipe akun belum dapat diklasifikasikan. "
+            f"Detail: {type(error).__name__}."
+        )
+        return "influencer"
+
+
+def _account_type_label(value: Any) -> str:
+    """Ubah nilai tipe akun menjadi badge Bahasa Indonesia."""
+    try:
+        normalized = str(value or "influencer").strip().lower()
+        return ACCOUNT_TYPE_LABELS.get(normalized, ACCOUNT_TYPE_LABELS["influencer"])
+    except Exception as error:
+        st.error(
+            "Label tipe akun belum dapat disiapkan. "
+            f"Detail: {type(error).__name__}."
+        )
+        return ACCOUNT_TYPE_LABELS["influencer"]
+
+
+def _add_account_type_column(influencers: pd.DataFrame) -> pd.DataFrame:
+    """Tambahkan kolom tipe_akun tanpa mengubah urutan kandidat influencer."""
+    try:
+        if influencers is None:
+            return pd.DataFrame(columns=["tipe_akun"])
+
+        result = influencers.copy()
+        if result.empty:
+            if "tipe_akun" not in result.columns:
+                result["tipe_akun"] = pd.Series(dtype="object")
+            return result
+
+        name_column = next(
+            (
+                column
+                for column in ("name", "nama", "display_name", "fullname", "full_name")
+                if column in result.columns
+            ),
+            None,
+        )
+        account_names = (
+            result[name_column]
+            if name_column is not None
+            else pd.Series("", index=result.index, dtype="object")
+        )
+        result["tipe_akun"] = [
+            _classify_account_type(username, account_name)
+            for username, account_name in zip(
+                result.get("username", pd.Series("", index=result.index)),
+                account_names,
+            )
+        ]
+        return result
+    except Exception as error:
+        st.error(
+            "Kolom tipe akun belum dapat ditambahkan. "
+            f"Detail: {type(error).__name__}."
+        )
+        fallback = influencers.copy() if isinstance(influencers, pd.DataFrame) else pd.DataFrame()
+        fallback["tipe_akun"] = "influencer"
+        return fallback
+
+
+def _filter_influencers_by_account_type(
+    influencers: pd.DataFrame,
+    selected_type: str,
+) -> pd.DataFrame:
+    """Filter rekomendasi berdasarkan pilihan Semua, Influencer, atau Akun Media."""
+    try:
+        if influencers is None or influencers.empty:
+            return pd.DataFrame(columns=getattr(influencers, "columns", None))
+
+        selection_map = {
+            "Influencer": "influencer",
+            "Akun Media": "media",
+        }
+        normalized_type = selection_map.get(str(selected_type).strip())
+        if normalized_type is None:
+            return influencers.copy()
+
+        filtered = influencers[
+            influencers["tipe_akun"].astype(str).str.lower().eq(normalized_type)
+        ].copy()
+        if filtered.empty:
+            return filtered
+
+        filtered = filtered.sort_values(
+            ["recommendation_score", "degree_centrality", "followers"],
+            ascending=[False, False, False],
+        ).reset_index(drop=True)
+        filtered["recommendation_rank"] = range(1, len(filtered) + 1)
+        return filtered
+    except Exception as error:
+        st.error(
+            "Influencer belum dapat disaring berdasarkan tipe akun. "
+            f"Detail: {type(error).__name__}."
+        )
+        return influencers.iloc[0:0].copy()
+
+
 def _topic_regex(keywords: tuple[str, ...]) -> str:
     """Bangun pola regex aman dari daftar kata kunci topik."""
     ordered = sorted((str(item) for item in keywords), key=len, reverse=True)
@@ -6266,6 +6411,9 @@ def _build_score_matrix(
                 row: dict[str, Any] = {
                     "username": _safe_username(influencer["username"]),
                     "platform": platform,
+                    "tipe_akun": str(
+                        influencer.get("tipe_akun", "influencer")
+                    ).strip().lower(),
                 }
                 content_topics = {
                     _clean_content_text(item)
@@ -6713,6 +6861,8 @@ def _render_influencer_card(
     degree = float(influencer.get("degree_centrality", 0.0) or 0.0)
     layanan = str(influencer.get("layanan", ""))
     rank = int(float(influencer.get("recommendation_rank", 0) or 0))
+    account_type = str(influencer.get("tipe_akun", "influencer")).strip().lower()
+    account_type_label = escape(_account_type_label(account_type))
     initial = escape(username[:1].upper() or "?")
     tag_html = "".join(
         f'<span class="rec-tag" style="{_topic_badge_style(tag)}">{escape(tag)}</span>'
@@ -6765,9 +6915,12 @@ def _render_influencer_card(
         <article class="rec-influencer-card" style="--platform-color:{meta['warna']};">
             <div class="rec-card-top">
                 <div class="rec-avatar">{initial}</div>
-                <span class="rec-platform-badge">
-                    {escape(meta['ikon'])} {escape(meta['label'])}
-                </span>
+                <div style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end;">
+                    <span class="rec-platform-badge">
+                        {escape(meta['ikon'])} {escape(meta['label'])}
+                    </span>
+                    <span class="rec-platform-badge">{account_type_label}</span>
+                </div>
             </div>
             {rank_html}
             <h3 class="rec-username">@{escape(username)}</h3>
@@ -8028,6 +8181,7 @@ def _render_matrix_rank_cards(
         platform_color = escape(str(meta["warna"]))
         platform_label = escape(str(meta["label"]))
         platform_icon = escape(str(meta.get("ikon", "★")))
+        account_type_label = escape(_account_type_label(row.get("tipe_akun", "influencer")))
         safe_username = escape(username)
 
         cards.append(
@@ -8039,7 +8193,7 @@ def _render_matrix_rank_cards(
                     <div class="rec-rank-main">
                         <span class="rec-rank-user">@{safe_username}</span>
                         <span class="rec-rank-platform">
-                            <b>{platform_icon}</b>{platform_label}
+                            <b>{platform_icon}</b>{platform_label} · {account_type_label}
                         </span>
                     </div>
                     <div class="rec-rank-score">{score}<em>/10</em></div>
@@ -8714,16 +8868,24 @@ def _render_matrix_table(filtered_matrix: pd.DataFrame) -> None:
     rename_map = {str(item["key"]): str(item["singkat"]) for item in TOPIC_CONFIG}
     topic_labels = [str(item["singkat"]) for item in TOPIC_CONFIG]
 
-    table = filtered_matrix[["username", "platform", *topic_keys]].copy()
+    table = filtered_matrix[["username", "platform", "tipe_akun", *topic_keys]].copy()
+    table["tipe_akun"] = table["tipe_akun"].map(_account_type_label)
     table["platform"] = table["platform"].map(
         lambda item: PLATFORM_META.get(str(item), PLATFORM_META["twitter"])["label"]
     )
-    table = table.rename(columns={"username": "Influencer", "platform": "Platform", **rename_map})
+    table = table.rename(
+        columns={
+            "username": "Influencer",
+            "platform": "Platform",
+            "tipe_akun": "Tipe Akun",
+            **rename_map,
+        }
+    )
 
     for column in topic_labels:
         table[column] = pd.to_numeric(table[column], errors="coerce").fillna(0).astype(int)
     table["Rata-rata"] = table[topic_labels].mean(axis=1).round(1)
-    table = table[["Influencer", "Platform", "Rata-rata", *topic_labels]]
+    table = table[["Influencer", "Tipe Akun", "Platform", "Rata-rata", *topic_labels]]
 
     with st.expander("🔎 Lihat & eksplor tabel skor detail", expanded=False):
         st.markdown(
@@ -8741,7 +8903,9 @@ def _render_matrix_table(filtered_matrix: pd.DataFrame) -> None:
         )
 
         platform_options = sorted(table["Platform"].dropna().unique().tolist())
-        sort_options = ["Rata-rata", *topic_labels, "Influencer", "Platform"]
+        sort_options = [
+            "Rata-rata", *topic_labels, "Influencer", "Tipe Akun", "Platform"
+        ]
         # Jumlah baris tabel bisa kecil pada layanan tertentu (misalnya hanya 1-5 kandidat).
         # Streamlit tidak mengizinkan slider ketika min_value sama dengan max_value,
         # sehingga kontrol jumlah baris dibuat adaptif agar halaman tidak gagal tampil.
@@ -8938,7 +9102,10 @@ def _render_matrix_table(filtered_matrix: pd.DataFrame) -> None:
             <div class="rec-matrix-table-detail">
                 <div class="rec-matrix-table-detail-title">
                     <strong>@{escape(str(selected_row['Influencer']))}</strong>
-                    <span>{escape(str(selected_row['Platform']))}</span>
+                    <span>
+                        {escape(str(selected_row['Platform']))} ·
+                        {escape(str(selected_row['Tipe Akun']))}
+                    </span>
                 </div>
                 <div class="rec-matrix-table-score-pills">{''.join(score_pills)}</div>
             </div>
@@ -11163,10 +11330,10 @@ def render_recommendation() -> None:
 
         influencers, influencer_meta = _build_influencer_data(layanan, demo_mode)
         influencers = _filter_influencers_by_active_platform(influencers, platform)
+        influencers = _add_account_type_column(influencers)
         influencer_meta = dict(influencer_meta or {})
         influencer_meta["actual_rows"] = int(len(influencers))
         influencer_meta["active_platform"] = platform
-        score_matrix = _build_score_matrix(influencers, layanan)
 
         _render_context_card(layanan, topic_meta, influencer_meta)
 
@@ -11178,6 +11345,19 @@ def render_recommendation() -> None:
                 "konten asli yang relevan pada dataset layanan terpilih."
             ),
         )
+        selected_account_type = st.radio(
+            "Tampilkan:",
+            options=["Semua", "Influencer", "Akun Media"],
+            horizontal=True,
+            key=ACCOUNT_TYPE_FILTER_KEY,
+        )
+        influencers = _filter_influencers_by_account_type(
+            influencers,
+            selected_account_type,
+        )
+        influencer_meta["actual_rows"] = int(len(influencers))
+        influencer_meta["active_account_type"] = selected_account_type
+        score_matrix = _build_score_matrix(influencers, layanan)
         _render_influencer_grid(layanan, influencers, topic_summary, influencer_meta)
 
         if layanan == "IndiBiz":

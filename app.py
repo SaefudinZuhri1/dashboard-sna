@@ -1,3 +1,4 @@
+# app.py
 """
 Entry point utama dashboard analitik media sosial Telkom Group.
 Skripsi S1 Sains Data — SNA & IndoBERT Sentiment Analysis.
@@ -46,7 +47,7 @@ _EARLY_SESSION_DEFAULTS = {
     "fullname": "",
     "role": "",
     "user_id": None,
-    "dark_mode": True,
+    "dark_mode": False,
     "remembered_username": "",
     "selected_page": "Beranda",
     "active_service": "IndiHome",
@@ -71,9 +72,10 @@ def _install_persistent_startup_overlay() -> bool:
     cookie, atau pemulihan sesi.
     """
     try:
-        render_html_iframe(
-            dedent(
-                r"""
+        startup_is_dark = bool(st.session_state.get("dark_mode", False))
+        startup_theme_flag = "true" if startup_is_dark else "false"
+        startup_overlay_html = dedent(
+            r"""
                 <!doctype html>
                 <html lang="id">
                 <head><meta charset="utf-8"></head>
@@ -84,10 +86,13 @@ def _install_persistent_startup_overlay() -> bool:
                         const doc = window.parent.document;
                         const overlayId = 'telkom-startup-boot-overlay-v2';
                         const styleId = 'telkom-startup-boot-style-v2';
+                        const lightStyleId = 'telkom-startup-boot-light-style-v1';
+                        const isDarkTheme = __IS_DARK_THEME__;
+                        const startupPageBackground = isDarkTheme ? '#0D0D0D' : '#F7F8FA';
 
-                        doc.documentElement.style.background = '#0D0D0D';
+                        doc.documentElement.style.background = startupPageBackground;
                         if (doc.body) {
-                            doc.body.style.background = '#0D0D0D';
+                            doc.body.style.background = startupPageBackground;
                         }
 
                         if (!doc.getElementById(styleId)) {
@@ -255,6 +260,39 @@ def _install_persistent_startup_overlay() -> bool:
                             (doc.head || doc.documentElement).appendChild(style);
                         }
 
+                        if (!isDarkTheme && !doc.getElementById(lightStyleId)) {
+                            const lightStyle = doc.createElement('style');
+                            lightStyle.id = lightStyleId;
+                            lightStyle.textContent = `
+                                html, body, .stApp,
+                                [data-testid="stAppViewContainer"] {
+                                    background: #F7F8FA !important;
+                                }
+                                #${overlayId} {
+                                    background:
+                                        radial-gradient(circle at 18% 18%, rgba(229,57,53,.12), transparent 34%),
+                                        radial-gradient(circle at 82% 76%, rgba(29,161,242,.10), transparent 35%),
+                                        linear-gradient(145deg, #F7F8FA 0%, #FFFFFF 48%, #EEF2F7 100%);
+                                }
+                                #${overlayId} .boot-grid {
+                                    opacity: .34;
+                                    background-image:
+                                        linear-gradient(rgba(15,23,42,.045) 1px, transparent 1px),
+                                        linear-gradient(90deg, rgba(15,23,42,.045) 1px, transparent 1px);
+                                }
+                                #${overlayId} .boot-card {
+                                    border-color: rgba(148,163,184,.30);
+                                    background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(248,250,252,.98));
+                                    box-shadow: 0 28px 80px rgba(15,23,42,.14), 0 0 0 1px rgba(229,57,53,.06) inset;
+                                }
+                                #${overlayId} h2 { color: #111827; }
+                                #${overlayId} p { color: #64748B; }
+                                #${overlayId} .boot-progress { background: rgba(15,23,42,.08); }
+                                #${overlayId} .boot-status { color: #475569; }
+                            `;
+                            (doc.head || doc.documentElement).appendChild(lightStyle);
+                        }
+
                         let overlay = doc.getElementById(overlayId);
                         if (!overlay) {
                             overlay = doc.createElement('div');
@@ -284,7 +322,9 @@ def _install_persistent_startup_overlay() -> bool:
                 </body>
                 </html>
                 """
-            ),
+        ).replace("__IS_DARK_THEME__", startup_theme_flag)
+        render_html_iframe(
+            startup_overlay_html,
             height=0,
             scrolling=False,
         )
@@ -341,6 +381,7 @@ from utils.access_control import (  # noqa: E402
     normalize_role,
 )
 from utils.css_loader import load_css  # noqa: E402
+from utils.theme_manager import install_plotly_theme_adapter  # noqa: E402
 from utils.app_version import get_sidebar_footer_text  # noqa: E402
 from utils.loading_screen import layar_loading  # noqa: E402
 from utils.audit_logger import log_activity, log_page_view_once  # noqa: E402
@@ -483,6 +524,8 @@ def _selesaikan_loading_awal() -> None:
                                         overlay.remove();
                                         const style = doc.getElementById('telkom-startup-boot-style-v2');
                                         if (style) style.remove();
+                                        const lightStyle = doc.getElementById('telkom-startup-boot-light-style-v1');
+                                        if (lightStyle) lightStyle.remove();
                                     }, 390);
                                 }, 90);
                             });
@@ -516,7 +559,7 @@ def init_session_state() -> None:
         "fullname": "",
         "role": "",
         "user_id": None,
-        "dark_mode": True,
+        "dark_mode": False,
         "remembered_username": "",
         "selected_page": "Beranda",
         "active_service": "IndiHome",
@@ -2786,7 +2829,7 @@ def _sinkronkan_pilihan_menu(widget_key: str) -> None:
 
 def render_sidebar_menu() -> str:
     """Render header, kartu pengguna, navigasi, tema, logout, dan versi."""
-    dark_mode = bool(st.session_state.get("dark_mode", True))
+    dark_mode = bool(st.session_state.get("dark_mode", False))
     load_css(dark_mode=dark_mode, hide_sidebar=False)
     _inject_sidebar_css()
     _inject_sidebar_open_button_fix()
@@ -2915,33 +2958,39 @@ def render_sidebar_menu() -> str:
             st.session_state["selected_page"] = selected_route
             st.session_state["page"] = selected_route
 
+            mode_label = "🌙 Mode Gelap" if dark_mode else "☀️ Mode Terang"
+            mode_help = (
+                "Nonaktifkan untuk kembali ke Mode Terang."
+                if dark_mode
+                else "Aktifkan untuk menggunakan Mode Gelap."
+            )
             mode_switch_col, mode_label_col, mode_help_col = st.columns(
                 [0.20, 0.66, 0.14]
             )
             with mode_switch_col:
                 new_dark_mode = st.toggle(
-                    "Mode Gelap",
+                    mode_label,
                     value=dark_mode,
                     key="dark_mode_toggle",
                     label_visibility="collapsed",
                 )
             with mode_label_col:
                 st.markdown(
-                    '<div class="mode-dark-label-v226">Mode Gelap</div>',
+                    f'<div class="mode-dark-label-v226">{mode_label}</div>',
                     unsafe_allow_html=True,
                 )
             with mode_help_col:
                 st.markdown(
-                    """
+                    f"""
                     <div class="mode-dark-help-wrap-v215">
                         <span
                             class="mode-dark-help-v215"
                             tabindex="0"
-                            aria-label="Informasi Mode Gelap"
+                            aria-label="Informasi Tema Dashboard"
                         >
                             ?
                             <span class="mode-dark-help-tooltip-v215">
-                                Aktifkan atau nonaktifkan tampilan gelap dashboard.
+                                {mode_help}
                             </span>
                         </span>
                     </div>
@@ -3577,6 +3626,7 @@ def main() -> None:
     """Jalankan autentikasi, sidebar, routing, dan footer dashboard."""
     try:
         init_session_state()
+        install_plotly_theme_adapter()
         _ensure_database_initialized()
 
         # CookieManager hanya boleh dirender pada fase autentikasi. Setelah
@@ -3597,7 +3647,7 @@ def main() -> None:
 
         if not st.session_state.logged_in:
             load_css(
-                dark_mode=st.session_state.get("dark_mode", True),
+                dark_mode=st.session_state.get("dark_mode", False),
                 hide_sidebar=True,
             )
 

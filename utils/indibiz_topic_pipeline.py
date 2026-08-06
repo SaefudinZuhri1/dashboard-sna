@@ -1,3 +1,4 @@
+# utils/indibiz_topic_pipeline.py
 """Pipeline Analisis Topik IndiBiz untuk dashboard Streamlit.
 
 Modul ini membentuk tepat lima topik utama dari seluruh komentar IndiBiz.
@@ -18,7 +19,7 @@ import streamlit as st
 from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import CountVectorizer
 
-from utils.preprocessor import STOPWORDS_ID
+from utils.preprocessor import STOPWORDS_ID, clean_for_wordcloud as clean_shared_wordcloud
 from utils.topic_classifier import (
     DEFAULT_TOPIC,
     SENTIMENT_LABELS_ID,
@@ -35,7 +36,7 @@ SENTIMENT_ORDER = ("positive", "neutral", "negative")
 SENTIMENT_TIE_PRIORITY = {"negative": 2, "positive": 1, "neutral": 0}
 
 INDIBIZ_BRAND_WORDS = {"indibiz", "indibizid", "indibiz_id", "telkom"}
-INDIBIZ_DOMAIN_STOPWORDS = {"biznet", "layanan", "bisnis"}
+INDIBIZ_DOMAIN_STOPWORDS = {"biznet", "bisnis"}
 STOPWORDS_INDIBIZ = set(STOPWORDS_ID) | INDIBIZ_BRAND_WORDS | INDIBIZ_DOMAIN_STOPWORDS
 
 # Nama tema dibuat khusus untuk konteks percakapan IndiBiz. LDA tetap menjadi
@@ -128,23 +129,13 @@ def _stopwords_for_display(show_brand: bool) -> set[str]:
 
 
 def clean_for_wordcloud(text: Any, show_brand: bool = False) -> str:
-    """Bersihkan teks untuk WordCloud, Top Kata, dan LDA IndiBiz."""
+    """Gunakan cleaning bersama agar WordCloud dan LDA IndiBiz konsisten."""
     try:
-        value = str(text or "").lower()
-        value = _URL_PATTERN.sub("", value)
-        value = _MENTION_PATTERN.sub("", value)
-        value = _HASHTAG_PATTERN.sub("", value)
-        value = _NON_WORD_PATTERN.sub(" ", value)
-        value = _NUMBER_PATTERN.sub("", value)
-        value = _WHITESPACE_PATTERN.sub(" ", value).strip()
-
         stopwords = _stopwords_for_display(show_brand)
-        tokens = [
-            token
-            for token in value.split()
-            if len(token) > 2 and token not in stopwords
-        ]
-        return " ".join(tokens)
+        return clean_shared_wordcloud(
+            str(text or ""),
+            custom_stopwords=stopwords,
+        )
     except Exception as error:
         st.error(f"Gagal membersihkan teks WordCloud IndiBiz: {error}")
         return ""

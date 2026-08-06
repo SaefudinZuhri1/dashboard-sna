@@ -98,6 +98,29 @@ BRAND_ALIASES = set().union(*SERVICE_ALIASES.values()) | {
 # indibizkti, indibiz_jtdiy, indihomecare_jabar, dan variasi resmi sejenis.
 BRAND_PREFIXES = ("indihome", "indibiz", "telkomsel")
 
+# Filter ini hanya digunakan untuk tampilan ranking influencer. Node tetap
+# dipertahankan di graph agar struktur hub-and-spoke tidak berubah.
+EXCLUDE_ACCOUNTS = [
+    "indihome",
+    "telkomsel",
+    "indibiz",
+    "telkom",
+    "tsel",
+    "telkomsel_id",
+    "indihome_id",
+    "indibiz_id",
+    "IndiHome",
+    "Telkomsel",
+    "IndiBiz",
+]
+EXCLUDE_ACCOUNTS_NORMALIZED = {
+    str(account).strip().lstrip("@").lower() for account in EXCLUDE_ACCOUNTS
+}
+EXCLUDE_ACCOUNTS_COMPACT = {
+    "".join(char for char in account if char.isalnum())
+    for account in EXCLUDE_ACCOUNTS_NORMALIZED
+}
+
 REQUIRED_SNA_COLUMNS = {"source", "target", "relationship", "followers", "platform"}
 SNA_ACTION_LOADING_KEY = "_sna_v9_action_loading_label"
 SNA_GRAPH_RENDER_REQUEST_KEY = "_sna_v9_graph_render_request"
@@ -3390,6 +3413,20 @@ def _is_brand_account(username: str) -> bool:
             return False
         return compact in BRAND_ALIASES or compact.startswith(BRAND_PREFIXES)
     except Exception:
+        return False
+
+
+def _is_excluded_from_influencer(username: Any) -> bool:
+    """Cek akun layanan yang harus disembunyikan dari ranking influencer."""
+    try:
+        normalized = _normalize_username(username)
+        if normalized in EXCLUDE_ACCOUNTS_NORMALIZED:
+            return True
+        # Variasi pemisah seperti indihome.id tetap dikenali, tanpa mengubah graph.
+        compact = _compact_username(normalized)
+        return compact in EXCLUDE_ACCOUNTS_COMPACT
+    except Exception as exc:
+        st.error(f"Filter akun layanan belum dapat diterapkan: {exc}")
         return False
 
 
@@ -7716,7 +7753,13 @@ def _render_influencer_tables(node_df: pd.DataFrame, service: str, platform: str
                 """
             )
 
-            non_brand = node_df[~node_df["is_brand"]].copy() if node_df is not None and not node_df.empty else pd.DataFrame()
+            if node_df is not None and not node_df.empty:
+                excluded_mask = node_df["username"].map(_is_excluded_from_influencer)
+                non_brand = node_df[
+                    (~node_df["is_brand"].astype(bool)) & (~excluded_mask)
+                ].copy()
+            else:
+                non_brand = pd.DataFrame()
             if non_brand.empty:
                 st.info("Belum ada akun non-brand untuk ditampilkan pada tabel influencer.")
                 return
@@ -7821,6 +7864,8 @@ def _render_influencer_tables(node_df: pd.DataFrame, service: str, platform: str
                     int(row_limit),
                 )
                 st.markdown(_compact_html(f'<div class="sna-v9-influencer-grid">{degree_html}{followers_html}</div>'), unsafe_allow_html=True)
+
+            st.caption("* Akun layanan resmi dikeluarkan dari daftar ini")
 
             detail_options = filtered_table_df.sort_values(
                 ["degree_centrality", "followers", "username"],
