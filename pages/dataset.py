@@ -4138,6 +4138,37 @@ def _inject_css() -> None:
                     color: var(--dataset-light-text) !important;
                 }
 
+                /*
+                 * Judul expander Upload Dataset Sendiri.
+                 * Selector ini sengaja dibuat lebih spesifik daripada aturan Dark Mode
+                 * agar teks tidak tetap putih saat background Light Mode aktif.
+                 */
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                details > summary [data-testid="stMarkdownContainer"],
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                details > summary [data-testid="stMarkdownContainer"] p,
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                details > summary [data-testid="stMarkdownContainer"] span,
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                details > summary p,
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                details > summary span {
+                    color: var(--dataset-light-title) !important;
+                    opacity: 1 !important;
+                    -webkit-text-fill-color: var(--dataset-light-title) !important;
+                }
+
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                details > summary svg {
+                    color: #E53935 !important;
+                    fill: currentColor !important;
+                }
+
+                div[data-testid="stExpander"]:has(.dataset-v16-upload-anchor)
+                details[open] > summary svg {
+                    color: #B91C1C !important;
+                }
+
                 .dataset-v16-upload-intro,
                 .dataset-v16-empty-state,
                 .dataset-v16-analysis-ready,
