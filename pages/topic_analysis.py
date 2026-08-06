@@ -417,6 +417,47 @@ def _inject_topic_css() -> None:
                     z-index: 1;
                 }
 
+                /* Hero memakai class tema eksplisit agar tidak tertimpa CSS global Streamlit. */
+                .topic-v8-hero-title {
+                    color: #FFFFFF !important;
+                    -webkit-text-fill-color: #FFFFFF !important;
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+                    font-size: clamp(1.65rem, 3vw, 2.15rem) !important;
+                    font-weight: 800 !important;
+                    letter-spacing: -0.03em !important;
+                    line-height: 1.15 !important;
+                    margin: 0 !important;
+                    position: relative !important;
+                    text-shadow: 0 2px 10px rgba(80,8,8,0.18) !important;
+                    z-index: 1 !important;
+                }
+
+                .topic-v8-hero-description {
+                    color: rgba(255,255,255,0.96) !important;
+                    -webkit-text-fill-color: rgba(255,255,255,0.96) !important;
+                    font-size: 0.96rem !important;
+                    line-height: 1.55 !important;
+                    margin: 0.65rem 0 0.95rem !important;
+                    max-width: 900px !important;
+                    position: relative !important;
+                    z-index: 1 !important;
+                }
+
+                .topic-v8-theme-light .topic-v8-badge {
+                    background: rgba(255,255,255,0.94) !important;
+                    border-color: rgba(255,255,255,0.90) !important;
+                    box-shadow: 0 6px 16px rgba(80,8,8,0.14) !important;
+                    color: #7F1D1D !important;
+                    -webkit-text-fill-color: #7F1D1D !important;
+                }
+
+                .topic-v8-theme-dark .topic-v8-badge {
+                    background: rgba(100,20,20,0.30) !important;
+                    border-color: rgba(255,255,255,0.22) !important;
+                    color: #FFFFFF !important;
+                    -webkit-text-fill-color: #FFFFFF !important;
+                }
+
                 .topic-v8-badges {
                     display: flex;
                     flex-wrap: wrap;
@@ -1600,7 +1641,7 @@ def _normalize_platform(value: Any) -> str:
 
 
 def _render_hero(data_source: str, layanan: str) -> None:
-    """Render hero banner dengan judul yang mengikuti layanan aktif."""
+    """Render hero banner dengan tema eksplisit agar stabil pada Light dan Dark Mode."""
     try:
         if "Real" in data_source:
             source_badge = "Data Real"
@@ -1612,49 +1653,22 @@ def _render_hero(data_source: str, layanan: str) -> None:
             source_badge = "Data Dummy"
 
         layanan_aman = escape(str(layanan or "IndiHome"))
-        dark_mode = _topic_is_dark_mode()
-
-        # Warna penting hero ditetapkan langsung pada elemen agar CSS global
-        # Light Mode tidak dapat menghilangkan atau mengubah keterbacaannya.
-        title_style = (
-            "color:#FFFFFF !important;"
-            "-webkit-text-fill-color:#FFFFFF !important;"
-            "text-shadow:0 2px 10px rgba(80,8,8,0.18);"
-        )
-        description_style = (
-            "color:rgba(255,255,255,0.96) !important;"
-            "-webkit-text-fill-color:rgba(255,255,255,0.96) !important;"
-        )
-        if dark_mode:
-            badge_style = (
-                "background:rgba(100,20,20,0.30);"
-                "border-color:rgba(255,255,255,0.22);"
-                "color:#FFFFFF !important;"
-                "-webkit-text-fill-color:#FFFFFF !important;"
-            )
-        else:
-            badge_style = (
-                "background:rgba(255,255,255,0.94) !important;"
-                "border-color:rgba(255,255,255,0.88) !important;"
-                "box-shadow:0 6px 16px rgba(80,8,8,0.14);"
-                "color:#7F1D1D !important;"
-                "-webkit-text-fill-color:#7F1D1D !important;"
-            )
+        theme_class = "topic-v8-theme-dark" if _topic_is_dark_mode() else "topic-v8-theme-light"
 
         st.markdown(
             f"""
-            <div class="topic-v8-page">
+            <div class="topic-v8-page {theme_class}">
                 <section class="topic-v8-hero" aria-label="Hero Analisis Topik">
-                    <h1 style="{title_style}">Analisis Topik {layanan_aman}</h1>
-                    <p style="{description_style}">
+                    <div class="topic-v8-hero-title">Analisis Topik {layanan_aman}</div>
+                    <div class="topic-v8-hero-description">
                         Menjelajahi kata dominan, pola topik, dan distribusi isu publik
                         untuk layanan {layanan_aman} pada Twitter/X, Instagram, dan TikTok.
-                    </p>
+                    </div>
                     <div class="topic-v8-badges">
-                        <span class="topic-v8-badge" style="{badge_style}">IndiHome • Aktif</span>
-                        <span class="topic-v8-badge" style="{badge_style}">IndiBiz • Aktif</span>
-                        <span class="topic-v8-badge" style="{badge_style}">Telkomsel • Aktif</span>
-                        <span class="topic-v8-badge" style="{badge_style}">{escape(source_badge)}</span>
+                        <div class="topic-v8-badge">IndiHome • Aktif</div>
+                        <div class="topic-v8-badge">IndiBiz • Aktif</div>
+                        <div class="topic-v8-badge">Telkomsel • Aktif</div>
+                        <div class="topic-v8-badge">{escape(source_badge)}</div>
                     </div>
                 </section>
             </div>
@@ -1663,9 +1677,6 @@ def _render_hero(data_source: str, layanan: str) -> None:
         )
     except Exception as exc:
         st.error(f"Hero Analisis Topik belum dapat ditampilkan: {exc}")
-
-
-DEFAULT_PLATFORMS = tuple(PLATFORM_LABELS.keys())
 
 
 def _init_filter_state() -> None:
