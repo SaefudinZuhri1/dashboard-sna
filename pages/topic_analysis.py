@@ -1320,6 +1320,28 @@ def _inject_topic_css() -> None:
                         color: #172033 !important;
                     }
 
+                    /* Hero tetap merah sebagai identitas halaman. Pada Light Mode,
+                       paksa judul/deskripsi tetap putih dan ubah badge menjadi terang
+                       agar tidak kalah oleh CSS global tema terang. */
+                    html body .stApp .topic-v8-hero h1 {
+                        color: #FFFFFF !important;
+                        -webkit-text-fill-color: #FFFFFF !important;
+                        text-shadow: 0 2px 10px rgba(80, 8, 8, 0.18);
+                    }
+
+                    html body .stApp .topic-v8-hero p {
+                        color: rgba(255, 255, 255, 0.96) !important;
+                        -webkit-text-fill-color: rgba(255, 255, 255, 0.96) !important;
+                    }
+
+                    html body .stApp .topic-v8-hero .topic-v8-badge {
+                        background: rgba(255, 255, 255, 0.94) !important;
+                        border-color: rgba(255, 255, 255, 0.88) !important;
+                        box-shadow: 0 6px 16px rgba(80, 8, 8, 0.14);
+                        color: #7F1D1D !important;
+                        -webkit-text-fill-color: #7F1D1D !important;
+                    }
+
                     .topic-v8-section-title,
                     .topic-v8-topic-name,
                     .topic-v8-topic-overview-title,
