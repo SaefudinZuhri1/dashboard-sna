@@ -3859,16 +3859,108 @@ def _inject_css() -> None:
                     background: #F8FAFC !important;
                 }
 
-                .dataset-v6-table tbody tr.dataset-v6-row-positive td {
-                    background: rgba(76,175,80,0.055) !important;
-                }
-
-                .dataset-v6-table tbody tr.dataset-v6-row-neutral td {
-                    background: rgba(255,152,0,0.055) !important;
-                }
-
+                /*
+                 * Light Mode memakai baris putih yang netral. Informasi sentimen
+                 * tetap dibedakan melalui badge, sehingga tabel lebih bersih dan
+                 * tidak terlihat merah atau kuning pada latar halaman terang.
+                 */
+                .dataset-v6-table tbody tr.dataset-v6-row-positive td,
+                .dataset-v6-table tbody tr.dataset-v6-row-neutral td,
                 .dataset-v6-table tbody tr.dataset-v6-row-negative td {
-                    background: rgba(244,67,54,0.055) !important;
+                    background: #FFFFFF !important;
+                }
+
+                .dataset-v6-table tbody tr.dataset-v6-row-positive:hover td,
+                .dataset-v6-table tbody tr.dataset-v6-row-neutral:hover td,
+                .dataset-v6-table tbody tr.dataset-v6-row-negative:hover td {
+                    background: #F8FAFC !important;
+                }
+
+                .dataset-v6-confidence-cell {
+                    color: #475569 !important;
+                    font-weight: 600 !important;
+                }
+
+                .dataset-v6-sentiment-badge {
+                    border: 1px solid transparent !important;
+                    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.10) !important;
+                    letter-spacing: 0.01em !important;
+                }
+
+                .dataset-v6-badge-positive {
+                    background: #43A047 !important;
+                    border-color: #388E3C !important;
+                    color: #FFFFFF !important;
+                }
+
+                .dataset-v6-badge-neutral {
+                    background: #FF9800 !important;
+                    border-color: #F57C00 !important;
+                    color: #2B2100 !important;
+                }
+
+                .dataset-v6-badge-negative {
+                    background: #EF3E3A !important;
+                    border-color: #D92F2B !important;
+                    color: #FFFFFF !important;
+                }
+
+                /* Ikon bantuan pada kontrol Baris per halaman mengikuti tema terang. */
+                div[data-testid="stHorizontalBlock"]:has(.dataset-v6-table-title)
+                div[data-testid="stSelectbox"] [data-testid="stTooltipIcon"] {
+                    align-items: center !important;
+                    background: #FFFFFF !important;
+                    border: 1px solid #CBD5E1 !important;
+                    border-radius: 999px !important;
+                    box-shadow: 0 2px 6px rgba(15,23,42,0.08) !important;
+                    color: #64748B !important;
+                    display: inline-flex !important;
+                    height: 20px !important;
+                    justify-content: center !important;
+                    min-height: 20px !important;
+                    min-width: 20px !important;
+                    padding: 0 !important;
+                    width: 20px !important;
+                }
+
+                div[data-testid="stHorizontalBlock"]:has(.dataset-v6-table-title)
+                div[data-testid="stSelectbox"] [data-testid="stTooltipIcon"] button,
+                div[data-testid="stHorizontalBlock"]:has(.dataset-v6-table-title)
+                div[data-testid="stSelectbox"] [data-testid="stTooltipHoverTarget"] {
+                    background: transparent !important;
+                    border: 0 !important;
+                    box-shadow: none !important;
+                    color: #64748B !important;
+                }
+
+                div[data-testid="stHorizontalBlock"]:has(.dataset-v6-table-title)
+                div[data-testid="stSelectbox"] [data-testid="stTooltipIcon"] svg {
+                    fill: #64748B !important;
+                    color: #64748B !important;
+                }
+
+                div[data-testid="stHorizontalBlock"]:has(.dataset-v6-table-title)
+                div[data-testid="stSelectbox"] [data-testid="stTooltipIcon"]:hover {
+                    background: #FEE2E2 !important;
+                    border-color: #FCA5A5 !important;
+                    color: #B91C1C !important;
+                }
+
+                div[data-testid="stHorizontalBlock"]:has(.dataset-v6-table-title)
+                div[data-testid="stSelectbox"] [data-testid="stTooltipIcon"]:hover svg {
+                    fill: #B91C1C !important;
+                    color: #B91C1C !important;
+                }
+
+                /* Hilangkan background gelap yang menempel pada ikon panah selectbox. */
+                div[data-testid="stHorizontalBlock"]:has(.dataset-v6-table-title)
+                div[data-testid="stSelectbox"] div[data-baseweb="select"] svg {
+                    background: transparent !important;
+                    border: 0 !important;
+                    border-radius: 0 !important;
+                    box-shadow: none !important;
+                    fill: #334155 !important;
+                    color: #334155 !important;
                 }
 
                 .dataset-v6-empty-row,
