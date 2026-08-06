@@ -3271,6 +3271,577 @@ def _inject_sentiment_css() -> None:
         st.error(f"Gaya halaman sentimen gagal dimuat: {exc}")
 
 
+def _inject_sentiment_light_css() -> None:
+    """Terapkan override Light Mode tanpa mengubah struktur halaman Sentimen."""
+    if _is_dark_mode():
+        return
+
+    try:
+        st.markdown(
+            """
+            <style>
+                :root {
+                    --sent-light-page: #F6F7F9;
+                    --sent-light-card: #FFFFFF;
+                    --sent-light-soft: #F8FAFC;
+                    --sent-light-soft-2: #F1F5F9;
+                    --sent-light-title: #111827;
+                    --sent-light-text: #334155;
+                    --sent-light-muted: #64748B;
+                    --sent-light-border: #DCE3EC;
+                    --sent-light-border-strong: #CBD5E1;
+                    --sent-light-shadow: 0 12px 28px rgba(15,23,42,0.08);
+                }
+
+                /* Hero merah tetap dipertahankan sebagai identitas halaman. */
+                .sent-v7-hero {
+                    border-color: rgba(255,255,255,0.46) !important;
+                    box-shadow: 0 14px 34px rgba(183,28,28,0.18) !important;
+                }
+
+                .sent-v7-hero h1,
+                .sent-v7-hero p,
+                .sent-v7-hero-badge {
+                    color: #FFFFFF !important;
+                    -webkit-text-fill-color: #FFFFFF !important;
+                }
+
+                .sent-v7-hero-badge {
+                    background: rgba(95,18,18,0.34) !important;
+                    border-color: rgba(255,255,255,0.44) !important;
+                }
+
+                /* Panel pemilihan layanan. */
+                .sent-v7-selector-wrap {
+                    background:
+                        radial-gradient(circle at 8% 0%, rgba(229,57,53,0.10), transparent 34%),
+                        radial-gradient(circle at 92% 20%, rgba(59,130,246,0.08), transparent 30%),
+                        linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+                    border-color: var(--sent-light-border) !important;
+                    box-shadow: var(--sent-light-shadow) !important;
+                }
+
+                .sent-v7-selector-label,
+                .sent-v7-selector-summary-chip strong {
+                    color: var(--sent-light-title) !important;
+                    -webkit-text-fill-color: var(--sent-light-title) !important;
+                }
+
+                .sent-v7-selector-copy,
+                .sent-v7-selector-summary-chip {
+                    color: var(--sent-light-muted) !important;
+                    -webkit-text-fill-color: var(--sent-light-muted) !important;
+                }
+
+                .sent-v7-selector-kicker {
+                    color: #C62828 !important;
+                }
+
+                .sent-v7-selector-summary-chip {
+                    background: rgba(255,255,255,0.88) !important;
+                    border-color: var(--sent-light-border) !important;
+                }
+
+                div[data-testid="stRadio"] {
+                    background: linear-gradient(180deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: var(--sent-light-border) !important;
+                    box-shadow: var(--sent-light-shadow) !important;
+                }
+
+                div[data-testid="stRadio"] div[role="radiogroup"] > label {
+                    background: linear-gradient(145deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: var(--sent-light-border) !important;
+                    color: var(--sent-light-title) !important;
+                    box-shadow: 0 8px 20px rgba(15,23,42,0.05) !important;
+                }
+
+                div[data-testid="stRadio"] div[role="radiogroup"] > label p {
+                    color: var(--sent-light-title) !important;
+                    -webkit-text-fill-color: var(--sent-light-title) !important;
+                }
+
+                div[data-testid="stRadio"] div[role="radiogroup"] > label:hover {
+                    background:
+                        radial-gradient(circle at 10% 20%, var(--service-accent-soft), transparent 58%),
+                        #FFFFFF !important;
+                    color: var(--sent-light-title) !important;
+                    box-shadow: 0 14px 30px var(--service-glow) !important;
+                }
+
+                div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {
+                    background:
+                        radial-gradient(circle at 10% 16%, var(--service-accent-soft), transparent 64%),
+                        linear-gradient(145deg, #FFFFFF, #F8FAFC) !important;
+                }
+
+                div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) p {
+                    color: var(--sent-light-title) !important;
+                    -webkit-text-fill-color: var(--sent-light-title) !important;
+                }
+
+                /* Filter IndiBiz dan tabel hasil. */
+                .sent-v17-filter-shell,
+                div[data-testid="stForm"] {
+                    background: var(--sent-light-card) !important;
+                    border-color: var(--sent-light-border) !important;
+                    box-shadow: 0 10px 24px rgba(15,23,42,0.06) !important;
+                }
+
+                .sent-v17-filter-title {
+                    color: var(--sent-light-title) !important;
+                }
+
+                .sent-v17-filter-copy {
+                    color: var(--sent-light-muted) !important;
+                }
+
+                .sent-v17-filter-status {
+                    background: #FEF2F2 !important;
+                    border-color: #FECACA !important;
+                    color: #B91C1C !important;
+                }
+
+                .sent-v17-table-wrap,
+                .sent-v7-telkomsel-table-wrap,
+                .sent-v7-history-table-wrap {
+                    background: var(--sent-light-card) !important;
+                    border-color: var(--sent-light-border) !important;
+                    box-shadow: var(--sent-light-shadow) !important;
+                }
+
+                .sent-v17-table th,
+                .sent-v7-telkomsel-table th,
+                .sent-v7-history-table thead th {
+                    background: linear-gradient(180deg, #F8FAFC, #F1F5F9) !important;
+                    border-color: var(--sent-light-border) !important;
+                    color: #475569 !important;
+                    -webkit-text-fill-color: #475569 !important;
+                }
+
+                .sent-v17-table td,
+                .sent-v7-telkomsel-table td,
+                .sent-v7-history-table tbody td {
+                    background: #FFFFFF !important;
+                    border-color: #E2E8F0 !important;
+                    color: var(--sent-light-text) !important;
+                    -webkit-text-fill-color: var(--sent-light-text) !important;
+                }
+
+                .sent-v17-table tbody tr.sent-positive td {
+                    background: #F0FDF4 !important;
+                }
+
+                .sent-v17-table tbody tr.sent-neutral td {
+                    background: #FFF7ED !important;
+                }
+
+                .sent-v17-table tbody tr.sent-negative td {
+                    background: #FEF2F2 !important;
+                }
+
+                .sent-v17-table tbody tr:hover td,
+                .sent-v7-telkomsel-table tbody tr:hover td,
+                .sent-v7-history-table tbody tr:hover td {
+                    background: #F8FAFC !important;
+                    color: var(--sent-light-title) !important;
+                    -webkit-text-fill-color: var(--sent-light-title) !important;
+                }
+
+                /* Heading dan kartu ringkasan. */
+                .sent-v7-section-heading h2 {
+                    color: var(--sent-light-title) !important;
+                    -webkit-text-fill-color: var(--sent-light-title) !important;
+                }
+
+                .sent-v7-section-heading p {
+                    color: var(--sent-light-muted) !important;
+                    -webkit-text-fill-color: var(--sent-light-muted) !important;
+                }
+
+                .sent-v7-section-index {
+                    background: #FEF2F2 !important;
+                    border-color: #FECACA !important;
+                    color: #C62828 !important;
+                }
+
+                .sent-v7-metric-card {
+                    background: linear-gradient(180deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: var(--sent-light-border) !important;
+                    border-left-color: var(--metric-color, #E53935) !important;
+                    box-shadow: 0 10px 24px rgba(15,23,42,0.07) !important;
+                }
+
+                .sent-v7-metric-label {
+                    color: #475569 !important;
+                }
+
+                .sent-v7-metric-note {
+                    color: var(--sent-light-muted) !important;
+                }
+
+                /* Panel analitik dan card chart. */
+                .sent-v7-platform-shell,
+                .sent-v7-platform-chart-card,
+                .sent-v11-status-card,
+                .sent-v7-chart-card,
+                .sent-v7-coming-soon,
+                .sent-v7-comment-card,
+                .sent-v7-comments-hero,
+                .sent-v7-comments-panel,
+                .sent-v7-prediction-card,
+                .sent-v7-result-box,
+                .sent-v7-wordcloud-hero,
+                .sent-v7-wordcloud-intro,
+                .sent-v7-wordcloud-control-head,
+                .sent-v7-wordcloud-mode-summary,
+                .sent-v7-wordcloud-card,
+                .sent-v7-wordcloud-focus-wrap {
+                    background-color: var(--sent-light-card) !important;
+                    border-color: var(--sent-light-border) !important;
+                    box-shadow: var(--sent-light-shadow) !important;
+                }
+
+                .sent-v7-platform-shell {
+                    background:
+                        radial-gradient(circle at 12% 14%, rgba(229,57,53,0.08), transparent 28%),
+                        radial-gradient(circle at 88% 18%, rgba(77,141,255,0.07), transparent 26%),
+                        linear-gradient(180deg, #FFFFFF, #F8FAFC) !important;
+                }
+
+                .sent-v7-platform-chart-card,
+                .sent-v7-chart-card,
+                .sent-v7-comments-hero,
+                .sent-v7-comments-panel,
+                .sent-v7-prediction-card,
+                .sent-v7-result-box,
+                .sent-v7-wordcloud-hero,
+                .sent-v7-wordcloud-card,
+                .sent-v7-wordcloud-focus-wrap {
+                    background-image:
+                        radial-gradient(circle at 92% 0%, rgba(229,57,53,0.055), transparent 30%),
+                        linear-gradient(180deg, #FFFFFF, #F8FAFC) !important;
+                }
+
+                .sent-v11-status-card {
+                    background:
+                        radial-gradient(circle at 88% -12%, rgba(229,57,53,0.10), transparent 34%),
+                        radial-gradient(circle at 8% 118%, rgba(255,152,0,0.07), transparent 32%),
+                        linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+                }
+
+                .sent-v7-coming-soon,
+                .sent-v7-wordcloud-intro,
+                .sent-v7-wordcloud-control-head,
+                .sent-v7-wordcloud-mode-summary {
+                    background-image: linear-gradient(135deg, #FFFFFF, #F8FAFC) !important;
+                }
+
+                .sent-v7-platform-title,
+                .sent-v7-platform-chart-title,
+                .sent-v11-status-title,
+                .sent-v11-status-value,
+                .sent-v7-chart-title,
+                .sent-v7-coming-soon h3,
+                .sent-v7-comment-content,
+                .sent-v7-comments-hero h3,
+                .sent-v7-comments-panel-title,
+                .sent-v7-comments-stat-value,
+                .sent-v7-manual-title,
+                .sent-v7-manual-step-title,
+                .sent-v7-manual-input-label,
+                .sent-v7-wordcloud-hero-title,
+                .sent-v7-wordcloud-control-title,
+                .sent-v7-wordcloud-mode-summary strong,
+                .sent-v7-wordcloud-title,
+                .sent-v7-wordcloud-focus-title,
+                .sent-v7-wordcloud-focus-stat-value {
+                    color: var(--sent-light-title) !important;
+                    -webkit-text-fill-color: var(--sent-light-title) !important;
+                }
+
+                .sent-v7-platform-copy,
+                .sent-v7-platform-chart-copy,
+                .sent-v11-status-subtitle,
+                .sent-v11-status-note,
+                .sent-v7-chart-subtitle,
+                .sent-v7-chart-hint,
+                .sent-v7-coming-soon p,
+                .sent-v7-comments-hero p,
+                .sent-v7-comments-panel-sub,
+                .sent-v7-comments-stat-label,
+                .sent-v7-comments-stat-note,
+                .sent-v7-manual-copy,
+                .sent-v7-manual-step-copy,
+                .sent-v7-manual-helper,
+                .sent-v7-manual-action-note,
+                .sent-v7-result-confidence,
+                .sent-v7-wordcloud-hero-copy,
+                .sent-v7-wordcloud-intro,
+                .sent-v7-wordcloud-mode-label,
+                .sent-v7-wordcloud-control-copy,
+                .sent-v7-wordcloud-mode-summary,
+                .sent-v7-wordcloud-subtitle,
+                .sent-v7-wordcloud-note,
+                .sent-v7-wordcloud-focus-copy,
+                .sent-v7-wordcloud-focus-stat-label,
+                .sent-v7-wordcloud-focus-stat-note {
+                    color: var(--sent-light-muted) !important;
+                    -webkit-text-fill-color: var(--sent-light-muted) !important;
+                }
+
+                .sent-v7-platform-chip,
+                .sent-v7-comments-chip,
+                .sent-v7-wordcloud-chip,
+                .sent-v11-chip {
+                    background: #FFFFFF !important;
+                    border-color: var(--sent-light-border) !important;
+                    color: var(--sent-light-text) !important;
+                    box-shadow: 0 5px 14px rgba(15,23,42,0.04) !important;
+                }
+
+                .sent-v7-platform-chip strong,
+                .sent-v7-comments-chip strong,
+                .sent-v7-wordcloud-chip strong {
+                    color: var(--sent-light-title) !important;
+                    -webkit-text-fill-color: var(--sent-light-title) !important;
+                }
+
+                .sent-v11-status-item,
+                .sent-v11-distribution,
+                .sent-v7-comments-stat,
+                .sent-v7-manual-step,
+                .sent-v7-wordcloud-focus-stat {
+                    background: var(--sent-light-soft) !important;
+                    border-color: var(--sent-light-border) !important;
+                }
+
+                .sent-v11-status-label,
+                .sent-v11-status-topline,
+                .sent-v11-distribution-label {
+                    color: #475569 !important;
+                }
+
+                .sent-v7-manual-step:hover {
+                    background: #FEF2F2 !important;
+                    box-shadow: 0 12px 26px rgba(15,23,42,0.08) !important;
+                }
+
+                /* Plotly dan kontrol grafik. */
+                div[data-testid="stPlotlyChart"] {
+                    background: linear-gradient(180deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: var(--sent-light-border) !important;
+                    box-shadow: var(--sent-light-shadow) !important;
+                }
+
+                div[data-testid="stPlotlyChart"]:hover {
+                    box-shadow: 0 16px 34px rgba(15,23,42,0.10) !important;
+                }
+
+                div[data-testid="stPlotlyChart"] .modebar {
+                    background: rgba(255,255,255,0.94) !important;
+                    border: 1px solid var(--sent-light-border) !important;
+                    border-radius: 8px !important;
+                }
+
+                div[data-testid="stPlotlyChart"] .modebar-btn path {
+                    fill: #475569 !important;
+                }
+
+                div[data-testid="stPlotlyChart"] .modebar-btn:hover path {
+                    fill: #C62828 !important;
+                }
+
+                /* Tab platform. */
+                div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+                    background: var(--sent-light-soft) !important;
+                    border-color: var(--sent-light-border) !important;
+                }
+
+                div[data-testid="stTabs"] button[role="tab"] {
+                    color: var(--sent-light-muted) !important;
+                    -webkit-text-fill-color: var(--sent-light-muted) !important;
+                }
+
+                div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+                    background: #E53935 !important;
+                    color: #FFFFFF !important;
+                    -webkit-text-fill-color: #FFFFFF !important;
+                }
+
+                /* Komentar, badge, dan tabel riwayat. */
+                .sent-v7-badge-platform,
+                .sent-v7-badge-confidence {
+                    background: #F1F5F9 !important;
+                    border-color: #CBD5E1 !important;
+                    color: #475569 !important;
+                }
+
+                .sent-v7-badge-positive,
+                .sent-v7-history-sentiment.positive {
+                    background: #DCFCE7 !important;
+                    border-color: #86EFAC !important;
+                    color: #166534 !important;
+                }
+
+                .sent-v7-badge-neutral,
+                .sent-v7-history-sentiment.neutral {
+                    background: #FFEDD5 !important;
+                    border-color: #FDBA74 !important;
+                    color: #9A3412 !important;
+                }
+
+                .sent-v7-badge-negative,
+                .sent-v7-history-sentiment.negative {
+                    background: #FEE2E2 !important;
+                    border-color: #FCA5A5 !important;
+                    color: #991B1B !important;
+                }
+
+                .sent-v7-history-summary-text,
+                .sent-v7-history-number,
+                .sent-v7-history-time,
+                .sent-v7-history-confidence-value {
+                    color: var(--sent-light-muted) !important;
+                    -webkit-text-fill-color: var(--sent-light-muted) !important;
+                }
+
+                .sent-v7-history-text {
+                    color: var(--sent-light-text) !important;
+                    -webkit-text-fill-color: var(--sent-light-text) !important;
+                }
+
+                .sent-v7-history-confidence-track {
+                    background: #E2E8F0 !important;
+                }
+
+                /* Prediksi manual dan input. */
+                div[data-testid="stTextArea"] textarea {
+                    background: #FFFFFF !important;
+                    border-color: var(--sent-light-border-strong) !important;
+                    color: var(--sent-light-title) !important;
+                    -webkit-text-fill-color: var(--sent-light-title) !important;
+                    caret-color: #E53935 !important;
+                    box-shadow: inset 0 1px 2px rgba(15,23,42,0.04) !important;
+                }
+
+                div[data-testid="stTextArea"] textarea::placeholder {
+                    color: #94A3B8 !important;
+                    -webkit-text-fill-color: #94A3B8 !important;
+                    opacity: 1 !important;
+                }
+
+                div[data-testid="stTextArea"] textarea:focus {
+                    background: #FFFFFF !important;
+                    border-color: #E53935 !important;
+                    box-shadow: 0 0 0 3px rgba(229,57,53,0.12), 0 12px 24px rgba(15,23,42,0.07) !important;
+                }
+
+                /* Expander dan isi riwayat. */
+                div[data-testid="stExpander"],
+                div[data-testid="stExpander"] details,
+                div[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+                    background: var(--sent-light-card) !important;
+                    border-color: var(--sent-light-border) !important;
+                    color: var(--sent-light-text) !important;
+                }
+
+                div[data-testid="stExpander"] summary {
+                    background: linear-gradient(90deg, #FEF2F2, #FFFFFF 42%) !important;
+                    border-color: transparent !important;
+                    color: var(--sent-light-title) !important;
+                }
+
+                div[data-testid="stExpander"] details[open] > summary {
+                    background: linear-gradient(90deg, #FEE2E2, #FFFFFF 46%) !important;
+                    border-bottom-color: var(--sent-light-border) !important;
+                }
+
+                div[data-testid="stExpander"] summary:hover {
+                    background: linear-gradient(90deg, #FEE2E2, #F8FAFC 48%) !important;
+                }
+
+                div[data-testid="stExpander"] summary p,
+                div[data-testid="stExpander"] summary span {
+                    color: var(--sent-light-title) !important;
+                    -webkit-text-fill-color: var(--sent-light-title) !important;
+                }
+
+                div[data-testid="stExpander"] summary svg {
+                    color: #C62828 !important;
+                    fill: currentColor !important;
+                }
+
+                /* WordCloud dan viewer fullscreen. */
+                .sent-v7-wc-viewer {
+                    background: #FFFFFF !important;
+                    border: 1px solid var(--sent-light-border) !important;
+                }
+
+                .sent-v7-wc-fullscreen-trigger,
+                div[data-testid="stImage"] button[title="View fullscreen"],
+                div[data-testid="stImage"] button[aria-label="View fullscreen"] {
+                    background: rgba(255,255,255,0.94) !important;
+                    border-color: var(--sent-light-border-strong) !important;
+                    color: #334155 !important;
+                    box-shadow: 0 8px 20px rgba(15,23,42,0.12) !important;
+                }
+
+                .sent-v7-wc-fullscreen-trigger:hover,
+                div[data-testid="stImage"] button[title="View fullscreen"]:hover,
+                div[data-testid="stImage"] button[aria-label="View fullscreen"]:hover {
+                    background: #E53935 !important;
+                    border-color: #E53935 !important;
+                    color: #FFFFFF !important;
+                }
+
+                div[data-testid="stImage"] button[title="View fullscreen"] svg,
+                div[data-testid="stImage"] button[aria-label="View fullscreen"] svg {
+                    color: currentColor !important;
+                    fill: currentColor !important;
+                }
+
+                div[data-baseweb="modal"] > div {
+                    background: rgba(248,250,252,0.98) !important;
+                    border-color: var(--sent-light-border) !important;
+                    box-shadow: 0 24px 72px rgba(15,23,42,0.22) !important;
+                }
+
+                .sent-v7-wc-overlay {
+                    background: rgba(248,250,252,0.97) !important;
+                }
+
+                .sent-v7-wc-overlay-image {
+                    background: #FFFFFF !important;
+                    box-shadow: 0 24px 72px rgba(15,23,42,0.20) !important;
+                }
+
+                .sent-v7-wc-overlay-close {
+                    background: rgba(255,255,255,0.95) !important;
+                    border-color: var(--sent-light-border-strong) !important;
+                    color: #334155 !important;
+                    box-shadow: 0 10px 24px rgba(15,23,42,0.14) !important;
+                }
+
+                .sent-v7-wc-overlay-close:hover {
+                    background: #E53935 !important;
+                    color: #FFFFFF !important;
+                }
+
+                /* Teks umum Streamlit yang berada di halaman Sentimen. */
+                div[data-testid="stTextArea"] label,
+                div[data-testid="stCaptionContainer"],
+                div[data-testid="stMarkdownContainer"] {
+                    color: var(--sent-light-text);
+                }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception as exc:
+        st.error(f"Gaya Light Mode halaman sentimen gagal dimuat: {exc}")
+
+
+
 def _section_heading(number: str, title: str, subtitle: str = "") -> None:
     """Render judul section yang konsisten."""
     try:
@@ -6159,6 +6730,7 @@ def render_sentiment() -> None:
 
         _sinkronkan_layanan_sentimen_saat_masuk()
         _inject_sentiment_css()
+        _inject_sentiment_light_css()
         layanan_awal = str(
             st.session_state.get("sent_v7_service_selector", "IndiHome")
         ).strip()
