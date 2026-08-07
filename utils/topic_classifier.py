@@ -802,6 +802,182 @@ INDIHOME_TOPIC_EXTRA_KEYWORDS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+
+
+# Khusus Telkomsel, Top 5 Topik juga harus dihitung lintas sentimen agar
+# kartu Negatif, Netral, dan Positif berasal dari predicted_sentiment asli,
+# bukan dari kamus topik yang lebih dulu dikunci oleh sentimen.
+TELKOMSEL_TOPIC_FAMILIES: dict[str, tuple[str, ...]] = {
+    "Harga Mahal": (
+        "Promo Menarik",
+        "Harga Terjangkau",
+        "Pertanyaan Paket",
+        "Info Promo",
+        "Perbandingan Paket",
+        "Harga Mahal",
+        "Paket Tidak Sesuai",
+        "Tagihan Salah/Bengkak",
+    ),
+    "Kecepatan Lambat": (
+        "Kecepatan Stabil",
+        "Streaming Lancar",
+        "Gaming Tanpa Lag",
+        "Koneksi WFH Andal",
+        "Tanya Kecepatan Paket",
+        "Kecepatan Lambat",
+        "Streaming dan Gaming Terganggu",
+    ),
+    "Permintaan Bantuan": (
+        "CS Ramah & Responsif",
+        "Pelayanan Profesional",
+        "Permintaan Bantuan",
+        "Cek Status Pengaduan",
+        "CS Lambat/Tidak Responsif",
+        "Teknisi Tidak Tuntas",
+    ),
+    "Gangguan Jaringan": (
+        "Respons Cepat Gangguan",
+        "Laporan Gangguan",
+        "Pengumuman Maintenance",
+        "Gangguan Jaringan",
+        "Pemadaman Berulang",
+        "Sinyal Hilang",
+        "Tidak Ada Sinyal Daerah",
+    ),
+    "Tanya Kuota dan Masa Aktif": (
+        "Paket Lengkap",
+        "Pertanyaan Paket",
+        "Tanya Kuota dan Masa Aktif",
+        "Konfirmasi Pembayaran",
+        "Kuota Cepat Habis",
+    ),
+    "Aplikasi & Perangkat": (
+        "Aplikasi Mudah Digunakan",
+        "Fitur Tambahan Bagus",
+        "Tanya Router dan Perangkat",
+        "Router Bermasalah",
+        "Aplikasi Bermasalah",
+    ),
+    "Pembayaran & Refund": (
+        "Tanya Lokasi Bayar",
+        "Konfirmasi Pembayaran",
+        "Cek Tagihan",
+        "Pemblokiran Layanan",
+        "Refund Tidak Jelas",
+        "Tagihan Salah/Bengkak",
+    ),
+}
+
+TELKOMSEL_TOPIC_EXTRA_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "Harga Mahal": (
+        "mahal",
+        "kemahalan",
+        "terlalu mahal",
+        "harga tinggi",
+        "boros",
+        "nguras",
+        "tidak worth it",
+        "tarif",
+        "biaya",
+        "promo",
+        "diskon",
+        "murah",
+        "paket",
+        "harga",
+    ),
+    "Kecepatan Lambat": (
+        "lemot",
+        "lambat",
+        "lelet",
+        "buffering",
+        "loading lama",
+        "ngelag",
+        "lag",
+        "ping",
+        "latency",
+        "speed",
+        "cepat",
+        "kencang",
+        "lancar",
+        "stabil",
+        "internet lambat",
+        "jaringan lambat",
+    ),
+    "Permintaan Bantuan": (
+        "tolong",
+        "bantu",
+        "tolong bantu",
+        "minta bantuan",
+        "mohon bantuan",
+        "admin",
+        "cs",
+        "customer service",
+        "cek dm",
+        "dibantu",
+        "bantu dong",
+        "respon",
+        "respons",
+        "pelayanan",
+        "pengaduan",
+        "laporan",
+    ),
+    "Gangguan Jaringan": (
+        "gangguan",
+        "sinyal jelek",
+        "sinyal bermasalah",
+        "tidak bisa nelpon",
+        "internet mati",
+        "jaringan bermasalah",
+        "sinyal hilang",
+        "tidak ada sinyal",
+        "down",
+        "maintenance",
+        "pemeliharaan",
+        "normal kembali",
+        "sudah normal",
+        "putus putus",
+        "jaringan putus",
+    ),
+    "Tanya Kuota dan Masa Aktif": (
+        "kuota",
+        "paket data",
+        "masa aktif",
+        "sisa kuota",
+        "cek kuota",
+        "kuota habis",
+        "pulsa",
+        "perpanjang",
+        "aktif sampai",
+        "bonus kuota",
+        "internet",
+    ),
+    "Aplikasi & Perangkat": (
+        "mytelkomsel",
+        "aplikasi",
+        "app",
+        "otp",
+        "login",
+        "error",
+        "bug",
+        "router",
+        "modem",
+        "perangkat",
+    ),
+    "Pembayaran & Refund": (
+        "pembayaran",
+        "bayar",
+        "sudah bayar",
+        "refund",
+        "pengembalian dana",
+        "tagihan",
+        "invoice",
+        "billing",
+        "diblokir",
+        "terblokir",
+        "suspend",
+    ),
+}
+
 _URL_MENTION_PATTERN = re.compile(r"https?://\S+|www\.\S+|@\w+", re.IGNORECASE)
 _NON_ALNUM_PATTERN = re.compile(r"[^a-z0-9\s]+")
 _WHITESPACE_PATTERN = re.compile(r"\s+")
@@ -934,12 +1110,14 @@ def classify_topic(text: str, sentiment: str) -> str:
         return DEFAULT_TOPIC
 
 
-@lru_cache(maxsize=2)
-def _normalized_indihome_topics() -> tuple[tuple[str, tuple[str, ...]], ...]:
-    """Gabungkan keyword topik IndiHome tanpa membatasi kandidat oleh sentimen."""
+def _normalize_topic_family_groups(
+    families: dict[str, tuple[str, ...]],
+    extra_keywords: dict[str, tuple[str, ...]],
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Gabungkan keyword keluarga topik lintas sentimen secara deduplikatif."""
     try:
         normalized_groups: list[tuple[str, tuple[str, ...]]] = []
-        for family_name, source_topics in INDIHOME_TOPIC_FAMILIES.items():
+        for family_name, source_topics in families.items():
             keywords: list[str] = []
             seen: set[str] = set()
 
@@ -952,7 +1130,7 @@ def _normalized_indihome_topics() -> tuple[tuple[str, tuple[str, ...]], ...]:
                             seen.add(normalized)
                             keywords.append(normalized)
 
-            for keyword in INDIHOME_TOPIC_EXTRA_KEYWORDS.get(family_name, ()):
+            for keyword in extra_keywords.get(family_name, ()):
                 normalized = _normalize_text(keyword)
                 if normalized and normalized not in seen:
                     seen.add(normalized)
@@ -961,6 +1139,30 @@ def _normalized_indihome_topics() -> tuple[tuple[str, tuple[str, ...]], ...]:
             normalized_groups.append((family_name, tuple(keywords)))
 
         return tuple(normalized_groups)
+    except Exception:
+        return tuple()
+
+
+@lru_cache(maxsize=2)
+def _normalized_indihome_topics() -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Gabungkan keyword topik IndiHome tanpa membatasi kandidat oleh sentimen."""
+    try:
+        return _normalize_topic_family_groups(
+            INDIHOME_TOPIC_FAMILIES,
+            INDIHOME_TOPIC_EXTRA_KEYWORDS,
+        )
+    except Exception:
+        return tuple()
+
+
+@lru_cache(maxsize=2)
+def _normalized_telkomsel_topics() -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Gabungkan keyword topik Telkomsel tanpa membatasi kandidat oleh sentimen."""
+    try:
+        return _normalize_topic_family_groups(
+            TELKOMSEL_TOPIC_FAMILIES,
+            TELKOMSEL_TOPIC_EXTRA_KEYWORDS,
+        )
     except Exception:
         return tuple()
 
@@ -1010,6 +1212,92 @@ def get_indihome_topic_keywords(topic_name: str, limit: int | None = None) -> li
         return []
     except Exception:
         return []
+
+
+@lru_cache(maxsize=50_000)
+def _classify_telkomsel_cached(text: str) -> str:
+    """Klasifikasikan topik Telkomsel dari isi teks, independen dari sentimen."""
+    try:
+        normalized_text = _normalize_text(text)
+        if not normalized_text:
+            return DEFAULT_TOPIC
+
+        best_topic = DEFAULT_TOPIC
+        best_score = 0
+        best_matches = 0
+
+        for topic_name, keywords in _normalized_telkomsel_topics():
+            score, matches = _score_topic(normalized_text, keywords)
+            if score > best_score or (score == best_score and matches > best_matches):
+                best_topic = topic_name
+                best_score = score
+                best_matches = matches
+
+        return best_topic if best_score > 0 else DEFAULT_TOPIC
+    except Exception:
+        return DEFAULT_TOPIC
+
+
+def classify_telkomsel_topic(text: str) -> str:
+    """Tentukan keluarga isu Telkomsel tanpa memakai predicted_sentiment."""
+    try:
+        return _classify_telkomsel_cached(str(text or ""))
+    except Exception:
+        return DEFAULT_TOPIC
+
+
+def get_telkomsel_topic_keywords(topic_name: str, limit: int | None = None) -> list[str]:
+    """Ambil keyword keluarga isu Telkomsel untuk ringkasan Top 5."""
+    try:
+        target = str(topic_name or "").strip()
+        for family_name, keywords in _normalized_telkomsel_topics():
+            if family_name == target:
+                values = list(keywords)
+                if limit is None:
+                    return values
+                return values[: max(0, int(limit))]
+        return []
+    except Exception:
+        return []
+
+
+def classify_telkomsel_topics_fast(texts: list[Any]) -> list[str]:
+    """Klasifikasikan banyak komentar Telkomsel dengan cache internal."""
+    try:
+        return [_classify_telkomsel_cached(str(text or "")) for text in list(texts or [])]
+    except Exception:
+        return [DEFAULT_TOPIC] * len(texts or [])
+
+
+def apply_telkomsel_topics(
+    df: pd.DataFrame,
+    text_col: str | None = None,
+) -> pd.DataFrame:
+    """Tambahkan topik Telkomsel tanpa mengubah label sentimen dari sumber."""
+    try:
+        if df is None:
+            return pd.DataFrame()
+        if df.empty:
+            return df.copy()
+
+        result = df.copy()
+        selected_text_col = text_col or (
+            "content_clean" if "content_clean" in result.columns else "content"
+        )
+        if selected_text_col not in result.columns:
+            result["topic"] = DEFAULT_TOPIC
+            result["_topic_scope"] = "telkomsel"
+            return result
+
+        texts = result[selected_text_col].fillna("").astype(str).tolist()
+        result["topic"] = classify_telkomsel_topics_fast(texts)
+        result["_topic_scope"] = "telkomsel"
+        return result
+    except Exception:
+        fallback = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+        fallback["topic"] = DEFAULT_TOPIC
+        fallback["_topic_scope"] = "telkomsel"
+        return fallback
 
 
 def classify_indihome_topics_fast(texts: list[Any]) -> list[str]:
@@ -1217,12 +1505,17 @@ def summarize_topics(df: pd.DataFrame, top_n: int = 5) -> pd.DataFrame:
                 if len(example) > 220:
                     example = example[:217].rstrip() + "..."
 
-            is_indihome_scope = (
-                "_topic_scope" in group.columns
-                and group["_topic_scope"].astype(str).str.casefold().eq("indihome").any()
-            )
-            if is_indihome_scope:
+            topic_scope = ""
+            if "_topic_scope" in group.columns:
+                try:
+                    topic_scope = str(group["_topic_scope"].dropna().astype(str).iloc[0]).casefold()
+                except Exception:
+                    topic_scope = ""
+
+            if topic_scope == "indihome":
                 keywords = get_indihome_topic_keywords(topic_label, limit=4)
+            elif topic_scope == "telkomsel":
+                keywords = get_telkomsel_topic_keywords(topic_label, limit=4)
             else:
                 keywords = get_topic_keywords(
                     topic_label,
