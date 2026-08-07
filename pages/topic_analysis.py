@@ -84,6 +84,79 @@ BRAND_WORDS = {
     "mytelkomsel",
 }
 
+# Noise tambahan khusus grafik Top 15 Kata. Daftar ini sengaja tidak dimasukkan
+# ke STOPWORDS_ID global agar WordCloud, tabel frekuensi, dan analisis topik
+# tetap memakai baseline preprocessing yang sudah dikunci.
+_TOP_WORD_NOISE = frozenset(
+    {
+        "dll",
+        "dsb",
+        "dst",
+        "etc",
+        "selalu",
+        "pastijodoh",
+        "gestun",
+        "lan",
+        "mak",
+        "kasih",
+        "semoga",
+        "sayang",
+        "tembus",
+        "kula",
+        "tansah",
+        "maaf",
+        "mohon",
+        "tolong",
+        "kak",
+        "kakak",
+        "makasih",
+        "terima",
+        "terimakasih",
+        "dibantu",
+        "bantu",
+        "biar",
+        "infoin",
+        "atas",
+        "lanjut",
+        "nama",
+        "terus",
+        "sekarang",
+        "mulu",
+        "honor",
+        "nomor",
+    }
+)
+
+# Fragmen ini dipakai hanya untuk menangkap hashtag/campaign yang digabung
+# menjadi satu token, misalnya "hariibuindihome". Nama brand yang berdiri
+# sendiri tetap mengikuti filter "Tampilkan nama brand" yang sudah ada.
+_TOP_WORD_BRAND_FRAGMENTS = tuple(sorted(BRAND_WORDS, key=len, reverse=True))
+_TOP_WORD_CAMPAIGN_PREFIXES = (
+    "ceritakanpengalaman",
+    "ceritakanpengala",
+    "hariibu",
+    "pastijodoh",
+)
+
+
+def _is_meaningful_top_word(word: Any) -> bool:
+    """Validasi kata yang layak masuk grafik Top 15 tanpa mengubah agregasi lain."""
+    try:
+        token = re.sub(r"[^a-z]", "", str(word or "").strip().lower())
+        if len(token) <= 2:
+            return False
+        if token in _TOP_WORD_NOISE:
+            return False
+        if any(token.startswith(prefix) for prefix in _TOP_WORD_CAMPAIGN_PREFIXES):
+            return False
+        if token not in BRAND_WORDS and any(
+            fragment in token for fragment in _TOP_WORD_BRAND_FRAGMENTS
+        ):
+            return False
+        return True
+    except Exception:
+        return False
+
 WORDCLOUD_EXPORT_WIDTH = 1400
 WORDCLOUD_EXPORT_HEIGHT = 875
 WORDCLOUD_EXPORT_SCALE = 2
@@ -2145,7 +2218,14 @@ def _render_wordclouds(
 
 def _top_words_figure(frequencies: dict[str, int], sentiment: str) -> go.Figure:
     """Buat horizontal bar chart Top 15 kata yang seimbang dan tanpa legenda."""
-    items = Counter(frequencies).most_common(15)
+    filtered_frequencies = Counter(
+        {
+            word: int(count)
+            for word, count in frequencies.items()
+            if _is_meaningful_top_word(word)
+        }
+    )
+    items = filtered_frequencies.most_common(15)
     if items:
         reversed_items = list(reversed(items))
         full_words = [word for word, _ in reversed_items]
