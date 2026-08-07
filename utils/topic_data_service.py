@@ -14,7 +14,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.data_loader import get_sentiment_file_signature, load_topic_data
-from utils.topic_classifier import apply_topics, summarize_topics
+from utils.topic_classifier import apply_indihome_topics, apply_topics, summarize_topics
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 INDIBIZ_TOPIC_FILE = PROJECT_ROOT / "data" / "indibiz_output_top_topic.csv"
@@ -63,7 +63,7 @@ def normalize_topic_platform(value: Any) -> str:
     return key or "lainnya"
 
 
-TOPIC_CACHE_SCHEMA_VERSION = "2026.07.26-topic-cache-v2"
+TOPIC_CACHE_SCHEMA_VERSION = "2026.08.08-indihome-mixed-topic-v3"
 
 
 def _build_enriched_topic_data(layanan: str) -> pd.DataFrame:
@@ -102,6 +102,8 @@ def _build_enriched_topic_data(layanan: str) -> pd.DataFrame:
     # dikembalikan untuk kebutuhan pipeline halaman Analisis Topik.
     if layanan == "IndiBiz":
         return result
+    if layanan == "IndiHome":
+        return apply_indihome_topics(result, text_col="content")
     return apply_topics(result, text_col="content")
 
 

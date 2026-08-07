@@ -622,6 +622,186 @@ TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
     for topic_name, keywords in sentiment_topics.items()
 }
 
+
+# Khusus IndiHome, Top 5 Topik memakai keluarga isu lintas sentimen.
+# Topik ditentukan dari isi komentar terlebih dahulu, sedangkan label sentimen
+# tetap berasal dari predicted_sentiment IndoBERT. Dengan demikian satu isu
+# dapat berisi komentar positif, netral, dan negatif secara alami.
+INDIHOME_TOPIC_FAMILIES: dict[str, tuple[str, ...]] = {
+    "Kecepatan Internet": (
+        "Kecepatan Stabil",
+        "Streaming Lancar",
+        "Gaming Tanpa Lag",
+        "Koneksi WFH Andal",
+        "Tanya Kecepatan Paket",
+        "Kecepatan Lambat",
+        "Streaming dan Gaming Terganggu",
+    ),
+    "Gangguan Jaringan": (
+        "Respons Cepat Gangguan",
+        "Laporan Gangguan",
+        "Pengumuman Maintenance",
+        "Gangguan Jaringan",
+        "Pemadaman Berulang",
+        "Sinyal Hilang",
+    ),
+    "Bantuan & Layanan Pelanggan": (
+        "CS Ramah & Responsif",
+        "Pelayanan Profesional",
+        "Permintaan Bantuan",
+        "Cek Status Pengaduan",
+        "CS Lambat/Tidak Responsif",
+        "Teknisi Tidak Tuntas",
+    ),
+    "Harga, Tagihan & Paket": (
+        "Promo Menarik",
+        "Harga Terjangkau",
+        "Paket Lengkap",
+        "Pertanyaan Paket",
+        "Cek Tagihan",
+        "Info Promo",
+        "Perbandingan Paket",
+        "Tagihan Salah/Bengkak",
+        "Harga Mahal",
+        "Paket Tidak Sesuai",
+        "Kuota Cepat Habis",
+    ),
+    "Instalasi & Upgrade": (
+        "Instalasi Cepat",
+        "Upgrade Mudah",
+        "Tanya Cara Daftar",
+        "Request Upgrade",
+        "Tanya Instalasi",
+        "Instalasi Lama",
+        "Migrasi Rumit",
+    ),
+    "Coverage & Sinyal": (
+        "Coverage Luas",
+        "Sinyal Merata",
+        "Tanya Coverage Area",
+        "Tidak Ada Sinyal Daerah",
+    ),
+    "Aplikasi & Perangkat": (
+        "Fitur Tambahan Bagus",
+        "Aplikasi Mudah Digunakan",
+        "Tanya Router dan Perangkat",
+        "Router Bermasalah",
+        "Aplikasi Bermasalah",
+    ),
+    "Pembayaran & Refund": (
+        "Tanya Lokasi Bayar",
+        "Konfirmasi Pembayaran",
+        "Pemblokiran Layanan",
+        "Refund Tidak Jelas",
+    ),
+}
+
+# Keyword tambahan ini hanya memperkuat variasi bahasa yang umum dipakai pada
+# komentar IndiHome. Tidak ada jumlah sentimen yang di-hardcode di sini.
+INDIHOME_TOPIC_EXTRA_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "Kecepatan Internet": (
+        "lemot",
+        "lambat",
+        "lelet",
+        "buffering",
+        "loading lama",
+        "ngelag",
+        "lag",
+        "ping",
+        "latency",
+        "speedtest",
+        "mbps",
+        "cepat",
+        "kencang",
+        "lancar",
+        "stabil",
+    ),
+    "Gangguan Jaringan": (
+        "gangguan",
+        "internet mati",
+        "wifi mati",
+        "jaringan mati",
+        "jaringan putus",
+        "koneksi putus",
+        "koneksi bermasalah",
+        "down",
+        "maintenance",
+        "pemeliharaan",
+        "perbaikan jaringan",
+        "normal kembali",
+        "sudah normal",
+    ),
+    "Bantuan & Layanan Pelanggan": (
+        "tolong bantu",
+        "minta bantuan",
+        "mohon bantuan",
+        "customer service",
+        "cs",
+        "admin",
+        "pengaduan",
+        "laporan",
+        "tiket",
+        "teknisi",
+        "pelayanan",
+        "respons",
+        "respon",
+    ),
+    "Harga, Tagihan & Paket": (
+        "harga",
+        "mahal",
+        "murah",
+        "paket",
+        "promo",
+        "diskon",
+        "tagihan",
+        "billing",
+        "biaya",
+        "kuota",
+        "bundling",
+    ),
+    "Instalasi & Upgrade": (
+        "pasang",
+        "pemasangan",
+        "instalasi",
+        "daftar",
+        "upgrade",
+        "downgrade",
+        "migrasi",
+        "ganti paket",
+        "naik paket",
+    ),
+    "Coverage & Sinyal": (
+        "coverage",
+        "jangkauan",
+        "blank spot",
+        "tidak ada sinyal",
+        "sinyal hilang",
+        "sinyal bagus",
+        "sinyal kuat",
+        "area terjangkau",
+    ),
+    "Aplikasi & Perangkat": (
+        "aplikasi",
+        "myindihome",
+        "router",
+        "modem",
+        "perangkat",
+        "restart router",
+        "lampu modem",
+        "login aplikasi",
+    ),
+    "Pembayaran & Refund": (
+        "pembayaran",
+        "sudah bayar",
+        "bayar di mana",
+        "refund",
+        "pengembalian dana",
+        "terblokir",
+        "suspend",
+        "diisolir",
+    ),
+}
+
 _URL_MENTION_PATTERN = re.compile(r"https?://\S+|www\.\S+|@\w+", re.IGNORECASE)
 _NON_ALNUM_PATTERN = re.compile(r"[^a-z0-9\s]+")
 _WHITESPACE_PATTERN = re.compile(r"\s+")
@@ -752,6 +932,123 @@ def classify_topic(text: str, sentiment: str) -> str:
         return _classify_cached(str(text or ""), str(sentiment or ""))
     except Exception:
         return DEFAULT_TOPIC
+
+
+@lru_cache(maxsize=2)
+def _normalized_indihome_topics() -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Gabungkan keyword topik IndiHome tanpa membatasi kandidat oleh sentimen."""
+    try:
+        normalized_groups: list[tuple[str, tuple[str, ...]]] = []
+        for family_name, source_topics in INDIHOME_TOPIC_FAMILIES.items():
+            keywords: list[str] = []
+            seen: set[str] = set()
+
+            for category in ("Positif", "Netral", "Negatif"):
+                category_topics = TOPICS.get(category, {})
+                for source_topic in source_topics:
+                    for keyword in category_topics.get(source_topic, []):
+                        normalized = _normalize_text(keyword)
+                        if normalized and normalized not in seen:
+                            seen.add(normalized)
+                            keywords.append(normalized)
+
+            for keyword in INDIHOME_TOPIC_EXTRA_KEYWORDS.get(family_name, ()):
+                normalized = _normalize_text(keyword)
+                if normalized and normalized not in seen:
+                    seen.add(normalized)
+                    keywords.append(normalized)
+
+            normalized_groups.append((family_name, tuple(keywords)))
+
+        return tuple(normalized_groups)
+    except Exception:
+        return tuple()
+
+
+@lru_cache(maxsize=50_000)
+def _classify_indihome_cached(text: str) -> str:
+    """Klasifikasikan topik IndiHome dari isi teks, independen dari sentimen."""
+    try:
+        normalized_text = _normalize_text(text)
+        if not normalized_text:
+            return DEFAULT_TOPIC
+
+        best_topic = DEFAULT_TOPIC
+        best_score = 0
+        best_matches = 0
+
+        for topic_name, keywords in _normalized_indihome_topics():
+            score, matches = _score_topic(normalized_text, keywords)
+            if score > best_score or (score == best_score and matches > best_matches):
+                best_topic = topic_name
+                best_score = score
+                best_matches = matches
+
+        return best_topic if best_score > 0 else DEFAULT_TOPIC
+    except Exception:
+        return DEFAULT_TOPIC
+
+
+def classify_indihome_topic(text: str) -> str:
+    """Tentukan keluarga isu IndiHome tanpa memakai predicted_sentiment."""
+    try:
+        return _classify_indihome_cached(str(text or ""))
+    except Exception:
+        return DEFAULT_TOPIC
+
+
+def get_indihome_topic_keywords(topic_name: str, limit: int | None = None) -> list[str]:
+    """Ambil keyword keluarga isu IndiHome untuk ringkasan Top 5."""
+    try:
+        target = str(topic_name or "").strip()
+        for family_name, keywords in _normalized_indihome_topics():
+            if family_name == target:
+                values = list(keywords)
+                if limit is None:
+                    return values
+                return values[: max(0, int(limit))]
+        return []
+    except Exception:
+        return []
+
+
+def classify_indihome_topics_fast(texts: list[Any]) -> list[str]:
+    """Klasifikasikan banyak komentar IndiHome dengan cache internal."""
+    try:
+        return [_classify_indihome_cached(str(text or "")) for text in list(texts or [])]
+    except Exception:
+        return [DEFAULT_TOPIC] * len(texts or [])
+
+
+def apply_indihome_topics(
+    df: pd.DataFrame,
+    text_col: str | None = None,
+) -> pd.DataFrame:
+    """Tambahkan topik IndiHome tanpa mengubah label sentimen dari sumber."""
+    try:
+        if df is None:
+            return pd.DataFrame()
+        if df.empty:
+            return df.copy()
+
+        result = df.copy()
+        selected_text_col = text_col or (
+            "content_clean" if "content_clean" in result.columns else "content"
+        )
+        if selected_text_col not in result.columns:
+            result["topic"] = DEFAULT_TOPIC
+            result["_topic_scope"] = "indihome"
+            return result
+
+        texts = result[selected_text_col].fillna("").astype(str).tolist()
+        result["topic"] = classify_indihome_topics_fast(texts)
+        result["_topic_scope"] = "indihome"
+        return result
+    except Exception:
+        fallback = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+        fallback["topic"] = DEFAULT_TOPIC
+        fallback["_topic_scope"] = "indihome"
+        return fallback
 
 
 def get_all_topics(sentiment: str) -> list[str]:
@@ -920,11 +1217,18 @@ def summarize_topics(df: pd.DataFrame, top_n: int = 5) -> pd.DataFrame:
                 if len(example) > 220:
                     example = example[:217].rstrip() + "..."
 
-            keywords = get_topic_keywords(
-                topic_label,
-                SENTIMENT_LABELS_ID.get(dominant),
-                limit=4,
+            is_indihome_scope = (
+                "_topic_scope" in group.columns
+                and group["_topic_scope"].astype(str).str.casefold().eq("indihome").any()
             )
+            if is_indihome_scope:
+                keywords = get_indihome_topic_keywords(topic_label, limit=4)
+            else:
+                keywords = get_topic_keywords(
+                    topic_label,
+                    SENTIMENT_LABELS_ID.get(dominant),
+                    limit=4,
+                )
             rows.append(
                 {
                     "topik": topic_label,
