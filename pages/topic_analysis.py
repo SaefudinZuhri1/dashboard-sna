@@ -50,6 +50,9 @@ PLATFORM_LABELS = {
     "instagram": "Instagram",
     "tiktok": "TikTok",
 }
+# Platform default untuk filter Analisis Topik. Nilai memakai key internal agar
+# konsisten dengan kolom platform hasil normalisasi dan logika filter halaman.
+DEFAULT_PLATFORMS = tuple(PLATFORM_LABELS.keys())
 SENTIMENT_OPTIONS = {
     "Semua": "all",
     "Positif": "positive",
