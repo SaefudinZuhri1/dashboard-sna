@@ -1426,6 +1426,33 @@ def _inject_topic_css() -> None:
                         box-shadow: 0 10px 28px rgba(15,23,42,.06) !important;
                     }
 
+                    /* Filter utama Analisis Topik pada Light Mode.
+                       Paksa seluruh lapisan container + form menjadi kartu terang
+                       agar tidak mewarisi lapisan abu/pink dari wrapper Streamlit. */
+                    div[data-testid="stAppViewContainer"] .main
+                    div[data-testid="stVerticalBlockBorderWrapper"]:has(.topic-v8-control-marker) {
+                        background: #FFFFFF !important;
+                        background-color: #FFFFFF !important;
+                        border-color: #DCE3EC !important;
+                        box-shadow: 0 10px 28px rgba(15,23,42,.06) !important;
+                    }
+
+                    div[data-testid="stAppViewContainer"] .main
+                    div[data-testid="stVerticalBlockBorderWrapper"]:has(.topic-v8-control-marker)
+                    > div[data-testid="stVerticalBlock"] {
+                        background: #FFFFFF !important;
+                        background-color: #FFFFFF !important;
+                    }
+
+                    div[data-testid="stAppViewContainer"] .main
+                    div[data-testid="stVerticalBlockBorderWrapper"]:has(.topic-v8-control-marker)
+                    div[data-testid="stForm"] {
+                        background: #FFFFFF !important;
+                        background-color: #FFFFFF !important;
+                        border-color: #E2E8F0 !important;
+                        box-shadow: 0 8px 22px rgba(15,23,42,.045) !important;
+                    }
+
                     .topic-v8-topic-example {
                         background: #F8FAFC !important;
                         border-color: #E2E8F0 !important;
