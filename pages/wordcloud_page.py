@@ -38,6 +38,36 @@ _WC_STYLE = {
 }
 _BRAND_WORDS = {"indihome", "indibiz", "telkomsel", "myindihome", "telkom"}
 
+# Kata yang tidak memberi informasi isu/sentimen saat ditampilkan sebagai Top 15 Kata.
+# Filter ini sengaja hanya dipakai pada ranking Top 15 agar tidak mengubah WordCloud,
+# analisis topik, dataset, atau hasil sentimen yang sudah dikunci.
+_TOP_WORD_NOISE = {
+    # Singkatan/pengisi umum
+    "dll", "dsb", "dst", "etc", "etcetera",
+    # Sapaan, kesopanan, dan kata percakapan yang terlalu umum
+    "maaf", "mohon", "tolong", "kakak", "mak", "kasih", "makasih",
+    "bantu", "dibantu", "biar", "atas", "lanjut", "selalu", "semoga",
+    "sayang", "terus", "sekarang", "mulu",
+    # Kata regional/penghubung yang tidak mewakili isu layanan
+    "lan", "kula", "tansah",
+    # Artefak/campaign spam yang muncul pada corpus dan tidak mewakili isu
+    "pastijodoh", "gestun", "tembus",
+}
+
+
+def _is_meaningful_top_word(word: str) -> bool:
+    """Validasi kata agar ranking Top 15 hanya berisi kata yang informatif."""
+    normalized = str(word).strip().lower()
+    if not normalized or normalized in _TOP_WORD_NOISE:
+        return False
+
+    # Buang hashtag/campaign yang menggabungkan nama brand dengan kata lain,
+    # contohnya ``hariibuindihome``. Nama brand tunggal tidak dipaksa dihapus di sini.
+    if normalized not in _BRAND_WORDS and any(brand in normalized for brand in _BRAND_WORDS):
+        return False
+
+    return True
+
 
 def _is_service_ready(layanan: str) -> bool:
     """Cek apakah layanan sudah siap untuk analisis WordCloud."""
@@ -124,7 +154,16 @@ def _get_top_words_list(
     try:
         freqs = _compute_word_frequencies(df, sentiment, show_brand)
         if freqs:
-            return freqs.most_common(top_n)
+            # Filter dilakukan sebelum mengambil Top N. Dengan begitu, kata noise
+            # otomatis digantikan kata bermakna berikutnya berdasarkan frekuensi corpus.
+            meaningful_freqs = Counter(
+                {
+                    word: count
+                    for word, count in freqs.items()
+                    if _is_meaningful_top_word(word)
+                }
+            )
+            return meaningful_freqs.most_common(top_n)
 
         # Fallback dummy jika corpus kosong
         dummy = get_dummy_top_words().get(sentiment, [])
