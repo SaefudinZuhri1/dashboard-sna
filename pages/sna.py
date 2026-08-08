@@ -174,6 +174,24 @@ NON_INFLUENCER_ENTITY_ACCOUNTS = {
     "commuterline",
     "kai121",
     "keretaapikita",
+    # Brand/perusahaan/instansi lain yang muncul pada ranking Telkomsel.
+    # Tetap dipertahankan di graph, tetapi tidak disebut influencer.
+    "grok",
+    "bni",
+    "bni46",
+    "bankbni46",
+    "grabid",
+    "grabindonesia",
+    "pt_transjakarta",
+    "transjakarta",
+    "transjakarta_id",
+    "gojekindonesia",
+    "gojek",
+    "shopee_id",
+    "tokopedia",
+    "bukalapak",
+    "duniagames",
+    "duniagames.co.id",
 }
 NON_INFLUENCER_ENTITY_ACCOUNTS_COMPACT = {
     "".join(char for char in account.lower() if char.isalnum())
@@ -202,6 +220,16 @@ NON_INFLUENCER_ENTITY_PREFIXES = (
     "polri",
     "divhumaspolri",
     "tni",
+    "bni",
+    "grab",
+    "transjakarta",
+    "pttransjakarta",
+    "grok",
+    "gojek",
+    "shopee",
+    "tokopedia",
+    "bukalapak",
+    "duniagames",
 )
 
 REQUIRED_SNA_COLUMNS = {"source", "target", "relationship", "followers", "platform"}
@@ -9536,13 +9564,16 @@ def _render_influencer_tables(node_df: pd.DataFrame, service: str, platform: str
 
             if node_df is not None and not node_df.empty:
                 excluded_mask = node_df["username"].map(_is_excluded_from_influencer)
+                external_entity_mask = node_df["username"].map(_is_external_brand_or_institution)
                 non_brand = node_df[
-                    (~node_df["is_brand"].astype(bool)) & (~excluded_mask)
+                    (~node_df["is_brand"].astype(bool))
+                    & (~excluded_mask)
+                    & (~external_entity_mask)
                 ].copy()
             else:
                 non_brand = pd.DataFrame()
             if non_brand.empty:
-                st.info("Belum ada akun non-brand untuk ditampilkan pada tabel influencer.")
+                st.info("Belum ada akun influencer non-brand/non-institusi untuk ditampilkan pada tabel.")
                 return
 
             _render_influencer_summary_cards(non_brand)
@@ -9646,7 +9677,10 @@ def _render_influencer_tables(node_df: pd.DataFrame, service: str, platform: str
                 )
                 st.markdown(_compact_html(f'<div class="sna-v9-influencer-grid">{degree_html}{followers_html}</div>'), unsafe_allow_html=True)
 
-            st.caption("* Akun layanan resmi dikeluarkan dari daftar ini")
+            st.caption(
+                "* Akun layanan, perusahaan, brand, dan instansi resmi dikeluarkan "
+                "dari dua ranking ini. Node dan metriknya tetap dipertahankan pada graph SNA."
+            )
 
             detail_options = filtered_table_df.sort_values(
                 ["degree_centrality", "followers", "username"],
