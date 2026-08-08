@@ -121,6 +121,20 @@ EXCLUDE_ACCOUNTS_COMPACT = {
     for account in EXCLUDE_ACCOUNTS_NORMALIZED
 }
 
+# Prefix ini khusus untuk menyaring ranking/tabel influencer. Berbeda dengan
+# BRAND_PREFIXES, daftar ini tidak mengubah klasifikasi atau tampilan node graph.
+# Tujuannya agar akun layanan, akun care, akun regional, dan akun turunannya
+# tidak dianggap sebagai influencer hanya karena memiliki koneksi tinggi.
+EXCLUDE_SERVICE_PREFIXES = (
+    "indihome",
+    "indibiz",
+    "telkomsel",
+    "telkom",
+    "tsel",
+    "myindihome",
+    "mytelkomsel",
+)
+
 REQUIRED_SNA_COLUMNS = {"source", "target", "relationship", "followers", "platform"}
 SNA_ACTION_LOADING_KEY = "_sna_v9_action_loading_label"
 SNA_GRAPH_RENDER_REQUEST_KEY = "_sna_v9_graph_render_request"
@@ -3944,14 +3958,20 @@ def _is_brand_account(username: str) -> bool:
 
 
 def _is_excluded_from_influencer(username: Any) -> bool:
-    """Cek akun layanan yang harus disembunyikan dari ranking influencer."""
+    """Cek akun layanan/turunan yang harus disembunyikan dari ranking influencer."""
     try:
         normalized = _normalize_username(username)
         if normalized in EXCLUDE_ACCOUNTS_NORMALIZED:
             return True
+
         # Variasi pemisah seperti indihome.id tetap dikenali, tanpa mengubah graph.
         compact = _compact_username(normalized)
-        return compact in EXCLUDE_ACCOUNTS_COMPACT
+        if compact in EXCLUDE_ACCOUNTS_COMPACT:
+            return True
+
+        # Tangkap akun layanan regional/care/turunan seperti indihomejtd,
+        # indihomecare_jabar, telkomjabar, telkomselcare, dan variasi sejenis.
+        return compact.startswith(EXCLUDE_SERVICE_PREFIXES)
     except Exception as exc:
         st.error(f"Filter akun layanan belum dapat diterapkan: {exc}")
         return False
@@ -4775,7 +4795,7 @@ def _render_telkomsel_pagerank_table(node_df: pd.DataFrame) -> None:
 
 
 def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
-    """Render chart Top 10 PageRank dan tabel Top 20 seluruh metrik."""
+    """Render chart Top 10 PageRank dan tabel Top 40 metrik akun non-layanan."""
     try:
         if node_df is None or node_df.empty:
             st.info("Belum ada node untuk menampilkan ranking PageRank.")
@@ -4797,7 +4817,7 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
         ).reset_index(drop=True)
 
         # Top Influencer hanya berisi akun non-brand. Akun layanan resmi dan
-        # turunannya tetap dipertahankan pada graph serta tabel semua node.
+        # turunannya tetap dipertahankan pada graph, tetapi dikeluarkan dari ranking.
         if "is_brand" in ranking.columns:
             brand_mask = ranking["is_brand"].astype(bool)
         else:
@@ -4838,9 +4858,11 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
                 key=f"sna_pagerank_{service.lower()}",
             )
 
-        top20 = ranking.head(20).copy()
-        top20.insert(0, "Rank", range(1, len(top20) + 1))
-        top20 = top20[
+        # Tabel semua metrik menggunakan ranking akun non-layanan yang sama
+        # dengan Top Influencer. Akun brand tetap dipertahankan pada graph.
+        top40 = influencer_ranking.head(40).copy()
+        top40.insert(0, "Rank", range(1, len(top40) + 1))
+        top40 = top40[
             [
                 "Rank", "username", "platform_label", "followers",
                 "degree_centrality", "in_degree", "out_degree",
@@ -4865,8 +4887,8 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
                 f"""
                 <div class="sna-v9-section-head">
                     <div>
-                        <h2 class="sna-v9-section-title">Top 20 Node — Semua Metrik</h2>
-                        <p class="sna-v9-section-subtitle">Default diurutkan berdasarkan PageRank tertinggi. Klik judul kolom pada tabel untuk mengurutkan ulang.</p>
+                        <h2 class="sna-v9-section-title">Top 40 Node — Semua Metrik</h2>
+                        <p class="sna-v9-section-subtitle">Default diurutkan berdasarkan PageRank tertinggi. Akun layanan resmi dan turunannya tidak disertakan. Klik judul kolom pada tabel untuk mengurutkan ulang.</p>
                     </div>
                     <span class="sna-v12-live-badge"><span class="sna-v12-live-dot"></span>{escape(service)}</span>
                 </div>
@@ -4874,7 +4896,7 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
                 unsafe_allow_html=True,
             )
             st.dataframe(
-                top20,
+                top40,
                 use_container_width=True,
                 hide_index=True,
                 height=520,
@@ -4889,15 +4911,15 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
                 },
             )
             st.download_button(
-                label="⬇️ Unduh CSV Top 20 Node",
-                data=top20.to_csv(index=False).encode("utf-8-sig"),
-                file_name=f"top20_node_sna_{service.lower()}.csv",
+                label="⬇️ Unduh CSV Top 40 Node",
+                data=top40.to_csv(index=False).encode("utf-8-sig"),
+                file_name=f"top40_node_sna_{service.lower()}.csv",
                 mime="text/csv",
                 use_container_width=True,
-                key=f"download_top20_sna_{service.lower()}",
+                key=f"download_top40_sna_{service.lower()}",
             )
     except Exception as exc:
-        st.error(f"Gagal menampilkan ranking PageRank dan tabel Top 20: {exc}")
+        st.error(f"Gagal menampilkan ranking PageRank dan tabel Top 40: {exc}")
 
 
 def _display_node_table(df: pd.DataFrame, height: int = 390, mode: str = "degree") -> None:
