@@ -2814,7 +2814,8 @@ def _inject_sna_css() -> None:
                 }
 
                 .sna-v10-table-grid {
-                    align-items: start;
+                    /* Samakan tinggi kedua card berdasarkan card tertinggi pada baris ini. */
+                    align-items: stretch;
                     display: grid;
                     gap: 0.9rem;
                     grid-template-columns: repeat(2, minmax(0, 1fr));
