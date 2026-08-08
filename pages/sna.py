@@ -3503,6 +3503,208 @@ def _inject_sna_light_mode_patch() -> None:
                     color: #64748B !important;
                 }
 
+                /* Patch light mode panel Statistik Network Analysis IndiBiz. */
+                html body:has(.sna-v9-page) .sna-v10-statistics-card {
+                    background:
+                        radial-gradient(circle at 7% 5%, rgba(229,57,53,0.06), transparent 24%),
+                        radial-gradient(circle at 96% 94%, rgba(29,161,242,0.05), transparent 28%),
+                        linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 16px 36px rgba(15,23,42,0.09) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-statistics-body {
+                    background: transparent !important;
+                    color: #1F2937 !important;
+                }
+
+                /* Header merah dipertahankan, teks dipaksa tetap putih di light mode. */
+                html body:has(.sna-v9-page) .sna-v10-statistics-head {
+                    background:
+                        radial-gradient(circle at 90% 15%, rgba(255,255,255,0.16), transparent 30%),
+                        linear-gradient(135deg, #A71919 0%, #C52D2D 48%, #E25555 100%) !important;
+                    border-bottom-color: rgba(127,29,29,0.16) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-statistics-eyebrow,
+                html body:has(.sna-v9-page) .sna-v10-statistics-title,
+                html body:has(.sna-v9-page) .sna-v10-statistics-subtitle,
+                html body:has(.sna-v9-page) .sna-v10-statistics-head h1,
+                html body:has(.sna-v9-page) .sna-v10-statistics-head h2,
+                html body:has(.sna-v9-page) .sna-v10-statistics-head h3,
+                html body:has(.sna-v9-page) .sna-v10-statistics-head p,
+                html body:has(.sna-v9-page) .sna-v10-statistics-badge,
+                html body:has(.sna-v9-page) .sna-v10-statistics-badge--soft {
+                    color: #FFFFFF !important;
+                    -webkit-text-fill-color: #FFFFFF !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-statistics-badge {
+                    background: rgba(92,16,18,0.34) !important;
+                    border-color: rgba(255,255,255,0.32) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-statistics-badge--soft {
+                    background: rgba(255,255,255,0.12) !important;
+                }
+
+                /* Lima kartu KPI. */
+                html body:has(.sna-v9-page) .sna-v10-metric {
+                    background:
+                        linear-gradient(145deg, rgba(255,255,255,0.92), rgba(248,250,252,0.94)) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 7px 18px rgba(15,23,42,0.05) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-metric:hover {
+                    border-color: color-mix(in srgb, var(--metric-accent) 46%, #CBD5E1) !important;
+                    box-shadow: 0 13px 28px color-mix(in srgb, var(--metric-accent) 14%, transparent) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-metric-label {
+                    color: #64748B !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-metric-value {
+                    color: #1F2937 !important;
+                    -webkit-text-fill-color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-metric-hint {
+                    color: #94A3B8 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-metric-icon {
+                    background: color-mix(in srgb, var(--metric-accent) 10%, #FFFFFF) !important;
+                    border-color: color-mix(in srgb, var(--metric-accent) 30%, #D8E0EA) !important;
+                }
+
+                /* Dua tabel ranking IndiBiz. */
+                html body:has(.sna-v9-page) .sna-v10-table-card {
+                    background: #FFFFFF !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 9px 24px rgba(15,23,42,0.06) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-table-card:hover {
+                    border-color: color-mix(in srgb, var(--table-accent) 38%, #CBD5E1) !important;
+                    box-shadow: 0 16px 34px color-mix(in srgb, var(--table-accent) 10%, rgba(15,23,42,0.08)) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-table-head {
+                    background:
+                        radial-gradient(circle at 98% 0%, var(--table-glow), transparent 38%),
+                        linear-gradient(135deg, color-mix(in srgb, var(--table-accent) 6%, #FFFFFF), #F8FAFC) !important;
+                    border-bottom-color: #E2E8F0 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-table-title,
+                html body:has(.sna-v9-page) .sna-v10-table-username {
+                    color: #1F2937 !important;
+                    -webkit-text-fill-color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-table-note {
+                    color: #64748B !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-table-badge {
+                    background: color-mix(in srgb, var(--table-accent) 8%, #FFFFFF) !important;
+                    border-color: color-mix(in srgb, var(--table-accent) 28%, #D8E0EA) !important;
+                    color: color-mix(in srgb, var(--table-accent) 84%, #1F2937) !important;
+                }
+
+                html body:has(.sna-v9-page) table.sna-v10-table {
+                    background: #FFFFFF !important;
+                    color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-table th {
+                    background: #F1F5F9 !important;
+                    border-bottom-color: #D8E0EA !important;
+                    color: #64748B !important;
+                    -webkit-text-fill-color: #64748B !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-table td {
+                    background: transparent !important;
+                    border-bottom-color: #E8EDF3 !important;
+                    color: #334155 !important;
+                    -webkit-text-fill-color: #334155 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-table tbody tr:hover {
+                    background: color-mix(in srgb, var(--table-accent) 6%, #F8FAFC) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-table-number {
+                    color: #334155 !important;
+                    -webkit-text-fill-color: #334155 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-account-avatar {
+                    background: color-mix(in srgb, var(--table-accent) 9%, #FFFFFF) !important;
+                    border-color: color-mix(in srgb, var(--table-accent) 24%, #D8E0EA) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-mini-track {
+                    background: #E2E8F0 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-rank-row--2 .sna-v10-rank-chip {
+                    background: #F1F5F9 !important;
+                    border-color: #CBD5E1 !important;
+                    color: #475569 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-rank-row--3 .sna-v10-rank-chip {
+                    background: #FFF7ED !important;
+                    border-color: #FED7AA !important;
+                    color: #9A4F12 !important;
+                }
+
+                /* Panel Cara membaca hasil analisis. */
+                html body:has(.sna-v9-page) .sna-v10-interpretation {
+                    background:
+                        linear-gradient(135deg, rgba(229,57,53,0.045), rgba(29,161,242,0.035)),
+                        #FFFFFF !important;
+                    border-color: #E1CBD0 !important;
+                    color: #475569 !important;
+                    box-shadow: 0 6px 16px rgba(15,23,42,0.04) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-interpretation:hover {
+                    border-color: rgba(229,57,53,0.36) !important;
+                    box-shadow: 0 10px 24px rgba(15,23,42,0.07) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-interpretation-title,
+                html body:has(.sna-v9-page) .sna-v10-interpretation-content strong {
+                    color: #1F2937 !important;
+                    -webkit-text-fill-color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-interpretation-content {
+                    border-top-color: #E2E8F0 !important;
+                    color: #475569 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-interpretation-chevron {
+                    color: #64748B !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-insight-chip {
+                    background: #F8FAFC !important;
+                    border-color: #D8E0EA !important;
+                    color: #475569 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v10-insight-chip:hover {
+                    background: #FFF1F1 !important;
+                    border-color: rgba(229,57,53,0.30) !important;
+                    color: #B42318 !important;
+                }
+
                 /* Filter dan kontrol Streamlit. */
                 html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
                 label,
