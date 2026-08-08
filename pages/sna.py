@@ -33,7 +33,9 @@ from utils.data_loader import (
     get_sna_source_names,
     load_indibiz_sna,
     load_indihome_sna,
+    load_sentiment_data,
     load_sna_data,
+    sentiment_file_exists,
     load_telkomsel_sna,
     sna_file_exists,
 )
@@ -6413,6 +6415,176 @@ def _hash_digraph_for_cache(graph: nx.DiGraph) -> tuple[Any, ...]:
         return (repr(graph),)
 
 
+def _ensure_indibiz_platform_representatives(
+    graph: nx.DiGraph,
+    node_df: pd.DataFrame,
+    minimum_per_platform: int = 2,
+) -> tuple[nx.DiGraph, pd.DataFrame]:
+    """Pastikan graf visual IndiBiz memiliki wakil nyata dari tiap platform.
+
+    Sumber SNA IndiBiz lama dapat hanya berisi edge Twitter/X. Saat itu terjadi,
+    fungsi ini mengambil akun non-brand yang benar-benar ada pada dataset
+    sentimen IndiBiz untuk menjadi wakil Instagram/TikTok pada visualisasi.
+    Akun tambahan tidak diberi edge buatan, sehingga struktur relasi SNA asli
+    tidak dipalsukan. Statistik utama tetap dihitung dari graf SNA asli.
+    """
+    try:
+        if graph is None or node_df is None or node_df.empty:
+            return graph.copy(), node_df.copy()
+
+        visual_graph = graph.copy()
+        visual_nodes = node_df.copy()
+        if "platform_group" not in visual_nodes.columns:
+            return visual_graph, visual_nodes
+
+        target_minimum = max(1, int(minimum_per_platform))
+        current_counts = (
+            visual_nodes.loc[~visual_nodes["is_brand"].astype(bool), "platform_group"]
+            .astype(str)
+            .value_counts()
+            .to_dict()
+        )
+        missing_platforms = [
+            platform
+            for platform in PLATFORM_ORDER
+            if int(current_counts.get(platform, 0)) < target_minimum
+        ]
+        if not missing_platforms:
+            return visual_graph, visual_nodes
+
+        # Jangan memakai dummy untuk membuat representasi platform. Wakil
+        # Instagram/TikTok hanya boleh berasal dari sumber IndiBiz aktual.
+        if not sentiment_file_exists("IndiBiz"):
+            return visual_graph, visual_nodes
+
+        sentiment_df = load_sentiment_data("IndiBiz")
+        if (
+            sentiment_df is None
+            or sentiment_df.empty
+            or bool(sentiment_df.attrs.get("is_dummy", False))
+            or str(sentiment_df.attrs.get("data_source", "")).lower() == "dummy"
+        ):
+            return visual_graph, visual_nodes
+        if "username" not in sentiment_df.columns or "platform" not in sentiment_df.columns:
+            return visual_graph, visual_nodes
+
+        candidates = sentiment_df.copy()
+        candidates["username"] = candidates["username"].map(_normalize_username)
+        candidates["platform_group"] = candidates["platform"].map(_normalize_platform)
+        if "followers" not in candidates.columns:
+            candidates["followers"] = 0
+        candidates["followers"] = (
+            pd.to_numeric(candidates["followers"], errors="coerce")
+            .fillna(0)
+            .clip(lower=0)
+            .astype(int)
+        )
+
+        sentiment_column = next(
+            (
+                column
+                for column in ["predicted_sentiment", "sentiment", "label", "sentimen"]
+                if column in candidates.columns
+            ),
+            None,
+        )
+        if sentiment_column is None:
+            candidates["dominant_sentiment"] = "unknown"
+        else:
+            candidates["dominant_sentiment"] = candidates[sentiment_column].map(
+                _normalize_sentiment
+            )
+
+        invalid_usernames = {"", "nan", "none", "null"}
+        candidates = candidates[
+            candidates["platform_group"].isin(PLATFORM_ORDER)
+            & ~candidates["username"].isin(invalid_usernames)
+        ].copy()
+        candidates = candidates[
+            ~candidates["username"].map(_hide_service_account_from_exploration_graph)
+        ].copy()
+        if candidates.empty:
+            return visual_graph, visual_nodes
+
+        # Satu username cukup satu kali per platform. Followers maksimum dipakai
+        # agar ukuran node Instagram/TikTok mengikuti jangkauan akun terbaru.
+        candidates = candidates.sort_values(
+            ["platform_group", "followers", "username"],
+            ascending=[True, False, True],
+            kind="mergesort",
+        ).drop_duplicates(["platform_group", "username"], keep="first")
+
+        existing_usernames = set(visual_nodes["username"].astype(str))
+        representative_rows: list[dict[str, Any]] = []
+
+        for platform in missing_platforms:
+            current = int(current_counts.get(platform, 0))
+            needed = max(0, target_minimum - current)
+            if needed <= 0:
+                continue
+
+            platform_candidates = candidates[
+                candidates["platform_group"].eq(platform)
+                & ~candidates["username"].isin(existing_usernames)
+            ].copy()
+            if platform_candidates.empty:
+                continue
+
+            for row in platform_candidates.head(needed).itertuples(index=False):
+                username = str(row.username)
+                followers = int(getattr(row, "followers", 0) or 0)
+                sentiment = _normalize_sentiment(
+                    getattr(row, "dominant_sentiment", "unknown")
+                )
+
+                # Node representatif berasal dari data aktual platform, tetapi
+                # tidak diberi relasi sintetis. Dengan begitu graf tidak
+                # menyatakan adanya edge yang memang tidak tersedia di SNA.
+                visual_graph.add_node(
+                    username,
+                    followers=followers,
+                    platform=platform,
+                    dominant_sentiment=sentiment,
+                    platform_representative=True,
+                )
+                representative_rows.append(
+                    {
+                        "username": username,
+                        "platform": platform,
+                        "platform_group": platform,
+                        "platform_label": PLATFORM_DISPLAY.get(platform, platform.title()),
+                        "followers": followers,
+                        "degree": 0,
+                        "degree_centrality": 0.0,
+                        "betweenness_centrality": 0.0,
+                        "pagerank": 0.0,
+                        "in_degree": 0,
+                        "out_degree": 0,
+                        "dominant_sentiment": sentiment,
+                        "sentiment_label": SENTIMENT_DISPLAY.get(
+                            sentiment, "Belum tersedia"
+                        ),
+                        "is_brand": False,
+                        "is_platform_representative": True,
+                    }
+                )
+                existing_usernames.add(username)
+
+        if representative_rows:
+            additions = pd.DataFrame(representative_rows)
+            visual_nodes = pd.concat([visual_nodes, additions], ignore_index=True, sort=False)
+            if "is_platform_representative" not in visual_nodes.columns:
+                visual_nodes["is_platform_representative"] = False
+            visual_nodes["is_platform_representative"] = (
+                visual_nodes["is_platform_representative"].fillna(False).astype(bool)
+            )
+
+        return visual_graph, visual_nodes.reset_index(drop=True)
+    except Exception as exc:
+        st.error(f"Gagal menyiapkan wakil platform pada graf IndiBiz: {exc}")
+        return graph.copy(), node_df.copy()
+
+
 @st.cache_data(
     show_spinner=False,
     max_entries=24,
@@ -6536,26 +6708,29 @@ def _limit_graph_nodes(
         }
         platform_quotas = {platform: 0 for platform in available_platforms}
 
-        # Pembagian round-robin menjamin setiap platform mendapatkan jatah yang
-        # hampir sama. Jika satu platform kehabisan node, sisa slot dialihkan ke
-        # platform lain yang masih memiliki kandidat.
-        while remaining_slots > 0:
-            allocated_this_round = False
+        # Sisihkan minimal 1-2 akun per platform, lalu isi seluruh slot sisa
+        # berdasarkan ranking global. Tujuannya bukan membagi node secara sama
+        # rata, tetapi memastikan Twitter/X, Instagram, dan TikTok tetap punya
+        # representasi saat data platform tersebut memang tersedia.
+        if available_platforms and remaining_slots > 0:
+            minimum_target = 2 if remaining_slots >= (2 * len(available_platforms)) else 1
             for platform in available_platforms:
                 if remaining_slots <= 0:
                     break
-                if platform_quotas[platform] < len(platform_frames[platform]):
-                    platform_quotas[platform] += 1
-                    remaining_slots -= 1
-                    allocated_this_round = True
-            if not allocated_this_round:
-                break
+                quota = min(
+                    minimum_target,
+                    len(platform_frames[platform]),
+                    remaining_slots,
+                )
+                platform_quotas[platform] = quota
+                remaining_slots -= quota
 
         for platform in available_platforms:
             quota = platform_quotas[platform]
             selected.extend(platform_frames[platform].head(quota)["username"].tolist())
 
-        # Jaga dari duplikasi dan isi slot tersisa dari kandidat non-brand terbaik.
+        # Setelah kuota minimum terpenuhi, ranking jaringan kembali menjadi
+        # prioritas agar sebagian besar node tetap mencerminkan struktur SNA.
         selected = list(dict.fromkeys(selected))
         if len(selected) < limit:
             remaining_non_brand = _rank(non_brand[~non_brand["username"].isin(selected)])
@@ -6697,7 +6872,13 @@ def generate_pyvis_graph(
             label = username if len(username) <= 22 else f"{username[:19]}..."
             is_key_label = is_brand or str(username) in key_label_nodes
             visible_label = label if is_key_label else ""
-            node_role = "Akun Brand / Hub" if is_brand else "Akun Percakapan"
+            is_platform_representative = bool(row.get("is_platform_representative", False))
+            if is_brand:
+                node_role = "Akun Brand / Hub"
+            elif is_platform_representative:
+                node_role = "Wakil platform (tanpa edge SNA)"
+            else:
+                node_role = "Akun Percakapan"
             label_font_size = 18 if is_brand else 12
 
             net.add_node(
@@ -8145,7 +8326,22 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
                 unsafe_allow_html=True,
             )
 
-            visual_graph, visual_nodes = _limit_graph_nodes(graph, node_df, node_limit, service=service)
+            service_key = str(service).strip().lower()
+            graph_for_visual = graph
+            nodes_for_visual = node_df
+            if service_key == "indibiz":
+                graph_for_visual, nodes_for_visual = _ensure_indibiz_platform_representatives(
+                    graph,
+                    node_df,
+                    minimum_per_platform=2,
+                )
+
+            visual_graph, visual_nodes = _limit_graph_nodes(
+                graph_for_visual,
+                nodes_for_visual,
+                node_limit,
+                service=service,
+            )
             if visual_graph.number_of_nodes() == 0:
                 st.info("Tidak ada data graf pada kombinasi filter yang dipilih.")
                 return
@@ -8258,7 +8454,7 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
             elif service_key == "indibiz":
                 st.caption(
                     "Ukuran node Twitter/X mengikuti degree. Ukuran node Instagram dan TikTok mengikuti jumlah followers. "
-                    "Akun layanan turunan/regional/care disembunyikan dari graf IndiBiz; hanya akun utama IndiHome, IndiBiz, dan Telkomsel yang tetap dapat tampil sebagai hub merah bila terdapat pada jaringan aktif. Data SNA asli tidak diubah."
+                    "Akun layanan turunan/regional/care disembunyikan dari graf IndiBiz; hanya akun utama IndiHome, IndiBiz, dan Telkomsel yang tetap dapat tampil sebagai hub merah bila terdapat pada jaringan aktif. Jika edge suatu platform belum tersedia, maksimal dua akun nyata dari dataset IndiBiz ditampilkan sebagai wakil platform tanpa membuat edge baru. Data SNA asli tidak diubah."
                 )
             else:
                 st.caption("Ukuran node mengikuti PageRank. Isi node menunjukkan sentimen; garis tepi menunjukkan platform. Jika sentimen node belum tersedia, isi node memakai warna platform agar jaringan tetap mudah dibaca.")
@@ -9333,7 +9529,11 @@ def render_sna() -> None:
             if bool(st.session_state.get("demo_mode", False)):
                 raw_df = get_demo_sna(selected_service)
             elif selected_service == "IndiBiz":
-                raw_df = load_indibiz_sna()
+                # Loader generik IndiBiz memang dirancang menggabungkan output
+                # Twitter/X dan output Instagram-TikTok bila keduanya tersedia.
+                # Loader khusus lama hanya membaca satu file sehingga graf dapat
+                # terlihat seluruhnya sebagai Twitter/X.
+                raw_df = load_sna_data("IndiBiz")
             elif selected_service == "Telkomsel":
                 raw_df = load_telkomsel_sna()
             else:
