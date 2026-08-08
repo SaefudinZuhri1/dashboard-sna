@@ -6683,11 +6683,15 @@ def generate_pyvis_graph(
             dominant_sentiment = _normalize_sentiment(
                 row.get("dominant_sentiment", "unknown")
             )
-            # Fill menampilkan sentimen. Data tanpa sentimen memakai warna platform,
-            # sehingga graf tidak berubah menjadi kumpulan node abu-abu.
-            fill_color = SENTIMENT_COLORS.get(dominant_sentiment, platform_color)
-            if is_brand:
-                fill_color = PLATFORM_GRAPH_COLORS["target"]
+            # Warna node mengikuti platform agar visual konsisten dengan legenda:
+            # Twitter/X = biru, Instagram = ungu, TikTok = cyan, dan akun
+            # brand/hub = merah. Sentimen tetap tersedia pada tooltip, tetapi
+            # tidak lagi mengganti warna utama node.
+            fill_color = (
+                PLATFORM_GRAPH_COLORS["target"]
+                if is_brand
+                else platform_color
+            )
             border_color = graph_highlight if is_brand else platform_color
             platform_label = str(row.get("platform_label", "Tidak diketahui"))
             label = username if len(username) <= 22 else f"{username[:19]}..."
@@ -7520,7 +7524,7 @@ def generate_pyvis_graph(
                     <button class="sna-pyvis-platform-button" data-platform-toggle="tiktok" type="button"><span class="sna-pyvis-platform-dot" style="background:#25F4EE"></span>TikTok</button>
                     <button class="sna-pyvis-platform-button" data-platform-toggle="target" type="button"><span class="sna-pyvis-platform-dot" style="background:#E53935"></span>Akun Brand / Hub</button>
                 </div>
-                <span class="sna-pyvis-platform-help">Isi node = sentimen · garis tepi = platform · data tanpa sentimen memakai warna platform.</span>
+                <span class="sna-pyvis-platform-help">Warna node = platform · Twitter/X biru · Instagram ungu · TikTok cyan · akun Brand/Hub merah. Sentimen tersedia saat hover.</span>
             </div>
             <div class="sna-node-tooltip" id="snaNodeTooltip" aria-hidden="true"></div>
             <div class="sna-edge-tooltip" id="snaEdgeTooltip" aria-hidden="true"></div>
