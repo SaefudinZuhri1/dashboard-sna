@@ -4203,8 +4203,12 @@ def _is_brand_account(username: str) -> bool:
         return False
 
 
-def _hide_service_account_from_indihome_graph(username: Any) -> bool:
-    """Sembunyikan akun layanan turunan dari visualisasi graf IndiHome saja."""
+def _hide_service_account_from_exploration_graph(username: Any) -> bool:
+    """Sembunyikan akun layanan turunan dari visualisasi graf interaktif.
+
+    Hanya akun layanan utama ``indihome``, ``indibiz``, dan ``telkomsel`` yang
+    boleh tetap tampil sebagai hub merah. Data SNA asli tidak dihapus.
+    """
     try:
         compact = _compact_username(username)
         if not compact:
@@ -4217,7 +4221,7 @@ def _hide_service_account_from_indihome_graph(username: Any) -> bool:
         # ikut dibersihkan dari visualisasi tanpa menghapusnya dari data SNA.
         return _is_brand_account(str(username)) or compact.startswith(EXCLUDE_SERVICE_PREFIXES)
     except Exception as exc:
-        st.error(f"Filter akun layanan pada graf IndiHome belum dapat diterapkan: {exc}")
+        st.error(f"Filter akun layanan pada graf interaktif belum dapat diterapkan: {exc}")
         return False
 
 
@@ -6424,11 +6428,10 @@ def _limit_graph_nodes(
 
     Pada filter satu platform, pemilihan tetap memakai ranking metrik jaringan.
     Pada filter Semua Platform, slot non-brand dibagi merata antara Twitter/X,
-    Instagram, dan TikTok yang tersedia. Khusus IndiHome, akun layanan turunan
-    disembunyikan dari visualisasi. Khusus IndiBiz, akun regional/care IndiBiz
-    disatukan ke satu node utama ``indibiz`` agar edge tetap terjaga dan pola
-    jaringan lebih konsisten. Hanya akun utama IndiHome, IndiBiz, atau Telkomsel
-    yang boleh tetap tampil sebagai node brand/hub.
+    Instagram, dan TikTok yang tersedia. Khusus IndiHome dan IndiBiz, akun
+    layanan turunan disembunyikan dari visualisasi. Hanya akun utama
+    ``indihome``, ``indibiz``, atau ``telkomsel`` yang boleh tetap tampil
+    sebagai node brand/hub merah.
     """
     try:
         limit = max(1, int(node_limit))
@@ -6436,17 +6439,15 @@ def _limit_graph_nodes(
         node_work = node_df.copy()
         service_key = str(service).strip().lower()
 
-        # IndiBiz memiliki banyak akun regional/resmi (indibiz_id,
-        # indibiz_borneo, indibizkti, dan lain-lain). Khusus visualisasi,
-        # seluruh akun turunan tersebut disatukan ke node utama ``indibiz``
-        # agar pola hub-and-spoke terbaca tanpa menghapus edge penelitian.
-        if service_key == "indibiz" and not node_work.empty:
-            graph_work, node_work = _collapse_indibiz_service_accounts_for_graph(
-                graph_work, node_work
+        # Terapkan aturan visual yang sama pada IndiHome dan IndiBiz:
+        # akun layanan turunan/regional/care dihapus hanya dari graf interaktif.
+        # Akun utama indihome, indibiz, dan telkomsel tetap boleh tampil.
+        # Edge yang menempel pada akun turunan ikut tidak divisualisasikan, sama
+        # seperti perilaku graf IndiHome yang sudah disetujui. Data asli tetap utuh.
+        if service_key in {"indihome", "indibiz"} and not node_work.empty:
+            hidden_mask = node_work["username"].map(
+                _hide_service_account_from_exploration_graph
             )
-
-        if service_key == "indihome" and not node_work.empty:
-            hidden_mask = node_work["username"].map(_hide_service_account_from_indihome_graph)
             hidden_usernames = set(node_work.loc[hidden_mask, "username"].astype(str))
             if hidden_usernames:
                 visible_nodes = [
@@ -6493,11 +6494,7 @@ def _limit_graph_nodes(
                 # Sumber SNA IndiBiz aktual dapat hanya memiliki label Twitter/X.
                 # Hub utama tetap wajib masuk visualisasi agar subgraf tidak
                 # kehilangan pusat jaringan saat kandidat non-brand melebihi limit.
-                allowed_primary_accounts = (
-                    {"indibiz"}
-                    if service_key == "indibiz"
-                    else PRIMARY_SERVICE_GRAPH_ACCOUNTS
-                )
+                allowed_primary_accounts = PRIMARY_SERVICE_GRAPH_ACCOUNTS
                 primary_brand = brand[
                     brand["username"].map(_compact_username).isin(
                         allowed_primary_accounts
@@ -6676,8 +6673,8 @@ def generate_pyvis_graph(
                 node_size = max(13, min(76, 13 + 63 * (relative_pagerank ** 0.42)))
 
             if is_brand:
-                # Hub utama tetap mudah dikenali. Pada IndiHome akun turunan
-                # disembunyikan; pada IndiBiz akun turunan digabung ke hub utama.
+                # Hub utama tetap mudah dikenali. Pada IndiHome dan IndiBiz,
+                # akun layanan turunan sudah dibuang sebelum PyVis dirender.
                 node_size = 82 if hybrid_metric_graph_mode else max(74, min(98, node_size * 1.22))
 
             platform_color = PLATFORM_GRAPH_COLORS.get(
@@ -8257,7 +8254,7 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
             elif service_key == "indibiz":
                 st.caption(
                     "Ukuran node Twitter/X mengikuti degree. Ukuran node Instagram dan TikTok mengikuti jumlah followers. "
-                    "Akun regional/care IndiBiz disatukan ke satu hub visual indibiz agar interaksi tidak hilang dan akun layanan tidak terbaca sebagai influencer terpisah. Data serta metrik SNA asli tidak diubah."
+                    "Akun layanan turunan/regional/care disembunyikan dari graf IndiBiz; hanya akun utama IndiHome, IndiBiz, dan Telkomsel yang tetap dapat tampil sebagai hub merah bila terdapat pada jaringan aktif. Data SNA asli tidak diubah."
                 )
             else:
                 st.caption("Ukuran node mengikuti PageRank. Isi node menunjukkan sentimen; garis tepi menunjukkan platform. Jika sentimen node belum tersedia, isi node memakai warna platform agar jaringan tetap mudah dibaca.")
