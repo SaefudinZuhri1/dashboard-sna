@@ -6833,6 +6833,89 @@ def _ensure_indibiz_platform_representatives(
         return graph.copy(), node_df.copy()
 
 
+def _ensure_telkomsel_platform_representatives(
+    graph: nx.DiGraph,
+    node_df: pd.DataFrame,
+    minimum_per_platform: int = 2,
+) -> tuple[nx.DiGraph, pd.DataFrame]:
+    """Pastikan graf visual Telkomsel memiliki wakil Instagram dan TikTok nyata.
+
+    File edge SNA Telkomsel penelitian terutama merepresentasikan Twitter/X.
+    Jika node Instagram/TikTok belum tersedia pada graph, fungsi ini mengambil
+    akun non-brand dari dataset Telkomsel aktual. Node tambahan tidak diberi edge
+    buatan, sehingga relasi jaringan tidak dipalsukan.
+    """
+    try:
+        if graph is None or node_df is None or node_df.empty:
+            return graph.copy(), node_df.copy()
+
+        visual_graph = graph.copy()
+        visual_nodes = node_df.copy()
+        representatives = _get_telkomsel_top40_platform_representatives(
+            visual_nodes,
+            minimum_per_platform=max(1, int(minimum_per_platform)),
+        )
+        if representatives is None or representatives.empty:
+            return visual_graph, visual_nodes
+
+        addition_rows: list[dict[str, Any]] = []
+        existing_usernames = set(visual_nodes["username"].astype(str))
+        for row in representatives.itertuples(index=False):
+            username = _normalize_username(getattr(row, "username", ""))
+            platform = _normalize_platform(getattr(row, "platform", "unknown"))
+            if not username or username in existing_usernames:
+                continue
+            followers = int(getattr(row, "followers", 0) or 0)
+
+            # Ini hanya node representatif dari data aktual. Tidak ada edge
+            # sintetis yang dibuat karena file SNA Telkomsel tidak menyediakan
+            # relasi Instagram/TikTok yang dapat dipertanggungjawabkan.
+            visual_graph.add_node(
+                username,
+                followers=followers,
+                platform=platform,
+                dominant_sentiment="unknown",
+                platform_representative=True,
+            )
+            addition_rows.append(
+                {
+                    "username": username,
+                    "platform": platform,
+                    "platform_group": platform,
+                    "platform_label": PLATFORM_DISPLAY.get(platform, platform.title()),
+                    "followers": followers,
+                    "degree": 0,
+                    "degree_centrality": 0.0,
+                    "betweenness_centrality": 0.0,
+                    "pagerank": 0.0,
+                    "in_degree": 0,
+                    "out_degree": 0,
+                    "dominant_sentiment": "unknown",
+                    "sentiment_label": "Belum tersedia",
+                    "is_brand": False,
+                    "is_platform_representative": True,
+                }
+            )
+            existing_usernames.add(username)
+
+        if addition_rows:
+            visual_nodes = pd.concat(
+                [visual_nodes, pd.DataFrame(addition_rows)],
+                ignore_index=True,
+                sort=False,
+            )
+            if "is_platform_representative" not in visual_nodes.columns:
+                visual_nodes["is_platform_representative"] = False
+            visual_nodes["is_platform_representative"] = (
+                visual_nodes["is_platform_representative"].fillna(False).astype(bool)
+            )
+
+        return visual_graph, visual_nodes.reset_index(drop=True)
+    except Exception as exc:
+        st.error(f"Gagal menyiapkan wakil platform pada graf Telkomsel: {exc}")
+        return graph.copy(), node_df.copy()
+
+
 @st.cache_data(
     show_spinner=False,
     max_entries=24,
@@ -8579,6 +8662,12 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
             nodes_for_visual = node_df
             if service_key == "indibiz":
                 graph_for_visual, nodes_for_visual = _ensure_indibiz_platform_representatives(
+                    graph,
+                    node_df,
+                    minimum_per_platform=2,
+                )
+            elif service_key == "telkomsel":
+                graph_for_visual, nodes_for_visual = _ensure_telkomsel_platform_representatives(
                     graph,
                     node_df,
                     minimum_per_platform=2,
