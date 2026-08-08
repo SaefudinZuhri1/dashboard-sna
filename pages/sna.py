@@ -98,6 +98,12 @@ BRAND_ALIASES = set().union(*SERVICE_ALIASES.values()) | {
 # indibizkti, indibiz_jtdiy, indihomecare_jabar, dan variasi resmi sejenis.
 BRAND_PREFIXES = ("indihome", "indibiz", "telkomsel")
 
+# Pada visualisasi graf IndiHome, hanya akun layanan utama berikut yang boleh
+# dipertahankan sebagai node brand/hub berwarna merah. Akun care, regional,
+# dan turunan layanan tetap ada pada data/metrik SNA, tetapi tidak ditampilkan
+# di Eksplorasi Graf SNA agar tidak terbaca sebagai aktor utama.
+PRIMARY_SERVICE_GRAPH_ACCOUNTS = {"indihome", "indibiz", "telkomsel"}
+
 # Filter ini hanya digunakan untuk tampilan ranking influencer. Node tetap
 # dipertahankan di graph agar struktur hub-and-spoke tidak berubah.
 EXCLUDE_ACCOUNTS = [
@@ -3957,6 +3963,24 @@ def _is_brand_account(username: str) -> bool:
         return False
 
 
+def _hide_service_account_from_indihome_graph(username: Any) -> bool:
+    """Sembunyikan akun layanan turunan dari visualisasi graf IndiHome saja."""
+    try:
+        compact = _compact_username(username)
+        if not compact:
+            return False
+        if compact in PRIMARY_SERVICE_GRAPH_ACCOUNTS:
+            return False
+
+        # Gunakan aturan akun layanan yang sudah dipakai ranking agar variasi
+        # seperti indihomecare, indihomejtd, telkomjabar, atau telkomselcare
+        # ikut dibersihkan dari visualisasi tanpa menghapusnya dari data SNA.
+        return _is_brand_account(str(username)) or compact.startswith(EXCLUDE_SERVICE_PREFIXES)
+    except Exception as exc:
+        st.error(f"Filter akun layanan pada graf IndiHome belum dapat diterapkan: {exc}")
+        return False
+
+
 def _is_excluded_from_influencer(username: Any) -> bool:
     """Cek akun layanan/turunan yang harus disembunyikan dari ranking influencer."""
     try:
@@ -5997,22 +6021,38 @@ def _limit_graph_nodes(
     graph: nx.DiGraph,
     node_df: pd.DataFrame,
     node_limit: int,
+    service: str = "",
 ) -> tuple[nx.DiGraph, pd.DataFrame]:
     """Batasi node secara adil agar semua platform tetap terwakili.
 
     Pada filter satu platform, pemilihan tetap memakai ranking metrik jaringan.
     Pada filter Semua Platform, slot non-brand dibagi merata antara Twitter/X,
-    Instagram, dan TikTok yang tersedia. Akun brand/hub dibatasi agar tidak
-    menghabiskan seluruh kuota visualisasi.
+    Instagram, dan TikTok yang tersedia. Khusus IndiHome, akun layanan turunan
+    disembunyikan dari visualisasi dan hanya akun utama IndiHome, IndiBiz, atau
+    Telkomsel yang boleh tetap tampil sebagai node brand/hub.
     """
     try:
         limit = max(1, int(node_limit))
-        if graph.number_of_nodes() <= limit:
-            return graph.copy(), node_df.copy()
+        graph_work = graph.copy()
+        node_work = node_df.copy()
 
-        work = node_df[node_df["username"].isin(graph.nodes)].copy()
+        if str(service).strip().lower() == "indihome" and not node_work.empty:
+            hidden_mask = node_work["username"].map(_hide_service_account_from_indihome_graph)
+            hidden_usernames = set(node_work.loc[hidden_mask, "username"].astype(str))
+            if hidden_usernames:
+                visible_nodes = [
+                    str(node) for node in graph_work.nodes
+                    if str(node) not in hidden_usernames
+                ]
+                graph_work = graph_work.subgraph(visible_nodes).copy()
+                node_work = node_work[~node_work["username"].isin(hidden_usernames)].copy()
+
+        if graph_work.number_of_nodes() <= limit:
+            return graph_work, node_work.reset_index(drop=True)
+
+        work = node_work[node_work["username"].isin(graph_work.nodes)].copy()
         if work.empty:
-            return graph.copy(), node_df.copy()
+            return graph_work, node_work.reset_index(drop=True)
 
         # Pastikan kolom ranking numerik agar pengurutan konsisten meskipun
         # sumber CSV memiliki tipe data campuran.
@@ -6042,7 +6082,7 @@ def _limit_graph_nodes(
         if len(available_platforms) <= 1:
             ranked = pd.concat([_rank(non_brand), _rank(brand)], ignore_index=True)
             selected_nodes = ranked.drop_duplicates("username").head(limit)["username"].tolist()
-            subgraph = graph.subgraph(selected_nodes).copy()
+            subgraph = graph_work.subgraph(selected_nodes).copy()
             selected_df = work[work["username"].isin(selected_nodes)].copy()
             return subgraph, selected_df
 
@@ -6093,7 +6133,7 @@ def _limit_graph_nodes(
             selected = list(dict.fromkeys(selected))
 
         selected_nodes = selected[:limit]
-        subgraph = graph.subgraph(selected_nodes).copy()
+        subgraph = graph_work.subgraph(selected_nodes).copy()
         selected_df = work[work["username"].isin(selected_nodes)].copy()
         return subgraph, selected_df
     except Exception as exc:
@@ -6110,6 +6150,7 @@ def generate_pyvis_graph(
     graph: nx.DiGraph,
     visual_nodes: pd.DataFrame,
     dark_mode: bool = True,
+    service: str = "",
 ) -> str:
     """Bangun HTML graf PyVis sesuai tema aktif dan aman memakai file sementara."""
     try:
@@ -6139,6 +6180,28 @@ def generate_pyvis_graph(
             float(pd.to_numeric(visual_nodes.get("pagerank", 0), errors="coerce").fillna(0).max()),
             1.0e-12,
         )
+
+        # Skala ukuran khusus Eksplorasi Graf SNA IndiHome:
+        # Twitter/X mengikuti degree, sedangkan Instagram dan TikTok mengikuti
+        # followers. Logarithmic scaling pada followers mencegah satu akun dengan
+        # followers sangat besar membuat node lain nyaris tidak terlihat.
+        indihome_graph_mode = str(service).strip().lower() == "indihome"
+        twitter_nodes = visual_nodes[visual_nodes.get("platform_group", "unknown").eq("twitter")] if "platform_group" in visual_nodes.columns else pd.DataFrame()
+        instagram_nodes = visual_nodes[visual_nodes.get("platform_group", "unknown").eq("instagram")] if "platform_group" in visual_nodes.columns else pd.DataFrame()
+        tiktok_nodes = visual_nodes[visual_nodes.get("platform_group", "unknown").eq("tiktok")] if "platform_group" in visual_nodes.columns else pd.DataFrame()
+        max_twitter_degree = max(
+            float(pd.to_numeric(twitter_nodes.get("degree", 0), errors="coerce").fillna(0).max()) if not twitter_nodes.empty else 0.0,
+            1.0,
+        )
+        max_instagram_followers = max(
+            float(pd.to_numeric(instagram_nodes.get("followers", 0), errors="coerce").fillna(0).max()) if not instagram_nodes.empty else 0.0,
+            1.0,
+        )
+        max_tiktok_followers = max(
+            float(pd.to_numeric(tiktok_nodes.get("followers", 0), errors="coerce").fillna(0).max()) if not tiktok_nodes.empty else 0.0,
+            1.0,
+        )
+
         ranked_for_labels = visual_nodes.sort_values(
             ["pagerank", "degree_centrality", "followers"],
             ascending=[False, False, False],
@@ -6154,13 +6217,28 @@ def generate_pyvis_graph(
             centrality = float(row.get("degree_centrality", 0.0))
             degree_count = int(row.get("degree", 0))
             pagerank_score = float(row.get("pagerank", 0.0))
+            followers = int(row.get("followers", 0))
             is_brand = bool(row.get("is_brand", False))
-            relative_pagerank = max(0.0, pagerank_score / max_pagerank)
-            node_size = max(13, min(76, 13 + 63 * (relative_pagerank ** 0.42)))
-            if is_brand:
-                node_size = max(74, min(98, node_size * 1.22))
-
             platform_group = str(row.get("platform_group", "unknown"))
+
+            if indihome_graph_mode and not is_brand and platform_group == "twitter":
+                relative_degree = max(0.0, min(1.0, degree_count / max_twitter_degree))
+                node_size = max(13, min(68, 13 + 55 * (relative_degree ** 0.50)))
+            elif indihome_graph_mode and not is_brand and platform_group == "instagram":
+                relative_followers = np.log1p(max(0, followers)) / np.log1p(max_instagram_followers)
+                node_size = max(13, min(68, 13 + 55 * (relative_followers ** 0.72)))
+            elif indihome_graph_mode and not is_brand and platform_group == "tiktok":
+                relative_followers = np.log1p(max(0, followers)) / np.log1p(max_tiktok_followers)
+                node_size = max(13, min(68, 13 + 55 * (relative_followers ** 0.72)))
+            else:
+                relative_pagerank = max(0.0, pagerank_score / max_pagerank)
+                node_size = max(13, min(76, 13 + 63 * (relative_pagerank ** 0.42)))
+
+            if is_brand:
+                # Hub utama tetap mudah dikenali. Khusus IndiHome, child-brand
+                # sudah dibuang sebelum PyVis sehingga yang merah hanya akun utama.
+                node_size = 82 if indihome_graph_mode else max(74, min(98, node_size * 1.22))
+
             platform_color = PLATFORM_GRAPH_COLORS.get(
                 platform_group, PLATFORM_GRAPH_COLORS["unknown"]
             )
@@ -6174,7 +6252,6 @@ def generate_pyvis_graph(
                 fill_color = PLATFORM_GRAPH_COLORS["target"]
             border_color = graph_highlight if is_brand else platform_color
             platform_label = str(row.get("platform_label", "Tidak diketahui"))
-            followers = int(row.get("followers", 0))
             label = username if len(username) <= 22 else f"{username[:19]}..."
             is_key_label = is_brand or str(username) in key_label_nodes
             visible_label = label if is_key_label else ""
@@ -7558,7 +7635,7 @@ def _render_networkx_fallback(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> 
         st.error(f"Ringkasan fallback graf juga gagal ditampilkan: {exc}")
 
 
-def _render_graph_legend() -> None:
+def _render_graph_legend(service: str = "") -> None:
     """Tampilkan legenda warna sentimen node pada visualisasi graf."""
     try:
         items = [
@@ -7573,9 +7650,15 @@ def _render_graph_legend() -> None:
             f'<span class="sna-v9-legend-item"><span class="sna-v9-dot" style="background:{color};"></span>{label}</span>'
             for color, label in items
         )
+        size_note = (
+            "Ukuran node: Twitter/X mengikuti degree, sedangkan Instagram dan TikTok mengikuti jumlah followers. "
+            "Node tanpa data sentimen menggunakan warna platform sebagai isi. Chip platform di dalam graf tetap dapat dipakai untuk menyaring kelompok node."
+            if str(service).strip().lower() == "indihome"
+            else "Ukuran node mengikuti PageRank. Node tanpa data sentimen menggunakan warna platform sebagai isi. Chip platform di dalam graf tetap dapat dipakai untuk menyaring kelompok node."
+        )
         st.markdown(
             f'<div class="sna-v9-platform-legend">{legend}</div>'
-            '<div class="sna-v9-section-subtitle" style="margin-top:.35rem;">Ukuran node mengikuti PageRank. Node tanpa data sentimen menggunakan warna platform sebagai isi. Chip platform di dalam graf tetap dapat dipakai untuk menyaring kelompok node.</div>',
+            f'<div class="sna-v9-section-subtitle" style="margin-top:.35rem;">{escape(size_note)}</div>',
             unsafe_allow_html=True,
         )
     except Exception as exc:
@@ -7602,7 +7685,7 @@ def _queue_network_graph_render(request_id: str) -> None:
     except Exception as exc:
         st.error(f"Permintaan graf belum dapat disiapkan: {exc}")
 
-def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: int) -> None:
+def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: int, service: str = "") -> None:
     """Render graf jaringan interaktif Pyvis full width."""
     try:
         with st.container(border=True):
@@ -7619,7 +7702,7 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
                 unsafe_allow_html=True,
             )
 
-            visual_graph, visual_nodes = _limit_graph_nodes(graph, node_df, node_limit)
+            visual_graph, visual_nodes = _limit_graph_nodes(graph, node_df, node_limit, service=service)
             if visual_graph.number_of_nodes() == 0:
                 st.info("Tidak ada data graf pada kombinasi filter yang dipilih.")
                 return
@@ -7710,6 +7793,7 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
                         visual_graph,
                         visual_nodes,
                         dark_mode=bool(st.session_state.get("dark_mode", False)),
+                        service=service,
                     )
                 if not html:
                     raise RuntimeError("HTML PyVis kosong.")
@@ -7721,8 +7805,14 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
                 LOGGER.warning("Visualisasi PyVis memakai graf pengganti karena komponen interaktif belum siap: %s", pyvis_exc)
                 _render_networkx_fallback(visual_graph, visual_nodes)
 
-            _render_graph_legend()
-            st.caption("Ukuran node mengikuti PageRank. Isi node menunjukkan sentimen; garis tepi menunjukkan platform. Jika sentimen node belum tersedia, isi node memakai warna platform agar jaringan tetap mudah dibaca.")
+            _render_graph_legend(service)
+            if str(service).strip().lower() == "indihome":
+                st.caption(
+                    "Ukuran node Twitter/X mengikuti degree. Ukuran node Instagram dan TikTok mengikuti jumlah followers. "
+                    "Akun layanan turunan disembunyikan dari graf IndiHome; akun utama IndiHome, IndiBiz, dan Telkomsel tetap dapat tampil sebagai hub merah bila terdapat pada jaringan aktif."
+                )
+            else:
+                st.caption("Ukuran node mengikuti PageRank. Isi node menunjukkan sentimen; garis tepi menunjukkan platform. Jika sentimen node belum tersedia, isi node memakai warna platform agar jaringan tetap mudah dibaca.")
     except Exception as exc:
         st.error(f"Gagal menampilkan visualisasi graf: {exc}")
 
@@ -8847,7 +8937,7 @@ def render_sna() -> None:
             )
             _render_indibiz_static_network_graph(clean_df)
 
-        _render_network_graph(graph, node_df, node_limit)
+        _render_network_graph(graph, node_df, node_limit, selected_service)
         _render_influencer_tables(node_df, selected_service, selected_platform)
         _render_statistics_expander(node_df)
         _render_method_card()
