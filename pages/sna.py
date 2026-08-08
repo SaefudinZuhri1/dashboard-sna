@@ -2814,6 +2814,7 @@ def _inject_sna_css() -> None:
                 }
 
                 .sna-v10-table-grid {
+                    align-items: start;
                     display: grid;
                     gap: 0.9rem;
                     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2905,30 +2906,51 @@ def _inject_sna_css() -> None:
                     white-space: nowrap;
                 }
 
+                /*
+                 * Tabel ranking IndiBiz dibuat memakai grid pada setiap baris.
+                 * Ini menghindari intrinsic sizing tabel Markdown/Streamlit yang
+                 * sebelumnya menyisakan ruang kosong di sisi kanan card.
+                 */
                 .sna-v10-table-scroll {
-                    max-width: 100%;
-                    overflow-x: auto;
-                    width: 100%;
-                }
-
-                table.sna-v10-table {
-                    border-collapse: collapse;
                     box-sizing: border-box;
-                    color: #FFFFFF;
-                    font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
-                    min-width: 100%;
-                    table-layout: fixed;
+                    display: block !important;
+                    max-width: none !important;
+                    overflow-x: auto;
                     width: 100% !important;
                 }
 
-                .sna-v10-table th:nth-child(1),
-                .sna-v10-table td:nth-child(1) { width: 15%; }
+                table.sna-v10-table {
+                    border-collapse: separate;
+                    border-spacing: 0;
+                    box-sizing: border-box;
+                    color: #FFFFFF;
+                    display: block !important;
+                    font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
+                    max-width: none !important;
+                    min-width: 0 !important;
+                    table-layout: auto;
+                    width: 100% !important;
+                }
 
-                .sna-v10-table th:nth-child(2),
-                .sna-v10-table td:nth-child(2) { width: 43%; }
+                .sna-v10-table thead,
+                .sna-v10-table tbody {
+                    display: block;
+                    width: 100%;
+                }
 
-                .sna-v10-table th:nth-child(3),
-                .sna-v10-table td:nth-child(3) { width: 42%; }
+                .sna-v10-table thead tr,
+                .sna-v10-table tbody tr {
+                    display: grid;
+                    grid-template-columns: 15% 43% 42%;
+                    width: 100%;
+                }
+
+                .sna-v10-table th,
+                .sna-v10-table td {
+                    box-sizing: border-box;
+                    min-width: 0;
+                    width: auto !important;
+                }
 
                 .sna-v10-table th {
                     background: #151515;
