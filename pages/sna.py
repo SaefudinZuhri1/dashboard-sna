@@ -3383,6 +3383,50 @@ def _inject_sna_light_mode_patch() -> None:
                     color: #1F2937 !important;
                 }
 
+                /* Hero light mode: merah tetap kuat, tetapi lebih hidup dan kontras. */
+                html body:has(.sna-v9-page) .sna-v9-hero {
+                    background:
+                        radial-gradient(circle at 88% 8%, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0) 34%),
+                        radial-gradient(circle at 8% 100%, rgba(255,179,153,0.16) 0%, rgba(255,179,153,0) 38%),
+                        linear-gradient(120deg, #B91C1C 0%, #D92525 34%, #EF3E3E 68%, #F46B68 100%) !important;
+                    border-color: rgba(185, 28, 28, 0.18) !important;
+                    box-shadow: 0 16px 36px rgba(185, 28, 28, 0.17), 0 3px 10px rgba(15, 23, 42, 0.06) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-hero::after {
+                    background: radial-gradient(circle, rgba(255,255,255,0.20), transparent 68%) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-hero h1 {
+                    color: #FFFFFF !important;
+                    text-shadow: 0 2px 10px rgba(90, 10, 10, 0.16);
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-hero p {
+                    color: rgba(255,255,255,0.96) !important;
+                    text-shadow: 0 1px 5px rgba(90, 10, 10, 0.10);
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-hero .sna-v9-badge {
+                    color: #FFFFFF !important;
+                    border-color: rgba(255,255,255,0.32) !important;
+                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-hero .sna-v9-badge-glass {
+                    background: rgba(117, 20, 24, 0.28) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-hero .sna-v9-badge-real {
+                    background: rgba(22, 101, 52, 0.86) !important;
+                    border-color: rgba(187, 247, 208, 0.48) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-hero .sna-v9-badge-dummy {
+                    background: rgba(180, 83, 9, 0.86) !important;
+                    border-color: rgba(254, 215, 170, 0.50) !important;
+                }
+
                 /* Permukaan utama dan section. */
                 html body:has(.sna-v9-page) .sna-v9-card,
                 html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-card-marker),
