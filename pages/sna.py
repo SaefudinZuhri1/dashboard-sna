@@ -143,6 +143,67 @@ EXCLUDE_SERVICE_PREFIXES = (
     "mytelkomsel",
 )
 
+# Akun perusahaan, instansi pemerintah, dan layanan eksternal tidak disebut
+# sebagai influencer personal/opinion leader. Daftar ini dibuat konservatif dan
+# dapat diperluas jika dataset penelitian menemukan akun resmi baru. Node tetap
+# ada pada graph dan seluruh metrik tetap dihitung; filter hanya memengaruhi
+# ranking/tabel influencer agar interpretasi penelitian tidak menyesatkan.
+NON_INFLUENCER_ENTITY_ACCOUNTS = {
+    "pln",
+    "pln_123",
+    "plnmobile",
+    "starlink",
+    "starlinkindonesia",
+    "pertamina",
+    "pertaminapatraniaga",
+    "bnpb",
+    "bnpb_indonesia",
+    "bmkg",
+    "infobmkg",
+    "basarnas",
+    "bpbd",
+    "byu_id",
+    "myxl",
+    "xlaxiata",
+    "indosat",
+    "indosatim3",
+    "careim3",
+    "triindonesia",
+    "smartfren",
+    "smartfrenworld",
+    "commuterline",
+    "kai121",
+    "keretaapikita",
+}
+NON_INFLUENCER_ENTITY_ACCOUNTS_COMPACT = {
+    "".join(char for char in account.lower() if char.isalnum())
+    for account in NON_INFLUENCER_ENTITY_ACCOUNTS
+}
+
+# Prefix hanya dipakai untuk pola yang sangat identik dengan akun institusi.
+# Hindari keyword generik seperti "official", "media", atau "news" agar
+# akun komunitas/media yang memang dapat berperan sebagai opinion leader tidak
+# terhapus dari ranking.
+NON_INFLUENCER_ENTITY_PREFIXES = (
+    "pln",
+    "pertamina",
+    "bnpb",
+    "bpbd",
+    "bmkg",
+    "basarnas",
+    "starlink",
+    "kemen",
+    "kemkomdigi",
+    "kominfo",
+    "pemprov",
+    "pemkot",
+    "pemkab",
+    "dishub",
+    "polri",
+    "divhumaspolri",
+    "tni",
+)
+
 REQUIRED_SNA_COLUMNS = {"source", "target", "relationship", "followers", "platform"}
 SNA_ACTION_LOADING_KEY = "_sna_v9_action_loading_label"
 SNA_GRAPH_RENDER_REQUEST_KEY = "_sna_v9_graph_render_request"
@@ -4404,6 +4465,25 @@ def _is_excluded_from_influencer(username: Any) -> bool:
         return False
 
 
+def _is_external_brand_or_institution(username: Any) -> bool:
+    """Tandai akun perusahaan/instansi eksternal agar tidak disebut influencer.
+
+    Fungsi ini tidak menghapus node dari graph. PageRank, degree, in-degree,
+    out-degree, dan hubungan jaringan tetap dihitung dari data asli. Penyaringan
+    hanya diterapkan pada daftar influencer dan tabel node non-layanan.
+    """
+    try:
+        compact = _compact_username(username)
+        if not compact:
+            return False
+        if compact in NON_INFLUENCER_ENTITY_ACCOUNTS_COMPACT:
+            return True
+        return compact.startswith(NON_INFLUENCER_ENTITY_PREFIXES)
+    except Exception as exc:
+        st.error(f"Filter akun brand/institusi belum dapat diterapkan: {exc}")
+        return False
+
+
 def _infer_service(row: pd.Series) -> str:
     """Inferensi layanan dari kolom layanan atau dari akun source/target."""
     try:
@@ -5250,7 +5330,10 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
         else:
             brand_mask = ranking["username"].map(_is_brand_account)
         excluded_mask = ranking["username"].map(_is_excluded_from_influencer)
-        influencer_ranking = ranking[(~brand_mask) & (~excluded_mask)].copy()
+        external_entity_mask = ranking["username"].map(_is_external_brand_or_institution)
+        influencer_ranking = ranking[
+            (~brand_mask) & (~excluded_mask) & (~external_entity_mask)
+        ].copy()
 
         if influencer_ranking.empty:
             st.info("Belum ada akun non-brand untuk ditampilkan pada Top 10 Influencer.")
@@ -5284,6 +5367,11 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
                 use_container_width=True,
                 key=f"sna_pagerank_{service.lower()}",
             )
+            st.caption(
+                "* Akun layanan, perusahaan, brand, dan instansi resmi dikeluarkan "
+                "dari ranking influencer, tetapi tetap dipertahankan pada graph dan "
+                "perhitungan metrik jaringan."
+            )
 
         # Tabel semua metrik menggunakan ranking akun non-layanan yang sama
         # dengan Top Influencer. Akun brand tetap dipertahankan pada graph.
@@ -5315,7 +5403,7 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
                 <div class="sna-v9-section-head">
                     <div>
                         <h2 class="sna-v9-section-title">Top 40 Node — Semua Metrik</h2>
-                        <p class="sna-v9-section-subtitle">Default diurutkan berdasarkan PageRank tertinggi. Akun layanan resmi dan turunannya tidak disertakan. Klik judul kolom pada tabel untuk mengurutkan ulang.</p>
+                        <p class="sna-v9-section-subtitle">Default diurutkan berdasarkan PageRank tertinggi. Akun layanan, perusahaan, brand, dan instansi resmi tidak disertakan. Klik judul kolom pada tabel untuk mengurutkan ulang.</p>
                     </div>
                     <span class="sna-v12-live-badge"><span class="sna-v12-live-dot"></span>{escape(service)}</span>
                 </div>
