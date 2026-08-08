@@ -4221,6 +4221,163 @@ def _hide_service_account_from_indihome_graph(username: Any) -> bool:
         return False
 
 
+
+
+def _map_service_account_for_indibiz_graph(username: Any) -> str:
+    """Petakan akun layanan ke node utama khusus visualisasi graf IndiBiz.
+
+    Akun regional/care IndiBiz disatukan ke ``indibiz`` agar interaksi tetap
+    terbaca sebagai hubungan ke layanan utama, bukan sebagai influencer atau
+    hub terpisah. Pada graf IndiBiz, hanya akun utama ``indibiz`` yang
+    dipertahankan sebagai node layanan. Akun layanan lain disembunyikan dari
+    visualisasi saja dan tidak dihapus dari data penelitian.
+    """
+    try:
+        normalized = _normalize_username(username)
+        compact = _compact_username(normalized)
+        if not compact:
+            return ""
+
+        # Pada konteks layanan IndiBiz, hanya node utama ``indibiz`` yang
+        # dipertahankan sebagai hub merah. Seluruh akun regional/care IndiBiz
+        # digabung ke hub ini. Akun layanan lain tidak ditampilkan pada graf
+        # IndiBiz agar tidak terbaca sebagai influencer percakapan IndiBiz.
+        if compact == "indibiz" or compact.startswith("indibiz"):
+            return "indibiz"
+        if compact in PRIMARY_SERVICE_GRAPH_ACCOUNTS:
+            return ""
+        if compact.startswith(("indihome", "myindihome")):
+            return ""
+        if compact.startswith(("telkomsel", "mytelkomsel", "tsel")):
+            return ""
+
+        # Akun Telkom/regional lain tidak dipaksakan menjadi Telkomsel karena
+        # secara entitas berbeda. Node tersebut cukup disembunyikan dari graf.
+        if _is_brand_account(normalized) or compact.startswith(EXCLUDE_SERVICE_PREFIXES):
+            return ""
+        return normalized
+    except Exception as exc:
+        st.error(f"Pemetaan akun layanan pada graf IndiBiz belum dapat diterapkan: {exc}")
+        return _normalize_username(username)
+
+
+def _collapse_indibiz_service_accounts_for_graph(
+    graph: nx.DiGraph,
+    node_df: pd.DataFrame,
+) -> tuple[nx.DiGraph, pd.DataFrame]:
+    """Satukan akun turunan IndiBiz ke satu hub visual tanpa mengubah data asli."""
+    try:
+        if graph is None or graph.number_of_nodes() == 0 or node_df is None or node_df.empty:
+            return graph.copy(), node_df.copy()
+
+        node_mapping = {
+            str(node): _map_service_account_for_indibiz_graph(node)
+            for node in graph.nodes
+        }
+        collapsed_graph = nx.DiGraph()
+
+        # Bangun ulang edge sehingga seluruh interaksi ke akun regional/care
+        # IndiBiz tetap dipertahankan, tetapi target/source visualnya menjadi
+        # satu node utama ``indibiz``. Edge ganda dijumlahkan melalui weight.
+        for source, target, attributes in graph.edges(data=True):
+            mapped_source = node_mapping.get(str(source), str(source))
+            mapped_target = node_mapping.get(str(target), str(target))
+            if not mapped_source or not mapped_target or mapped_source == mapped_target:
+                continue
+
+            weight = int(attributes.get("weight", 1) or 1)
+            if collapsed_graph.has_edge(mapped_source, mapped_target):
+                collapsed_graph[mapped_source][mapped_target]["weight"] = int(
+                    collapsed_graph[mapped_source][mapped_target].get("weight", 1)
+                ) + weight
+            else:
+                collapsed_graph.add_edge(
+                    mapped_source,
+                    mapped_target,
+                    relationship=str(attributes.get("relationship", "interaction")),
+                    platform=str(attributes.get("platform", "unknown")),
+                    weight=weight,
+                )
+
+        if collapsed_graph.number_of_nodes() == 0:
+            return graph.copy(), node_df.copy()
+
+        work = node_df.copy()
+        work["username"] = work["username"].astype(str)
+        work["visual_username"] = work["username"].map(
+            lambda value: node_mapping.get(str(value), _map_service_account_for_indibiz_graph(value))
+        )
+        work = work[work["visual_username"].astype(str).ne("")].copy()
+
+        degree_centrality = (
+            nx.degree_centrality(collapsed_graph)
+            if collapsed_graph.number_of_nodes() > 1
+            else {str(node): 0.0 for node in collapsed_graph.nodes}
+        )
+        try:
+            pagerank = nx.pagerank(
+                collapsed_graph,
+                alpha=0.85,
+                weight="weight",
+                max_iter=200,
+                tol=1.0e-6,
+            )
+        except Exception:
+            pagerank = {str(node): 0.0 for node in collapsed_graph.nodes}
+
+        rows: list[dict[str, Any]] = []
+        for username in collapsed_graph.nodes:
+            candidates = work[work["visual_username"].eq(str(username))].copy()
+            exact = candidates[candidates["username"].eq(str(username))]
+            if not exact.empty:
+                base = exact.iloc[0].to_dict()
+            elif not candidates.empty:
+                base = candidates.iloc[0].to_dict()
+            else:
+                base = {"username": str(username)}
+
+            followers = 0
+            if not candidates.empty and "followers" in candidates.columns:
+                followers = int(
+                    pd.to_numeric(candidates["followers"], errors="coerce").fillna(0).max()
+                )
+
+            is_primary_service = str(username) in PRIMARY_SERVICE_GRAPH_ACCOUNTS
+            sentiment = _normalize_sentiment(base.get("dominant_sentiment", "unknown"))
+            base.update(
+                {
+                    "username": str(username),
+                    "platform": str(username) if is_primary_service else str(base.get("platform", "unknown")),
+                    "platform_group": "target" if is_primary_service else str(base.get("platform_group", "unknown")),
+                    "platform_label": PLATFORM_DISPLAY["target"] if is_primary_service else str(base.get("platform_label", "Tidak diketahui")),
+                    "followers": followers,
+                    "degree": int(collapsed_graph.degree(username)),
+                    "degree_centrality": float(degree_centrality.get(username, 0.0)),
+                    "pagerank": float(pagerank.get(username, 0.0)),
+                    "in_degree": int(collapsed_graph.in_degree(username)),
+                    "out_degree": int(collapsed_graph.out_degree(username)),
+                    "dominant_sentiment": sentiment,
+                    "sentiment_label": SENTIMENT_DISPLAY.get(sentiment, "Belum tersedia"),
+                    "is_brand": bool(is_primary_service),
+                }
+            )
+            base.pop("visual_username", None)
+            rows.append(base)
+
+        collapsed_nodes = pd.DataFrame(rows)
+        if not collapsed_nodes.empty:
+            collapsed_nodes = collapsed_nodes.sort_values(
+                ["pagerank", "degree_centrality", "followers", "username"],
+                ascending=[False, False, False, True],
+                kind="mergesort",
+            ).reset_index(drop=True)
+
+        return collapsed_graph, collapsed_nodes
+    except Exception as exc:
+        st.error(f"Gagal merapikan akun layanan pada graf IndiBiz: {exc}")
+        return graph.copy(), node_df.copy()
+
+
 def _is_excluded_from_influencer(username: Any) -> bool:
     """Cek akun layanan/turunan yang harus disembunyikan dari ranking influencer."""
     try:
@@ -6268,15 +6425,27 @@ def _limit_graph_nodes(
     Pada filter satu platform, pemilihan tetap memakai ranking metrik jaringan.
     Pada filter Semua Platform, slot non-brand dibagi merata antara Twitter/X,
     Instagram, dan TikTok yang tersedia. Khusus IndiHome, akun layanan turunan
-    disembunyikan dari visualisasi dan hanya akun utama IndiHome, IndiBiz, atau
-    Telkomsel yang boleh tetap tampil sebagai node brand/hub.
+    disembunyikan dari visualisasi. Khusus IndiBiz, akun regional/care IndiBiz
+    disatukan ke satu node utama ``indibiz`` agar edge tetap terjaga dan pola
+    jaringan lebih konsisten. Hanya akun utama IndiHome, IndiBiz, atau Telkomsel
+    yang boleh tetap tampil sebagai node brand/hub.
     """
     try:
         limit = max(1, int(node_limit))
         graph_work = graph.copy()
         node_work = node_df.copy()
+        service_key = str(service).strip().lower()
 
-        if str(service).strip().lower() == "indihome" and not node_work.empty:
+        # IndiBiz memiliki banyak akun regional/resmi (indibiz_id,
+        # indibiz_borneo, indibizkti, dan lain-lain). Khusus visualisasi,
+        # seluruh akun turunan tersebut disatukan ke node utama ``indibiz``
+        # agar pola hub-and-spoke terbaca tanpa menghapus edge penelitian.
+        if service_key == "indibiz" and not node_work.empty:
+            graph_work, node_work = _collapse_indibiz_service_accounts_for_graph(
+                graph_work, node_work
+            )
+
+        if service_key == "indihome" and not node_work.empty:
             hidden_mask = node_work["username"].map(_hide_service_account_from_indihome_graph)
             hidden_usernames = set(node_work.loc[hidden_mask, "username"].astype(str))
             if hidden_usernames:
@@ -6320,10 +6489,41 @@ def _limit_graph_nodes(
         # dipertahankan, tetapi akun brand tidak lagi otomatis mengalahkan semua
         # akun percakapan hanya karena statusnya sebagai brand.
         if len(available_platforms) <= 1:
-            ranked = pd.concat([_rank(non_brand), _rank(brand)], ignore_index=True)
-            selected_nodes = ranked.drop_duplicates("username").head(limit)["username"].tolist()
-            subgraph = graph_work.subgraph(selected_nodes).copy()
-            selected_df = work[work["username"].isin(selected_nodes)].copy()
+            if service_key in {"indihome", "indibiz"}:
+                # Sumber SNA IndiBiz aktual dapat hanya memiliki label Twitter/X.
+                # Hub utama tetap wajib masuk visualisasi agar subgraf tidak
+                # kehilangan pusat jaringan saat kandidat non-brand melebihi limit.
+                allowed_primary_accounts = (
+                    {"indibiz"}
+                    if service_key == "indibiz"
+                    else PRIMARY_SERVICE_GRAPH_ACCOUNTS
+                )
+                primary_brand = brand[
+                    brand["username"].map(_compact_username).isin(
+                        allowed_primary_accounts
+                    )
+                ].copy()
+                primary_names = _rank(primary_brand).head(3)["username"].tolist()
+                selected_nodes = list(dict.fromkeys(primary_names))
+                remaining = max(0, limit - len(selected_nodes))
+                selected_nodes.extend(
+                    _rank(non_brand).head(remaining)["username"].tolist()
+                )
+                selected_nodes = list(dict.fromkeys(selected_nodes))
+                if len(selected_nodes) < limit:
+                    remaining_brand = _rank(
+                        brand[~brand["username"].isin(selected_nodes)]
+                    )
+                    selected_nodes.extend(
+                        remaining_brand.head(limit - len(selected_nodes))["username"].tolist()
+                    )
+                    selected_nodes = list(dict.fromkeys(selected_nodes))
+            else:
+                ranked = pd.concat([_rank(non_brand), _rank(brand)], ignore_index=True)
+                selected_nodes = ranked.drop_duplicates("username").head(limit)["username"].tolist()
+
+            subgraph = graph_work.subgraph(selected_nodes[:limit]).copy()
+            selected_df = work[work["username"].isin(selected_nodes[:limit])].copy()
             return subgraph, selected_df
 
         # Maksimal 10 akun brand atau sekitar 10% dari batas node. Dengan batas
@@ -6421,11 +6621,12 @@ def generate_pyvis_graph(
             1.0e-12,
         )
 
-        # Skala ukuran khusus Eksplorasi Graf SNA IndiHome:
+        # Skala ukuran khusus Eksplorasi Graf SNA IndiHome dan IndiBiz:
         # Twitter/X mengikuti degree, sedangkan Instagram dan TikTok mengikuti
         # followers. Logarithmic scaling pada followers mencegah satu akun dengan
         # followers sangat besar membuat node lain nyaris tidak terlihat.
-        indihome_graph_mode = str(service).strip().lower() == "indihome"
+        service_graph_key = str(service).strip().lower()
+        hybrid_metric_graph_mode = service_graph_key in {"indihome", "indibiz"}
         twitter_nodes = visual_nodes[visual_nodes.get("platform_group", "unknown").eq("twitter")] if "platform_group" in visual_nodes.columns else pd.DataFrame()
         instagram_nodes = visual_nodes[visual_nodes.get("platform_group", "unknown").eq("instagram")] if "platform_group" in visual_nodes.columns else pd.DataFrame()
         tiktok_nodes = visual_nodes[visual_nodes.get("platform_group", "unknown").eq("tiktok")] if "platform_group" in visual_nodes.columns else pd.DataFrame()
@@ -6461,13 +6662,13 @@ def generate_pyvis_graph(
             is_brand = bool(row.get("is_brand", False))
             platform_group = str(row.get("platform_group", "unknown"))
 
-            if indihome_graph_mode and not is_brand and platform_group == "twitter":
+            if hybrid_metric_graph_mode and not is_brand and platform_group == "twitter":
                 relative_degree = max(0.0, min(1.0, degree_count / max_twitter_degree))
                 node_size = max(13, min(68, 13 + 55 * (relative_degree ** 0.50)))
-            elif indihome_graph_mode and not is_brand and platform_group == "instagram":
+            elif hybrid_metric_graph_mode and not is_brand and platform_group == "instagram":
                 relative_followers = np.log1p(max(0, followers)) / np.log1p(max_instagram_followers)
                 node_size = max(13, min(68, 13 + 55 * (relative_followers ** 0.72)))
-            elif indihome_graph_mode and not is_brand and platform_group == "tiktok":
+            elif hybrid_metric_graph_mode and not is_brand and platform_group == "tiktok":
                 relative_followers = np.log1p(max(0, followers)) / np.log1p(max_tiktok_followers)
                 node_size = max(13, min(68, 13 + 55 * (relative_followers ** 0.72)))
             else:
@@ -6475,9 +6676,9 @@ def generate_pyvis_graph(
                 node_size = max(13, min(76, 13 + 63 * (relative_pagerank ** 0.42)))
 
             if is_brand:
-                # Hub utama tetap mudah dikenali. Khusus IndiHome, child-brand
-                # sudah dibuang sebelum PyVis sehingga yang merah hanya akun utama.
-                node_size = 82 if indihome_graph_mode else max(74, min(98, node_size * 1.22))
+                # Hub utama tetap mudah dikenali. Pada IndiHome akun turunan
+                # disembunyikan; pada IndiBiz akun turunan digabung ke hub utama.
+                node_size = 82 if hybrid_metric_graph_mode else max(74, min(98, node_size * 1.22))
 
             platform_color = PLATFORM_GRAPH_COLORS.get(
                 platform_group, PLATFORM_GRAPH_COLORS["unknown"]
@@ -7890,10 +8091,11 @@ def _render_graph_legend(service: str = "") -> None:
             f'<span class="sna-v9-legend-item"><span class="sna-v9-dot" style="background:{color};"></span>{label}</span>'
             for color, label in items
         )
+        service_key = str(service).strip().lower()
         size_note = (
             "Ukuran node: Twitter/X mengikuti degree, sedangkan Instagram dan TikTok mengikuti jumlah followers. "
             "Node tanpa data sentimen menggunakan warna platform sebagai isi. Chip platform di dalam graf tetap dapat dipakai untuk menyaring kelompok node."
-            if str(service).strip().lower() == "indihome"
+            if service_key in {"indihome", "indibiz"}
             else "Ukuran node mengikuti PageRank. Node tanpa data sentimen menggunakan warna platform sebagai isi. Chip platform di dalam graf tetap dapat dipakai untuk menyaring kelompok node."
         )
         st.markdown(
@@ -8046,10 +8248,16 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
                 _render_networkx_fallback(visual_graph, visual_nodes)
 
             _render_graph_legend(service)
-            if str(service).strip().lower() == "indihome":
+            service_key = str(service).strip().lower()
+            if service_key == "indihome":
                 st.caption(
                     "Ukuran node Twitter/X mengikuti degree. Ukuran node Instagram dan TikTok mengikuti jumlah followers. "
                     "Akun layanan turunan disembunyikan dari graf IndiHome; akun utama IndiHome, IndiBiz, dan Telkomsel tetap dapat tampil sebagai hub merah bila terdapat pada jaringan aktif."
+                )
+            elif service_key == "indibiz":
+                st.caption(
+                    "Ukuran node Twitter/X mengikuti degree. Ukuran node Instagram dan TikTok mengikuti jumlah followers. "
+                    "Akun regional/care IndiBiz disatukan ke satu hub visual indibiz agar interaksi tidak hilang dan akun layanan tidak terbaca sebagai influencer terpisah. Data serta metrik SNA asli tidak diubah."
                 )
             else:
                 st.caption("Ukuran node mengikuti PageRank. Isi node menunjukkan sentimen; garis tepi menunjukkan platform. Jika sentimen node belum tersedia, isi node memakai warna platform agar jaringan tetap mudah dibaca.")
