@@ -4796,31 +4796,47 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
             kind="mergesort",
         ).reset_index(drop=True)
 
-        top10 = ranking.head(10).sort_values("pagerank", ascending=True)
-        fig = go.Figure(
-            go.Bar(
-                x=top10["pagerank"],
-                y=top10["username"],
-                orientation="h",
-                marker={"color": "#E53935"},
-                customdata=top10[["platform_label", "followers"]],
-                hovertemplate=(
-                    "<b>%{y}</b><br>PageRank: %{x:.8f}<br>"
-                    "Platform: %{customdata[0]}<br>Followers: %{customdata[1]:,.0f}"
-                    "<extra></extra>"
-                ),
+        # Top Influencer hanya berisi akun non-brand. Akun layanan resmi dan
+        # turunannya tetap dipertahankan pada graph serta tabel semua node.
+        if "is_brand" in ranking.columns:
+            brand_mask = ranking["is_brand"].astype(bool)
+        else:
+            brand_mask = ranking["username"].map(_is_brand_account)
+        excluded_mask = ranking["username"].map(_is_excluded_from_influencer)
+        influencer_ranking = ranking[(~brand_mask) & (~excluded_mask)].copy()
+
+        if influencer_ranking.empty:
+            st.info("Belum ada akun non-brand untuk ditampilkan pada Top 10 Influencer.")
+        else:
+            top10 = influencer_ranking.head(10).sort_values("pagerank", ascending=True)
+            fig = go.Figure(
+                go.Bar(
+                    x=top10["pagerank"],
+                    y=top10["username"],
+                    orientation="h",
+                    marker={"color": "#E53935"},
+                    customdata=top10[["platform_label", "followers"]],
+                    hovertemplate=(
+                        "<b>%{y}</b><br>PageRank: %{x:.8f}<br>"
+                        "Platform: %{customdata[0]}<br>Followers: %{customdata[1]:,.0f}"
+                        "<extra></extra>"
+                    ),
+                )
             )
-        )
-        fig.update_layout(
-            height=430,
-            xaxis_title="PageRank Score",
-            yaxis_title="Akun / Username",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            showlegend=False,
-        )
-        fig = _apply_plotly_theme(fig, f"Top 10 Influencer — {service}")
-        _plotly_chart_aman(fig, use_container_width=True, key=f"sna_pagerank_{service.lower()}")
+            fig.update_layout(
+                height=430,
+                xaxis_title="PageRank Score",
+                yaxis_title="Akun / Username",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                showlegend=False,
+            )
+            fig = _apply_plotly_theme(fig, f"Top 10 Influencer — {service}")
+            _plotly_chart_aman(
+                fig,
+                use_container_width=True,
+                key=f"sna_pagerank_{service.lower()}",
+            )
 
         top20 = ranking.head(20).copy()
         top20.insert(0, "Rank", range(1, len(top20) + 1))
