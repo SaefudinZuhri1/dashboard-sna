@@ -2905,15 +2905,30 @@ def _inject_sna_css() -> None:
                     white-space: nowrap;
                 }
 
-                .sna-v10-table-scroll { overflow-x: auto; }
+                .sna-v10-table-scroll {
+                    max-width: 100%;
+                    overflow-x: auto;
+                    width: 100%;
+                }
 
                 table.sna-v10-table {
                     border-collapse: collapse;
+                    box-sizing: border-box;
                     color: #FFFFFF;
                     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
-                    min-width: 430px;
-                    width: 100%;
+                    min-width: 100%;
+                    table-layout: fixed;
+                    width: 100% !important;
                 }
+
+                .sna-v10-table th:nth-child(1),
+                .sna-v10-table td:nth-child(1) { width: 15%; }
+
+                .sna-v10-table th:nth-child(2),
+                .sna-v10-table td:nth-child(2) { width: 43%; }
+
+                .sna-v10-table th:nth-child(3),
+                .sna-v10-table td:nth-child(3) { width: 42%; }
 
                 .sna-v10-table th {
                     background: #151515;

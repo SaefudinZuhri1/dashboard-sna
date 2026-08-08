@@ -1,6 +1,15 @@
 {
   "user_id:1": [
     {
+      "id": "20260807020655538432",
+      "Waktu": "07-08-2026 02:06:55",
+      "Teks": "Jelek banget",
+      "Sentimen": "Negatif",
+      "SentimentKey": "negative",
+      "ConfidenceValue": 0.9982628357019938,
+      "Confidence": "99.8%"
+    },
+    {
       "id": "20260729235630383891",
       "Waktu": "29-07-2026 23:56:30",
       "Teks": "testing",
@@ -80,15 +89,6 @@
       "SentimentKey": "negative",
       "ConfidenceValue": 0.9980999443944332,
       "Confidence": "99.8%"
-    },
-    {
-      "id": "20260708033233352533",
-      "Waktu": "08-07-2026 03:32:33",
-      "Teks": "Apa itu indibiz?",
-      "Sentimen": "Netral",
-      "SentimentKey": "neutral",
-      "ConfidenceValue": 0.943307102909384,
-      "Confidence": "94.3%"
     }
   ]
 }

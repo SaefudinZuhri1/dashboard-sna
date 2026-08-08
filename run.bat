@@ -157,10 +157,11 @@ if exist "%REQUIREMENTS_MARKER%" set /p INSTALLED_REQUIREMENTS_HASH=<"%REQUIREME
 set "INSTALL_REQUIRED=0"
 if /I not "%CURRENT_REQUIREMENTS_HASH%"=="%INSTALLED_REQUIREMENTS_HASH%" set "INSTALL_REQUIRED=1"
 
-REM Verifikasi import library inti. Jika ada library hilang, dependency
-REM dipasang ulang walaupun requirements.txt tidak berubah.
+REM Verifikasi dependency secara ringan melalui metadata paket.
+REM Jangan mengimpor Torch, Transformers, atau Google SDK pada setiap startup
+REM karena import library berat tersebut memperlambat launcher.
 if "%INSTALL_REQUIRED%"=="0" (
-    "%VENV_PYTHON%" -c "import streamlit, pandas, plotly, networkx, pyvis, bcrypt, transformers, torch, wordcloud, openpyxl; import google.genai" >nul 2>&1
+    "%VENV_PYTHON%" -c "import importlib.metadata as m; n=lambda x:x.lower().replace('_','-'); a={n(d.metadata['Name']) for d in m.distributions() if d.metadata.get('Name')}; r={'streamlit','pandas','plotly','networkx','pyvis','bcrypt','transformers','torch','wordcloud','openpyxl','google-genai'}; raise SystemExit(0 if r <= a else 1)" >nul 2>&1
     if errorlevel 1 set "INSTALL_REQUIRED=1"
 )
 
@@ -221,8 +222,10 @@ echo [INFO] Tekan Ctrl+C untuk menghentikan server.
 echo ======================================================
 echo.
 
-REM Buka browser beberapa detik setelah proses server dimulai.
-start "" /b "%VENV_PYTHON%" -c "import time, webbrowser; time.sleep(4); webbrowser.open('%DASHBOARD_URL%')"
+REM Buka browser hanya setelah port Streamlit benar-benar siap.
+REM os.startfile pada helper Windows lebih andal daripada webbrowser.open
+REM yang pada sebagian komputer tidak menjalankan browser dari proses background.
+start "" /b "%VENV_PYTHON%" "%~dp0utils\browser_launcher.py" "%DASHBOARD_URL%" "%DASHBOARD_PORT%" >nul 2>&1
 
 REM Streamlit dijalankan melalui CMD anak. Saat Ctrl+C ditekan, proses
 REM Streamlit dihentikan lalu kontrol dikembalikan ke menu launcher.
