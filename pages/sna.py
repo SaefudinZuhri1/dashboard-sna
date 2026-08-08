@@ -3364,6 +3364,489 @@ def _inject_sna_css() -> None:
         st.error(f"Gagal menyisipkan CSS halaman SNA: {exc}")
 
 
+
+def _inject_sna_light_mode_patch() -> None:
+    """Selaraskan komponen SNA dengan light theme tanpa mengubah dark theme."""
+    try:
+        if bool(st.session_state.get("dark_mode", False)):
+            return
+
+        st.markdown(
+            """
+            <style>
+                /* Patch light theme khusus halaman Social Network Analysis. */
+                html body:has(.sna-v9-page) div[data-testid="stAppViewContainer"] {
+                    background: #F5F7FA !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-testid="stAppViewContainer"] .main .block-container {
+                    color: #1F2937 !important;
+                }
+
+                /* Permukaan utama dan section. */
+                html body:has(.sna-v9-page) .sna-v9-card,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-card-marker),
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker),
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-section-marker),
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-graph-marker) {
+                    background: #FFFFFF !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.07) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-stat {
+                    background: linear-gradient(145deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #D8E0EA !important;
+                    border-left-color: #E53935 !important;
+                    box-shadow: 0 7px 18px rgba(15, 23, 42, 0.05) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-stat:hover,
+                html body:has(.sna-v9-page) .sna-v9-card:hover,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-section-marker):hover,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-graph-marker):hover {
+                    border-color: rgba(229,57,53,0.50) !important;
+                    box-shadow: 0 12px 28px rgba(15,23,42,0.09), 0 0 0 1px rgba(229,57,53,0.08) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-section-title,
+                html body:has(.sna-v9-page) .sna-v9-influencer-mini-value,
+                html body:has(.sna-v9-page) .sna-v9-influencer-table-title,
+                html body:has(.sna-v9-page) .sna-v9-detail-title,
+                html body:has(.sna-v9-page) .sna-v9-detail-value,
+                html body:has(.sna-v9-page) .sna-v9-graph-kpi-value,
+                html body:has(.sna-v9-page) .sna-v11-academic-note strong,
+                html body:has(.sna-v9-page) .sna-v11-check-item strong,
+                html body:has(.sna-v9-page) .sna-v13-static-title,
+                html body:has(.sna-v9-page) .sna-v13-static-kpi-value {
+                    color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-section-subtitle,
+                html body:has(.sna-v9-page) .sna-v9-stat-label,
+                html body:has(.sna-v9-page) .sna-v9-stat-note,
+                html body:has(.sna-v9-page) .sna-v9-influencer-mini-label,
+                html body:has(.sna-v9-page) .sna-v9-influencer-mini-note,
+                html body:has(.sna-v9-page) .sna-v9-influencer-table-subtitle,
+                html body:has(.sna-v9-page) .sna-v9-detail-subtitle,
+                html body:has(.sna-v9-page) .sna-v9-detail-label,
+                html body:has(.sna-v9-page) .sna-v9-detail-hint,
+                html body:has(.sna-v9-page) .sna-v9-graph-kpi-label,
+                html body:has(.sna-v9-page) .sna-v9-graph-kpi-note,
+                html body:has(.sna-v9-page) .sna-v11-microcopy,
+                html body:has(.sna-v9-page) .sna-v13-static-subtitle,
+                html body:has(.sna-v9-page) .sna-v13-static-kpi-label {
+                    color: #64748B !important;
+                }
+
+                /* Filter dan kontrol Streamlit. */
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                label,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                label p,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                [data-testid="stWidgetLabel"] p {
+                    color: #334155 !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker)
+                div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker)
+                div[data-testid="stTextInput"] input {
+                    background: #FFFFFF !important;
+                    background-color: #FFFFFF !important;
+                    border-color: #CBD5E1 !important;
+                    box-shadow: 0 4px 12px rgba(15,23,42,0.04) !important;
+                    color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker)
+                div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker)
+                div[data-testid="stTextInput"] input {
+                    color: #1F2937 !important;
+                    -webkit-text-fill-color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v9-control-marker)
+                div[data-testid="stSelectbox"] svg,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-filter-marker)
+                div[data-testid="stSelectbox"] svg {
+                    fill: #64748B !important;
+                    color: #64748B !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-baseweb="popover"]:has([role="listbox"]),
+                html body:has(.sna-v9-page) [data-testid="stSelectboxVirtualDropdown"] {
+                    background: #FFFFFF !important;
+                    background-color: #FFFFFF !important;
+                    border: 1px solid #D7DEE8 !important;
+                    box-shadow: 0 14px 34px rgba(15,23,42,0.16) !important;
+                    color: #24324A !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-baseweb="popover"]:has([role="listbox"]) [role="listbox"],
+                html body:has(.sna-v9-page) [data-testid="stSelectboxVirtualDropdown"] [role="listbox"] {
+                    background: #FFFFFF !important;
+                    border-color: #D7DEE8 !important;
+                    box-shadow: none !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-baseweb="popover"]:has([role="listbox"]) [role="option"],
+                html body:has(.sna-v9-page) [data-testid="stSelectboxVirtualDropdown"] [role="option"] {
+                    background: #FFFFFF !important;
+                    border-color: transparent !important;
+                    color: #334155 !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-baseweb="popover"]:has([role="listbox"]) [role="option"] *,
+                html body:has(.sna-v9-page) [data-testid="stSelectboxVirtualDropdown"] [role="option"] * {
+                    color: inherit !important;
+                    -webkit-text-fill-color: currentColor !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-baseweb="popover"]:has([role="listbox"]) [role="option"]:hover,
+                html body:has(.sna-v9-page) [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover {
+                    background: #F6F8FB !important;
+                    border-color: #E1E7EF !important;
+                    color: #1E293B !important;
+                    transform: none !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-baseweb="popover"]:has([role="listbox"]) [role="option"][aria-selected="true"],
+                html body:has(.sna-v9-page) [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"] {
+                    background: #FFF1F1 !important;
+                    border-color: #F4C7C7 !important;
+                    box-shadow: inset 3px 0 0 #E53935 !important;
+                    color: #B42318 !important;
+                }
+
+                /* Legend, chips, catatan, dan ringkasan. */
+                html body:has(.sna-v9-page) .sna-v9-legend-item,
+                html body:has(.sna-v9-page) .sna-v9-platform-chip,
+                html body:has(.sna-v9-page) .sna-v9-interaction-pill,
+                html body:has(.sna-v9-page) .sna-v12-chip,
+                html body:has(.sna-v9-page) .sna-v12-summary-tag,
+                html body:has(.sna-v9-page) .sna-v9-detail-chip,
+                html body:has(.sna-v9-page) .sna-v11-chip {
+                    background: #F8FAFC !important;
+                    border-color: #D8E0EA !important;
+                    color: #334155 !important;
+                    box-shadow: none !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-influencer-control-note,
+                html body:has(.sna-v9-page) .sna-v9-interaction-strip,
+                html body:has(.sna-v9-page) .sna-v11-academic-note {
+                    background: linear-gradient(135deg, rgba(229,57,53,0.055), rgba(29,161,242,0.045)) !important;
+                    border-color: #D8E0EA !important;
+                    color: #475569 !important;
+                    box-shadow: none !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-interaction-strip strong {
+                    color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-interaction-strip span {
+                    color: #64748B !important;
+                }
+
+                /* KPI graf. */
+                html body:has(.sna-v9-page) .sna-v9-graph-kpi {
+                    background:
+                        radial-gradient(circle at 94% 12%, rgba(229,57,53,0.08), transparent 36%),
+                        linear-gradient(145deg, #FFFFFF 0%, #F7F9FC 100%) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 8px 20px rgba(15,23,42,0.06) !important;
+                }
+
+                /* Area influencer modern. */
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v12-influencer-marker) {
+                    background:
+                        radial-gradient(circle at 0% 0%, rgba(229,57,53,0.07), transparent 24%),
+                        radial-gradient(circle at 100% 0%, rgba(131,58,180,0.06), transparent 26%),
+                        radial-gradient(circle at 100% 100%, rgba(29,161,242,0.055), transparent 30%),
+                        linear-gradient(180deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 16px 36px rgba(15,23,42,0.08), inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v12-influencer-hero .sna-v9-section-subtitle {
+                    color: #64748B !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v12-live-badge {
+                    background: #ECFDF3 !important;
+                    border-color: #BBE7C8 !important;
+                    color: #166534 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-influencer-mini-card {
+                    background:
+                        radial-gradient(circle at 96% 4%, color-mix(in srgb, var(--summary-accent) 10%, transparent), transparent 37%),
+                        linear-gradient(145deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 8px 22px rgba(15,23,42,0.06) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-influencer-mini-card:hover {
+                    border-color: color-mix(in srgb, var(--summary-accent) 38%, #D8E0EA) !important;
+                    box-shadow: 0 14px 30px rgba(15,23,42,0.09) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v12-summary-icon {
+                    background: color-mix(in srgb, var(--summary-accent) 10%, #FFFFFF) !important;
+                    border-color: color-mix(in srgb, var(--summary-accent) 30%, #D8E0EA) !important;
+                }
+
+                /* Ranking influencer dan tabel. */
+                html body:has(.sna-v9-page) .sna-v9-influencer-table-card {
+                    background:
+                        radial-gradient(circle at 96% 0%, color-mix(in srgb, var(--table-accent, #E53935) 7%, transparent), transparent 30%),
+                        linear-gradient(180deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 10px 26px rgba(15,23,42,0.07) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-influencer-table-card:hover {
+                    border-color: color-mix(in srgb, var(--table-accent, #E53935) 38%, #D8E0EA) !important;
+                    box-shadow: 0 16px 34px rgba(15,23,42,0.10) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-influencer-table-head {
+                    background: linear-gradient(135deg, color-mix(in srgb, var(--table-accent, #E53935) 7%, #FFFFFF), #FFFFFF) !important;
+                    border-bottom-color: #E2E8F0 !important;
+                }
+
+                html body:has(.sna-v9-page) table.sna-v9-influencer-table {
+                    color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-influencer-table thead th {
+                    background: #F1F5F9 !important;
+                    border-bottom-color: #D8E0EA !important;
+                    color: #475569 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-influencer-table tbody td {
+                    border-bottom-color: #E8EDF3 !important;
+                    color: #334155 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-influencer-table tbody tr:hover {
+                    background: color-mix(in srgb, var(--table-accent, #E53935) 6%, #FFFFFF) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-username-cell,
+                html body:has(.sna-v9-page) .sna-v9-num-cell,
+                html body:has(.sna-v9-page) .sna-v9-score-text {
+                    color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-rank-pill {
+                    background: #FFF1F1;
+                    border-color: #F2C1C1;
+                    color: #B42318;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-score-bar {
+                    background: #E5E7EB !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v12-avatar {
+                    background: color-mix(in srgb, var(--table-accent, #E53935) 10%, #FFFFFF) !important;
+                    border-color: color-mix(in srgb, var(--table-accent, #E53935) 28%, #D8E0EA) !important;
+                    color: #334155 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-table-scroll {
+                    scrollbar-color: #B7C0CD #F1F5F9 !important;
+                }
+
+                /* Detail node. */
+                html body:has(.sna-v9-page) .sna-v9-detail-panel {
+                    background:
+                        radial-gradient(circle at 10% 0%, rgba(229,57,53,0.07), transparent 32%),
+                        radial-gradient(circle at 95% 10%, rgba(29,161,242,0.06), transparent 34%),
+                        linear-gradient(135deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 12px 28px rgba(15,23,42,0.07) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-detail-item {
+                    background: linear-gradient(145deg, #FFFFFF, #F7F9FC) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 6px 16px rgba(15,23,42,0.05) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-detail-item:hover,
+                html body:has(.sna-v9-page) .sna-v9-detail-item[open] {
+                    background: linear-gradient(145deg, #FFFFFF, #F2F6FA) !important;
+                    border-color: color-mix(in srgb, var(--detail-accent) 42%, #D8E0EA) !important;
+                    box-shadow: 0 12px 24px rgba(15,23,42,0.08) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-detail-icon {
+                    background: color-mix(in srgb, var(--detail-accent) 10%, #FFFFFF) !important;
+                    border-color: color-mix(in srgb, var(--detail-accent) 30%, #D8E0EA) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-detail-more {
+                    background: #F8FAFC !important;
+                    border-color: color-mix(in srgb, var(--detail-accent) 32%, #CBD5E1) !important;
+                    color: #475569 !important;
+                }
+
+                /* Card penjelasan metode. */
+                html body:has(.sna-v9-page) .sna-v9-method-card {
+                    background:
+                        radial-gradient(circle at 7% 0%, rgba(229,57,53,0.09), transparent 34%),
+                        radial-gradient(circle at 95% 18%, rgba(29,161,242,0.08), transparent 30%),
+                        linear-gradient(135deg, #FFFFFF, #F5F8FC) !important;
+                    border-color: #CAD8E8 !important;
+                    box-shadow: 0 14px 30px rgba(15,23,42,0.08), inset 0 1px 0 #FFFFFF !important;
+                    color: #334155 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-method-kicker {
+                    color: #B42318 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-method-head h3,
+                html body:has(.sna-v9-page) .sna-v9-method-mini strong,
+                html body:has(.sna-v9-page) .sna-v9-method-note strong {
+                    color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-method-lead,
+                html body:has(.sna-v9-page) .sna-v9-method-mini p {
+                    color: #64748B !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-method-mini {
+                    background: #FFFFFF !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 5px 14px rgba(15,23,42,0.04) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-method-note {
+                    background: linear-gradient(135deg, rgba(229,57,53,0.055), rgba(29,161,242,0.045)) !important;
+                    border-color: #D8E0EA !important;
+                    color: #475569 !important;
+                }
+
+                /* Expander statistik. */
+                html body:has(.sna-v9-page) div[data-testid="stExpander"] details,
+                html body:has(.sna-v9-page) div[data-testid="stExpander"] details[open],
+                html body:has(.sna-v9-page) div[data-testid="stExpander"] summary,
+                html body:has(.sna-v9-page) div[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+                    background: #FFFFFF !important;
+                    background-color: #FFFFFF !important;
+                    border-color: #D8E0EA !important;
+                    color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-testid="stExpander"] summary,
+                html body:has(.sna-v9-page) div[data-testid="stExpander"] summary p,
+                html body:has(.sna-v9-page) div[data-testid="stExpander"] summary span,
+                html body:has(.sna-v9-page) div[data-testid="stExpander"] summary svg {
+                    color: #1F2937 !important;
+                    fill: currentColor !important;
+                }
+
+                /* Frame graf interaktif. Isi iframe juga diberi tema terpisah. */
+                html body:has(.sna-v9-page) .sna-v9-graph-frame iframe,
+                html body:has(.sna-v9-page) [data-testid="stIFrame"] iframe {
+                    background: #FFFFFF !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 12px 28px rgba(15,23,42,0.08) !important;
+                }
+
+                /* Graf statis akademik IndiBiz. */
+                html body:has(.sna-v9-page) .sna-v11-check-item,
+                html body:has(.sna-v9-page) .sna-v11-platform-card,
+                html body:has(.sna-v9-page) .sna-v13-static-guide,
+                html body:has(.sna-v9-page) .sna-v13-static-kpi {
+                    background: linear-gradient(145deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #D8E0EA !important;
+                    color: #475569 !important;
+                    box-shadow: 0 6px 16px rgba(15,23,42,0.05) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v11-stage-shell,
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v13-indibiz-static-marker) {
+                    background:
+                        radial-gradient(circle at 0% 0%, rgba(229,57,53,0.065), transparent 24%),
+                        radial-gradient(circle at 100% 0%, rgba(131,58,180,0.05), transparent 26%),
+                        radial-gradient(circle at 100% 100%, rgba(29,161,242,0.05), transparent 28%),
+                        linear-gradient(180deg, #FFFFFF, #F8FAFC) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 14px 32px rgba(15,23,42,0.08) !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v11-platform-title,
+                html body:has(.sna-v9-page) .sna-v11-platform-count,
+                html body:has(.sna-v9-page) .sna-v13-static-guide strong {
+                    color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v11-platform-note,
+                html body:has(.sna-v9-page) .sna-v11-platform-share,
+                html body:has(.sna-v9-page) .sna-v13-static-guide span {
+                    color: #64748B !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-testid="stVerticalBlockBorderWrapper"]:has(.sna-v13-indibiz-static-marker)
+                div[data-testid="stPlotlyChart"] {
+                    background: #FFFFFF !important;
+                    border-color: #D8E0EA !important;
+                }
+
+                /* Dialog fullscreen chart tetap mengikuti tema aktif. */
+                html body:has(.sna-v9-page) div[data-testid="stDialog"],
+                html body:has(.sna-v9-page) div[data-baseweb="modal"] {
+                    background: #F5F7FA !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-testid="stDialog"] [data-testid="stPlotlyChart"],
+                html body:has(.sna-v9-page) div[data-baseweb="modal"] [data-testid="stPlotlyChart"] {
+                    background: #FFFFFF !important;
+                    border-color: #D8E0EA !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-fullscreen-title {
+                    color: #1F2937 !important;
+                }
+
+                html body:has(.sna-v9-page) .sna-v9-fullscreen-hint {
+                    color: #64748B !important;
+                }
+
+                html body:has(.sna-v9-page) div[data-testid="stDialog"] button[aria-label="Close"],
+                html body:has(.sna-v9-page) div[data-baseweb="modal"] button[aria-label="Close"] {
+                    background: #FFFFFF !important;
+                    border-color: #CBD5E1 !important;
+                    color: #334155 !important;
+                }
+
+                /* Caption akhir halaman tetap terbaca di latar terang. */
+                html body:has(.sna-v9-page) [data-testid="stCaptionContainer"],
+                html body:has(.sna-v9-page) [data-testid="stCaptionContainer"] p {
+                    color: #64748B !important;
+                }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception as exc:
+        st.error(f"Penyesuaian light theme halaman SNA belum dapat dimuat: {exc}")
+
+
 # -----------------------------------------------------------------------------
 # Helper normalisasi data
 # -----------------------------------------------------------------------------
@@ -5541,8 +6024,12 @@ def _limit_graph_nodes(
     max_entries=12,
     hash_funcs={nx.DiGraph: _hash_digraph_for_cache},
 )
-def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
-    """Bangun HTML graf PyVis bertema gelap dan aman memakai file sementara."""
+def generate_pyvis_graph(
+    graph: nx.DiGraph,
+    visual_nodes: pd.DataFrame,
+    dark_mode: bool = True,
+) -> str:
+    """Bangun HTML graf PyVis sesuai tema aktif dan aman memakai file sementara."""
     try:
         if graph.number_of_nodes() == 0 or visual_nodes.empty:
             return ""
@@ -5551,11 +6038,16 @@ def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
         # statistik dan tabel influencer tidak perlu menanggung biaya import ini.
         from pyvis.network import Network
 
+        graph_bg = "#0D0D0D" if dark_mode else "#F8FAFC"
+        graph_text = "#FFFFFF" if dark_mode else "#1F2937"
+        graph_label_stroke = "#06080C" if dark_mode else "#FFFFFF"
+        graph_highlight = "#FFFFFF" if dark_mode else "#0F172A"
+
         net = Network(
             height="660px",
             width="100%",
-            bgcolor="#0D0D0D",
-            font_color="#FFFFFF",
+            bgcolor=graph_bg,
+            font_color=graph_text,
             directed=True,
             cdn_resources="in_line",
         )
@@ -5598,7 +6090,7 @@ def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
             fill_color = SENTIMENT_COLORS.get(dominant_sentiment, platform_color)
             if is_brand:
                 fill_color = PLATFORM_GRAPH_COLORS["target"]
-            border_color = "#FFFFFF" if is_brand else platform_color
+            border_color = graph_highlight if is_brand else platform_color
             platform_label = str(row.get("platform_label", "Tidak diketahui"))
             followers = int(row.get("followers", 0))
             label = username if len(username) <= 22 else f"{username[:19]}..."
@@ -5629,8 +6121,8 @@ def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
                 color={
                     "background": fill_color,
                     "border": border_color,
-                    "highlight": {"background": fill_color, "border": "#FFFFFF"},
-                    "hover": {"background": fill_color, "border": "#FFFFFF"},
+                    "highlight": {"background": fill_color, "border": graph_highlight},
+                    "hover": {"background": fill_color, "border": graph_highlight},
                 },
                 size=node_size,
                 borderWidth=5 if is_brand else 3,
@@ -5644,12 +6136,12 @@ def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
                     "y": 3,
                 },
                 font={
-                    "color": "#FFFFFF",
+                    "color": graph_text,
                     "size": label_font_size,
                     "face": "Inter",
-                    "bold": {"color": "#FFFFFF", "size": label_font_size},
-                    "strokeWidth": 6,
-                    "strokeColor": "#06080C",
+                    "bold": {"color": graph_text, "size": label_font_size},
+                    "strokeWidth": 6 if dark_mode else 4,
+                    "strokeColor": graph_label_stroke,
                     "vadjust": -3,
                 },
             )
@@ -5673,7 +6165,7 @@ def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
                 value=max(1, min(weight, 6)),
                 color={
                     "color": edge_color,
-                    "highlight": "#FFFFFF",
+                    "highlight": graph_highlight,
                     "hover": "#E53935",
                     "opacity": 0.24,
                 },
@@ -5721,7 +6213,7 @@ def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
                 "borderWidth": 3,
                 "borderWidthSelected": 6,
                 "chosen": true,
-                "font": {"size":12,"color":"#FFFFFF","face":"Inter"}
+                "font": {"size":12,"color":"__GRAPH_TEXT__","face":"Inter"}
               },
               "interaction": {
                 "hover": true,
@@ -5734,7 +6226,7 @@ def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
                 "keyboard": false
               }
             }
-            """
+            """.replace("__GRAPH_TEXT__", graph_text)
         )
 
         # HOTFIX WINDOWS UTF-8:
@@ -6275,6 +6767,133 @@ def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
             }
         </style>
         """
+        if not dark_mode:
+            custom_css += """
+            <style>
+                :root {
+                    --sna-bg: #F8FAFC;
+                    --sna-card: #FFFFFF;
+                    --sna-card-2: #F1F5F9;
+                    --sna-border: #D8E0EA;
+                    --sna-text: #1F2937;
+                    --sna-muted: #64748B;
+                }
+                html,
+                body {
+                    background: #F8FAFC !important;
+                    color: #1F2937 !important;
+                }
+                .sna-pyvis-shell,
+                .sna-pyvis-shell:fullscreen,
+                .sna-pyvis-shell:-webkit-full-screen {
+                    background:
+                        radial-gradient(circle at 16% 10%, rgba(229,57,53,0.07), transparent 28%),
+                        radial-gradient(circle at 86% 12%, rgba(29,161,242,0.07), transparent 30%),
+                        linear-gradient(145deg, #FFFFFF 0%, #F8FAFC 50%, #FFFFFF 100%) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: inset 0 0 0 1px #FFFFFF, 0 12px 28px rgba(15,23,42,0.08) !important;
+                }
+                .sna-pyvis-toolbar,
+                .sna-pyvis-platform-filter {
+                    background: rgba(255,255,255,0.92) !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 8px 22px rgba(15,23,42,0.07) !important;
+                }
+                .sna-pyvis-toolbar-title strong,
+                .sna-pyvis-guide strong {
+                    color: #1F2937 !important;
+                }
+                .sna-pyvis-actions button,
+                .sna-pyvis-platform-button {
+                    background: #FFFFFF !important;
+                    border-color: #CBD5E1 !important;
+                    color: #334155 !important;
+                    box-shadow: 0 3px 9px rgba(15,23,42,0.04) !important;
+                }
+                .sna-pyvis-actions button:hover,
+                .sna-pyvis-platform-button:hover {
+                    background: #F8FAFC !important;
+                    border-color: rgba(229,57,53,0.48) !important;
+                    color: #1F2937 !important;
+                }
+                .sna-pyvis-actions button.primary,
+                .sna-pyvis-actions button.primary:hover {
+                    background: linear-gradient(135deg, #E53935, #B71C1C) !important;
+                    border-color: #E53935 !important;
+                    color: #FFFFFF !important;
+                }
+                .sna-pyvis-guide {
+                    background: linear-gradient(135deg, rgba(229,57,53,0.05), rgba(29,161,242,0.04)) !important;
+                    border-color: #D8E0EA !important;
+                    color: #64748B !important;
+                }
+                .sna-pyvis-status {
+                    background: #F1F5F9 !important;
+                    border-color: #D8E0EA !important;
+                    color: #475569 !important;
+                }
+                .sna-pyvis-platform-label,
+                .sna-pyvis-platform-help {
+                    color: #64748B !important;
+                }
+                .sna-pyvis-platform-button.is-hidden {
+                    background: #F1F5F9 !important;
+                    color: #94A3B8 !important;
+                }
+                .sna-pyvis-platform-dot {
+                    box-shadow: 0 0 0 3px rgba(15,23,42,0.05) !important;
+                }
+                #mynetwork {
+                    background:
+                        radial-gradient(circle at 12% 18%, rgba(229,57,53,0.07), transparent 28%),
+                        radial-gradient(circle at 88% 16%, rgba(29,161,242,0.07), transparent 32%),
+                        linear-gradient(rgba(100,116,139,0.08) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(100,116,139,0.08) 1px, transparent 1px),
+                        linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+                    box-shadow: inset 0 0 0 1px #D8E0EA !important;
+                }
+                #mynetwork::after {
+                    border-color: #D8E0EA !important;
+                }
+                div.vis-tooltip,
+                .sna-node-tooltip,
+                .sna-edge-tooltip {
+                    background: #FFFFFF !important;
+                    border-color: #D8E0EA !important;
+                    box-shadow: 0 14px 34px rgba(15,23,42,0.16) !important;
+                    color: #1F2937 !important;
+                }
+                .sna-node-tooltip__head,
+                .sna-edge-tooltip__head {
+                    background: linear-gradient(135deg, rgba(229,57,53,0.08), rgba(29,161,242,0.05)) !important;
+                    border-bottom-color: #E2E8F0 !important;
+                }
+                .sna-node-tooltip__name,
+                .sna-node-tooltip__value,
+                .sna-edge-tooltip__title,
+                .sna-edge-tooltip__value {
+                    color: #1F2937 !important;
+                }
+                .sna-node-tooltip__role,
+                .sna-node-tooltip__label,
+                .sna-edge-tooltip__subtitle,
+                .sna-edge-tooltip__label {
+                    color: #64748B !important;
+                }
+                .sna-node-tooltip__item,
+                .sna-edge-tooltip__node,
+                .sna-edge-tooltip__meta-item {
+                    background: #F8FAFC !important;
+                    border-color: #E2E8F0 !important;
+                }
+                .sna-node-tooltip__hint,
+                .sna-edge-tooltip__hint {
+                    background: rgba(29,161,242,0.055) !important;
+                    border-top-color: #E2E8F0 !important;
+                    color: #475569 !important;
+                }
+            </style>
+            """
         custom_toolbar = """
         <div class="sna-pyvis-shell">
             <div class="sna-pyvis-toolbar">
@@ -6829,7 +7448,11 @@ def generate_pyvis_graph(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
 
 def _pyvis_html(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> str:
     """Alias kompatibilitas untuk implementasi PyVis sebelum Fase 14."""
-    return generate_pyvis_graph(graph, visual_nodes)
+    return generate_pyvis_graph(
+        graph,
+        visual_nodes,
+        dark_mode=bool(st.session_state.get("dark_mode", False)),
+    )
 
 def _render_networkx_fallback(graph: nx.DiGraph, visual_nodes: pd.DataFrame) -> None:
     """Tampilkan ringkasan aman apabila HTML PyVis gagal dirender."""
@@ -7001,7 +7624,11 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
 
             try:
                 with st.spinner("Membangun network graph..."):
-                    html = generate_pyvis_graph(visual_graph, visual_nodes)
+                    html = generate_pyvis_graph(
+                        visual_graph,
+                        visual_nodes,
+                        dark_mode=bool(st.session_state.get("dark_mode", False)),
+                    )
                 if not html:
                     raise RuntimeError("HTML PyVis kosong.")
                 st.markdown('<div class="sna-v9-graph-frame">', unsafe_allow_html=True)
@@ -8054,6 +8681,7 @@ def render_sna() -> None:
             action_loading_handle = _start_filter_loading(str(loading_label))
 
         _inject_sna_css()
+        _inject_sna_light_mode_patch()
 
         # Hero tetap ditampilkan sebagai bagian pertama halaman. Nilai layanan
         # awal dibaca dari state filter yang sudah tersimpan pada rerun sebelumnya.
