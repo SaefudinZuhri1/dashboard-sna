@@ -5301,6 +5301,153 @@ def _render_telkomsel_pagerank_table(node_df: pd.DataFrame) -> None:
         st.error(f"Gagal menampilkan Top 10 PageRank Telkomsel: {exc}")
 
 
+def _get_telkomsel_top40_platform_representatives(
+    ranking: pd.DataFrame,
+    minimum_per_platform: int = 2,
+) -> pd.DataFrame:
+    """Ambil wakil Instagram/TikTok Telkomsel dari data real untuk tabel Top 40.
+
+    File SNA Telkomsel penelitian terutama memuat relasi Twitter/X. Karena itu,
+    node Instagram dan TikTok dapat tidak pernah masuk ranking PageRank walaupun
+    data real kedua platform tersedia pada dataset sentimen Telkomsel. Fungsi ini
+    hanya menambahkan wakil akun nyata ke tabel Top 40. Metrik jaringan untuk
+    wakil yang tidak ada pada graph dibiarkan kosong agar dashboard tidak
+    mengarang nilai centrality/PageRank.
+    """
+    try:
+        if ranking is None or ranking.empty or minimum_per_platform <= 0:
+            return pd.DataFrame()
+        if not sentiment_file_exists("Telkomsel"):
+            return pd.DataFrame()
+
+        source = load_sentiment_data("Telkomsel")
+        if source is None or source.empty:
+            return pd.DataFrame()
+
+        required = {"platform", "username", "followers"}
+        if not required.issubset(source.columns):
+            return pd.DataFrame()
+
+        candidates = source[["platform", "username", "followers"]].copy()
+        candidates["platform"] = candidates["platform"].map(_normalize_platform)
+        candidates["username"] = candidates["username"].map(_normalize_username)
+        candidates["followers"] = (
+            pd.to_numeric(candidates["followers"], errors="coerce")
+            .fillna(0)
+            .clip(lower=0)
+        )
+        candidates = candidates[
+            candidates["platform"].isin({"instagram", "tiktok"})
+            & candidates["username"].astype(str).ne("")
+        ].copy()
+        if candidates.empty:
+            return pd.DataFrame()
+
+        candidates = candidates[
+            ~candidates["username"].map(_is_brand_account)
+            & ~candidates["username"].map(_is_excluded_from_influencer)
+            & ~candidates["username"].map(_is_external_brand_or_institution)
+        ].copy()
+        if candidates.empty:
+            return pd.DataFrame()
+
+        candidates = (
+            candidates.groupby(["platform", "username"], as_index=False)["followers"]
+            .max()
+            .sort_values(
+                ["platform", "followers", "username"],
+                ascending=[True, False, True],
+                kind="mergesort",
+            )
+        )
+
+        existing = ranking.copy()
+        existing["_platform_group"] = existing.get(
+            "platform",
+            existing.get("platform_label", pd.Series("unknown", index=existing.index)),
+        ).map(_normalize_platform)
+        existing["_username_key"] = existing["username"].map(_normalize_username)
+        existing_usernames = set(existing["_username_key"].astype(str))
+
+        rows: list[dict[str, Any]] = []
+        for platform in ("instagram", "tiktok"):
+            current_count = int(existing["_platform_group"].eq(platform).sum())
+            needed = max(0, int(minimum_per_platform) - current_count)
+            if needed <= 0:
+                continue
+
+            platform_candidates = candidates[candidates["platform"].eq(platform)]
+            added = 0
+            for row in platform_candidates.itertuples(index=False):
+                username = _normalize_username(getattr(row, "username", ""))
+                if not username or username in existing_usernames:
+                    continue
+                existing_usernames.add(username)
+                rows.append(
+                    {
+                        "username": username,
+                        "platform": platform,
+                        "platform_label": PLATFORM_DISPLAY.get(platform, platform.title()),
+                        "followers": int(getattr(row, "followers", 0) or 0),
+                        "degree_centrality": np.nan,
+                        "in_degree": np.nan,
+                        "out_degree": np.nan,
+                        "betweenness_centrality": np.nan,
+                        "pagerank": np.nan,
+                        "is_brand": False,
+                        "is_platform_representative": True,
+                    }
+                )
+                added += 1
+                if added >= needed:
+                    break
+
+        return pd.DataFrame(rows)
+    except Exception as exc:
+        st.error(f"Gagal menyiapkan wakil platform Telkomsel pada Top 40: {exc}")
+        return pd.DataFrame()
+
+
+def _build_top40_balanced_by_platform(
+    influencer_ranking: pd.DataFrame,
+    service: str,
+    total_limit: int = 40,
+) -> tuple[pd.DataFrame, bool]:
+    """Bangun Top 40 dan pertahankan wakil Instagram/TikTok Telkomsel jika ada."""
+    try:
+        if influencer_ranking is None or influencer_ranking.empty:
+            return pd.DataFrame(), False
+
+        ranking = influencer_ranking.copy().reset_index(drop=True)
+        if str(service).strip().lower() != "telkomsel":
+            return ranking.head(total_limit).copy(), False
+
+        initial = ranking.head(total_limit).copy()
+        representatives = _get_telkomsel_top40_platform_representatives(
+            initial,
+            minimum_per_platform=2,
+        )
+        if representatives is None or representatives.empty:
+            return initial, False
+
+        reserve = min(len(representatives), total_limit)
+        base = ranking.head(max(0, total_limit - reserve)).copy()
+        existing_keys = set(base["username"].map(_normalize_username).astype(str))
+        representatives = representatives[
+            ~representatives["username"].map(_normalize_username).isin(existing_keys)
+        ].copy()
+        if representatives.empty:
+            return initial, False
+
+        reserve = min(len(representatives), total_limit)
+        base = ranking.head(max(0, total_limit - reserve)).copy()
+        top40 = pd.concat([base, representatives.head(reserve)], ignore_index=True, sort=False)
+        return top40.head(total_limit).copy(), True
+    except Exception as exc:
+        st.error(f"Gagal menyeimbangkan platform pada tabel Top 40: {exc}")
+        return influencer_ranking.head(total_limit).copy(), False
+
+
 def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
     """Render chart Top 10 PageRank dan tabel Top 40 metrik akun non-layanan."""
     try:
@@ -5373,9 +5520,15 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
                 "perhitungan metrik jaringan."
             )
 
-        # Tabel semua metrik menggunakan ranking akun non-layanan yang sama
-        # dengan Top Influencer. Akun brand tetap dipertahankan pada graph.
-        top40 = influencer_ranking.head(40).copy()
+        # Tabel semua metrik tetap memakai ranking akun non-layanan. Khusus
+        # Telkomsel, pertahankan minimal dua wakil real Instagram dan TikTok
+        # jika kedua platform tersedia pada dataset. Nilai metrik jaringan untuk
+        # wakil yang tidak ada pada file SNA dibiarkan kosong, bukan dikarang.
+        top40, has_platform_representatives = _build_top40_balanced_by_platform(
+            influencer_ranking,
+            service,
+            total_limit=40,
+        )
         top40.insert(0, "Rank", range(1, len(top40) + 1))
         top40 = top40[
             [
@@ -5403,7 +5556,7 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
                 <div class="sna-v9-section-head">
                     <div>
                         <h2 class="sna-v9-section-title">Top 40 Node — Semua Metrik</h2>
-                        <p class="sna-v9-section-subtitle">Default diurutkan berdasarkan PageRank tertinggi. Akun layanan, perusahaan, brand, dan instansi resmi tidak disertakan. Klik judul kolom pada tabel untuk mengurutkan ulang.</p>
+                        <p class="sna-v9-section-subtitle">Default diurutkan berdasarkan PageRank tertinggi. Akun layanan, perusahaan, brand, dan instansi resmi tidak disertakan. Khusus Telkomsel, wakil Instagram dan TikTok dari data real dipertahankan jika tersedia. Klik judul kolom pada tabel untuk mengurutkan ulang.</p>
                     </div>
                     <span class="sna-v12-live-badge"><span class="sna-v12-live-dot"></span>{escape(service)}</span>
                 </div>
@@ -5425,6 +5578,13 @@ def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
                     "PageRank": st.column_config.NumberColumn(format="%.8f"),
                 },
             )
+            if has_platform_representatives:
+                st.caption(
+                    "* Wakil Instagram/TikTok berasal dari data real Telkomsel dan dipilih "
+                    "berdasarkan followers tertinggi. Metrik Degree/PageRank dibiarkan kosong "
+                    "jika akun tersebut tidak tersedia pada file edge SNA Telkomsel, agar "
+                    "dashboard tidak membuat nilai jaringan palsu."
+                )
             st.download_button(
                 label="⬇️ Unduh CSV Top 40 Node",
                 data=top40.to_csv(index=False).encode("utf-8-sig"),
