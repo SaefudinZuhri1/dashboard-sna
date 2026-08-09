@@ -9380,15 +9380,92 @@ def generate_pyvis_graph(
                 graph.on('dragStart', hideCustomTooltip);
                 graph.on('zoom', hideCustomTooltip);
 
+                var stabilizeTimer = null;
+
+                function hideNativeStabilizationOverlay() {
+                    // PyVis/vis-network dapat menyisakan overlay progress stabilisasi.
+                    // Tombol Stabilkan custom tidak membutuhkan overlay tersebut.
+                    var selectors = [
+                        '#loadingBar',
+                        '.vis-network-loading',
+                        '.vis-loading',
+                        '[data-sna-stabilization-overlay]'
+                    ];
+                    selectors.forEach(function (selector) {
+                        var elements = document.querySelectorAll(selector);
+                        for (var i = 0; i < elements.length; i += 1) {
+                            elements[i].style.display = 'none';
+                            elements[i].style.visibility = 'hidden';
+                            elements[i].style.opacity = '0';
+                            elements[i].style.pointerEvents = 'none';
+                        }
+                    });
+                }
+
+                function finishSoftStabilization() {
+                    try { graph.stopSimulation(); } catch (err) {}
+                    try {
+                        graph.setOptions({
+                            physics: {
+                                enabled: false,
+                                stabilization: { enabled: false }
+                            }
+                        });
+                    } catch (err) {}
+
+                    physicsEnabled = false;
+                    var physicsButton = byId('snaTogglePhysics');
+                    if (physicsButton) { physicsButton.textContent = 'Physics: OFF'; }
+
+                    hideNativeStabilizationOverlay();
+                    try {
+                        graph.fit({
+                            animation: {
+                                duration: 650,
+                                easingFunction: 'easeInOutQuad'
+                            }
+                        });
+                    } catch (err) {}
+                    setStatus('Graf sudah dirapikan, dikunci, dan dipusatkan.');
+                }
+
                 var stabilizeButton = byId('snaStabilizeGraph');
                 if (stabilizeButton) {
                     stabilizeButton.onclick = function () {
-                        graph.setOptions({ physics: { enabled: true } });
+                        // Jangan gunakan graph.stabilize(). Method tersebut memicu progress
+                        // stabilisasi bawaan vis-network yang dapat menutup graf pada 100%.
+                        // Sebagai gantinya, jalankan physics sebentar tanpa stabilization
+                        // overlay, lalu hentikan simulasi dan pusatkan graf otomatis.
+                        if (stabilizeTimer) {
+                            window.clearTimeout(stabilizeTimer);
+                            stabilizeTimer = null;
+                        }
+
+                        hideCustomTooltip();
+                        hideNativeStabilizationOverlay();
+
+                        try {
+                            graph.setOptions({
+                                physics: {
+                                    enabled: true,
+                                    stabilization: { enabled: false }
+                                }
+                            });
+                            graph.startSimulation();
+                        } catch (err) {
+                            finishSoftStabilization();
+                            return;
+                        }
+
                         physicsEnabled = true;
                         var physicsButton = byId('snaTogglePhysics');
                         if (physicsButton) { physicsButton.textContent = 'Physics: ON'; }
-                        graph.stabilize(160);
-                        setStatus('Graf sedang distabilkan.');
+                        setStatus('Merapikan posisi node...');
+
+                        stabilizeTimer = window.setTimeout(function () {
+                            stabilizeTimer = null;
+                            finishSoftStabilization();
+                        }, 850);
                     };
                 }
 
@@ -9457,6 +9534,9 @@ def generate_pyvis_graph(
                 });
 
                 graph.on('stabilizationIterationsDone', function () {
+                    // Event ini tetap dipakai untuk stabilisasi awal saat graf pertama dibuat.
+                    // Overlay progress bawaan selalu disembunyikan agar tidak menutup interaksi.
+                    hideNativeStabilizationOverlay();
                     graph.setOptions({ physics: { enabled: false } });
                     physicsEnabled = false;
                     var physicsButton = byId('snaTogglePhysics');
