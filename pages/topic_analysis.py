@@ -23,6 +23,7 @@ from utils.data_loader import (
     get_sentiment_file_signature,
     load_topic_data,
 )
+from utils.css_loader import render_analytics_control_style
 from utils.loading_screen import mulai_loading_aksi, selesaikan_loading_aksi
 from utils.dummy_data import get_demo_sentiment
 from utils.indibiz_topic_pipeline import (
@@ -4876,6 +4877,7 @@ def render_topic_analysis() -> None:
             action_loading_handle = mulai_loading_aksi(str(loading_label))
 
         _inject_topic_css()
+        render_analytics_control_style()
 
         _init_filter_state()
         initial_service = str(

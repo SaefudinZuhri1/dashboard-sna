@@ -39,6 +39,7 @@ from utils.data_loader import (
     load_telkomsel_sna,
     sna_file_exists,
 )
+from utils.css_loader import render_analytics_control_style
 from utils.export_utils import export_to_csv, get_export_filename
 from utils.dummy_data import get_demo_sna
 from utils.indibiz_config import TARGET_NODE
@@ -9870,6 +9871,7 @@ def render_sna() -> None:
 
         _inject_sna_css()
         _inject_sna_light_mode_patch()
+        render_analytics_control_style()
 
         # Hero tetap ditampilkan sebagai bagian pertama halaman. Nilai layanan
         # awal dibaca dari state filter yang sudah tersimpan pada rerun sebelumnya.

@@ -25,6 +25,7 @@ from utils.audit_logger import log_activity
 from utils.data_loader import load_indibiz_sentiment, load_indibiz_sna
 from utils.indibiz_config import INDIBIZ_SENTIMENT_CANDIDATES, INDIBIZ_SNA_CANDIDATES
 from utils.dummy_data import get_demo_sentiment
+from utils.css_loader import render_analytics_control_style
 from utils.loading_screen import (
     batalkan_layar_loading,
     mulai_layar_loading,
@@ -10113,6 +10114,7 @@ def render_dataset() -> None:
         _inisialisasi_state()
         _sinkronkan_layanan_dataset_saat_masuk()
         _inject_css()
+        render_analytics_control_style()
         loading_placeholder = mulai_layar_loading(
             STATE_LOADING_SELESAI,
             (

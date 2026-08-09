@@ -78,6 +78,7 @@ from utils.dummy_data import (
     get_demo_sentiment,
     get_dummy_sentiment_data,
 )
+from utils.css_loader import render_analytics_control_style
 from utils.loading_screen import mulai_loading_aksi, selesaikan_loading_aksi
 from utils.model_loader import load_indobert, predict_sentiment_batch
 from utils.preprocessor import STOPWORDS_ID, clean_text
@@ -6753,6 +6754,7 @@ def render_sentiment() -> None:
         _sinkronkan_layanan_sentimen_saat_masuk()
         _inject_sentiment_css()
         _inject_sentiment_light_css()
+        render_analytics_control_style()
         layanan_awal = str(
             st.session_state.get("sent_v7_service_selector", "IndiHome")
         ).strip()

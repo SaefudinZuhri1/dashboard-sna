@@ -1,3 +1,4 @@
+# utils/css_loader.py
 """CSS global dan komponen UI helper untuk dashboard."""
 
 import streamlit as st
@@ -9,6 +10,256 @@ NEGATIVE = "#F44336"
 NEUTRAL = "#FF9800"
 CARD_RADIUS = "12px"
 HEADER_GRAD = "linear-gradient(135deg, #B71C1C, #E53935, #F05A56)"
+
+
+
+def render_analytics_control_style(dark_mode: bool | None = None) -> None:
+    """Samakan dropdown dan tombol halaman analitik dengan halaman Rekomendasi."""
+    try:
+        if dark_mode is None:
+            dark_mode = bool(st.session_state.get("dark_mode", False))
+
+        if dark_mode:
+            control_bg = "#151B26"
+            control_bg_hover = "#1E293B"
+            control_text = "#F8FAFC"
+            control_muted = "#A7B0BF"
+            control_border = "#344155"
+            popover_bg = "#151B26"
+            option_selected = "#253247"
+            option_hover = "#1E293B"
+            secondary_bg = "linear-gradient(145deg, rgba(229,57,53,.10), rgba(18,18,22,.94))"
+            secondary_text = "#FFD2D0"
+            secondary_hover_bg = "linear-gradient(145deg, rgba(229,57,53,.22), rgba(24,18,24,.98))"
+            secondary_hover_text = "#FFFFFF"
+            shadow = "0 12px 28px rgba(0,0,0,.20)"
+            popover_shadow = "0 16px 38px rgba(0,0,0,.34)"
+        else:
+            control_bg = "#FFFFFF"
+            control_bg_hover = "#F8FAFC"
+            control_text = "#273548"
+            control_muted = "#667285"
+            control_border = "#D5DCE5"
+            popover_bg = "#FFFFFF"
+            option_selected = "#E8EDF3"
+            option_hover = "#F3F6F9"
+            secondary_bg = "linear-gradient(145deg, #FFFFFF, #F6F8FB)"
+            secondary_text = "#B42318"
+            secondary_hover_bg = "#FFF4F3"
+            secondary_hover_text = "#9F1D14"
+            shadow = "0 8px 20px rgba(15,23,42,.07)"
+            popover_shadow = "0 14px 34px rgba(15,23,42,.16)"
+
+        st.markdown(
+            f"""
+            <style>
+                /* ============================================================= */
+                /* STANDAR KONTROL HALAMAN ANALITIK                              */
+                /* Mengikuti bentuk halaman Rekomendasi tanpa menyentuh sidebar, */
+                /* login, profil, Admin Panel, layout, card, chart, atau tabel.   */
+                /* ============================================================= */
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stSelectbox"] > label,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stMultiSelect"] > label {{
+                    color: {control_text} !important;
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+                    font-weight: 700 !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div {{
+                    min-height: 48px !important;
+                    border: 1px solid {control_border} !important;
+                    border-radius: 14px !important;
+                    background: {control_bg} !important;
+                    color: {control_text} !important;
+                    box-shadow: none !important;
+                    transition: border-color .18s ease, box-shadow .18s ease, background .18s ease !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div:hover {{
+                    border-color: #E53935 !important;
+                    background: {control_bg_hover} !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:focus-within,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div:focus-within {{
+                    border-color: #E53935 !important;
+                    box-shadow: 0 0 0 1px #E53935 !important;
+                    background: {control_bg} !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stSelectbox"] div[data-baseweb="select"] *,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stMultiSelect"] div[data-baseweb="select"] * {{
+                    color: {control_text} !important;
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stMultiSelect"] span[data-baseweb="tag"] {{
+                    border: 1px solid rgba(229,57,53,.20) !important;
+                    border-radius: 999px !important;
+                    background: rgba(229,57,53,.09) !important;
+                    color: {control_text} !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stMultiSelect"] span[data-baseweb="tag"] * {{
+                    color: {control_text} !important;
+                }}
+
+                /* Popover BaseWeb dirender di luar kolom utama. CSS ini hanya   */
+                /* hidup saat halaman analitik yang memanggil fungsi ini aktif. */
+                div[data-baseweb="popover"]:has([role="listbox"]),
+                [data-testid="stSelectboxVirtualDropdown"] {{
+                    overflow: hidden !important;
+                    border: 1px solid {control_border} !important;
+                    border-radius: 14px !important;
+                    background: {popover_bg} !important;
+                    color: {control_text} !important;
+                    box-shadow: {popover_shadow} !important;
+                }}
+
+                div[data-baseweb="popover"]:has([role="listbox"]) [role="listbox"],
+                [data-testid="stSelectboxVirtualDropdown"] [role="listbox"] {{
+                    max-height: 300px !important;
+                    margin: 0 !important;
+                    padding: .38rem !important;
+                    border: 0 !important;
+                    border-radius: 13px !important;
+                    background: {popover_bg} !important;
+                    color: {control_text} !important;
+                    scrollbar-width: thin !important;
+                    scrollbar-color: {control_muted} transparent !important;
+                }}
+
+                div[data-baseweb="popover"]:has([role="listbox"]) [role="option"],
+                [data-testid="stSelectboxVirtualDropdown"] [role="option"] {{
+                    min-height: 42px !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    margin: .08rem 0 !important;
+                    padding: .64rem .78rem !important;
+                    border: 1px solid transparent !important;
+                    border-radius: 9px !important;
+                    background: {popover_bg} !important;
+                    color: {control_text} !important;
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+                    font-weight: 500 !important;
+                }}
+
+                div[data-baseweb="popover"]:has([role="listbox"]) [role="option"] *,
+                [data-testid="stSelectboxVirtualDropdown"] [role="option"] * {{
+                    color: inherit !important;
+                    background: transparent !important;
+                }}
+
+                div[data-baseweb="popover"]:has([role="listbox"]) [role="option"]:hover,
+                div[data-baseweb="popover"]:has([role="listbox"]) [role="option"][data-highlighted="true"],
+                [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover,
+                [data-testid="stSelectboxVirtualDropdown"] [role="option"][data-highlighted="true"] {{
+                    border-color: {control_border} !important;
+                    background: {option_hover} !important;
+                    color: {control_text} !important;
+                }}
+
+                div[data-baseweb="popover"]:has([role="listbox"]) [role="option"][aria-selected="true"],
+                [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"] {{
+                    border-color: transparent !important;
+                    background: {option_selected} !important;
+                    color: {control_text} !important;
+                    font-weight: 650 !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stButton"] button,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stFormSubmitButton"] button,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stDownloadButton"] button {{
+                    position: relative !important;
+                    overflow: hidden !important;
+                    min-height: 46px !important;
+                    border-radius: 14px !important;
+                    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+                    font-size: 12px !important;
+                    font-weight: 850 !important;
+                    letter-spacing: -.01em !important;
+                    transition: transform .18s ease, box-shadow .22s ease, border-color .22s ease,
+                        background .22s ease, color .22s ease, filter .22s ease !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stButton"] button:hover,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stFormSubmitButton"] button:hover,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stDownloadButton"] button:hover {{
+                    transform: translateY(-2px) !important;
+                    filter: saturate(1.08) brightness(1.02) !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stButton"] button:active,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stFormSubmitButton"] button:active,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stDownloadButton"] button:active {{
+                    transform: translateY(0) scale(.985) !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stButton"] button[kind="primary"],
+                [data-testid="stAppViewContainer"] .main div[data-testid="stFormSubmitButton"] button[kind="primary"] {{
+                    border: 1px solid rgba(255,255,255,.18) !important;
+                    background: linear-gradient(110deg, #E53935 0%, #F0445B 38%, #8B5CF6 72%, #C04BB8 100%) !important;
+                    background-size: 180% 100% !important;
+                    color: #FFFFFF !important;
+                    box-shadow: 0 12px 28px rgba(177,70,153,.20), inset 0 1px 0 rgba(255,255,255,.20) !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stButton"] button[kind="primary"] *,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stFormSubmitButton"] button[kind="primary"] * {{
+                    color: #FFFFFF !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stButton"] button[kind="primary"]:hover,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stFormSubmitButton"] button[kind="primary"]:hover {{
+                    background-position: 100% 0 !important;
+                    box-shadow: 0 16px 34px rgba(177,70,153,.28) !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stButton"] button[kind="secondary"],
+                [data-testid="stAppViewContainer"] .main div[data-testid="stFormSubmitButton"] button[kind="secondary"],
+                [data-testid="stAppViewContainer"] .main div[data-testid="stDownloadButton"] button {{
+                    border: 1px solid #E53935 !important;
+                    background: {secondary_bg} !important;
+                    color: {secondary_text} !important;
+                    box-shadow: {shadow} !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stButton"] button[kind="secondary"] *,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stFormSubmitButton"] button[kind="secondary"] *,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stDownloadButton"] button * {{
+                    color: {secondary_text} !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stButton"] button[kind="secondary"]:hover,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stFormSubmitButton"] button[kind="secondary"]:hover,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stDownloadButton"] button:hover {{
+                    border-color: #FF5252 !important;
+                    background: {secondary_hover_bg} !important;
+                    color: {secondary_hover_text} !important;
+                    box-shadow: 0 11px 24px rgba(229,57,53,.12) !important;
+                }}
+
+                [data-testid="stAppViewContainer"] .main div[data-testid="stButton"] button[kind="secondary"]:hover *,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stFormSubmitButton"] button[kind="secondary"]:hover *,
+                [data-testid="stAppViewContainer"] .main div[data-testid="stDownloadButton"] button:hover * {{
+                    color: {secondary_hover_text} !important;
+                }}
+
+                /* Pertahankan perilaku disabled dan guard pointer-events halaman. */
+                [data-testid="stAppViewContainer"] .main button:disabled {{
+                    transform: none !important;
+                    filter: none !important;
+                    opacity: .72 !important;
+                }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    except Exception as exc:
+        st.error(f"Gaya dropdown dan tombol analitik belum dapat diterapkan: {exc}")
 
 
 def load_css(dark_mode: bool = False, hide_sidebar: bool = False) -> None:
