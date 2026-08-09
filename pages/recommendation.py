@@ -435,6 +435,241 @@ div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button[kind="sec
 </style>
 """
 
+RECOMMENDATION_ACCOUNT_FILTER_CSS = """
+<style>
+.rec-account-filter-shell {
+    position: relative;
+    overflow: hidden;
+    margin: 6px 0 8px;
+    padding: 18px 18px 16px;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 22px;
+    background:
+        radial-gradient(circle at 8% 18%, rgba(229,57,53,.18), transparent 30%),
+        radial-gradient(circle at 92% 16%, rgba(29,161,242,.16), transparent 32%),
+        linear-gradient(145deg, rgba(24,26,33,.98), rgba(14,16,22,.98));
+    box-shadow: 0 18px 46px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.rec-account-filter-shell::after {
+    content: "";
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: 0;
+    height: 3px;
+    border-radius: 999px 999px 0 0;
+    background: linear-gradient(90deg, #E53935, #FF9800, #8B5CF6, #1DA1F2);
+    opacity: .95;
+}
+
+.rec-account-filter-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.rec-account-filter-copy {
+    min-width: 0;
+}
+
+.rec-account-filter-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    color: #FFB4AF;
+    background: rgba(229,57,53,.10);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.rec-account-filter-title {
+    margin: 0;
+    color: #FFFFFF;
+    font-family: "Plus Jakarta Sans", sans-serif;
+    font-size: 1.1rem;
+    font-weight: 900;
+    letter-spacing: -.02em;
+}
+
+.rec-account-filter-desc {
+    margin: 7px 0 0;
+    max-width: 880px;
+    color: rgba(255,255,255,.76);
+    font-size: 0.90rem;
+    line-height: 1.62;
+    font-weight: 600;
+}
+
+.rec-account-filter-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    align-self: flex-start;
+    padding: 9px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(76,175,80,.28);
+    color: #A5D6A7;
+    background: rgba(76,175,80,.10);
+    font-size: 12px;
+    font-weight: 850;
+    white-space: nowrap;
+}
+
+.rec-account-filter-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.rec-account-filter-stat {
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 16px;
+    background: rgba(255,255,255,.04);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+.rec-account-filter-stat-label {
+    display: block;
+    margin-bottom: 6px;
+    color: rgba(255,255,255,.62);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.rec-account-filter-stat-value {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    color: #FFFFFF;
+    font-family: "Plus Jakarta Sans", sans-serif;
+    font-size: 1.18rem;
+    font-weight: 900;
+    letter-spacing: -.03em;
+}
+
+.rec-account-filter-stat-hint {
+    color: rgba(255,255,255,.54);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.rec-account-filter-foot {
+    margin: 8px 0 12px;
+    padding: 11px 14px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px;
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.74);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.55;
+}
+
+.rec-account-filter-foot strong {
+    color: #FFFFFF;
+}
+
+.rec-account-filter-foot .accent {
+    color: #FFB020;
+}
+
+/* Radio filter khusus tipe akun */
+div[data-testid="stRadio"] {
+    margin: 0 0 8px !important;
+}
+
+div[data-testid="stRadio"] > label[data-testid="stWidgetLabel"] {
+    display: none !important;
+}
+
+div[data-testid="stRadio"] div[role="radiogroup"] {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"] {
+    margin: 0 !important;
+    padding: 14px 16px !important;
+    min-height: 62px;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 18px;
+    background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.03));
+    box-shadow: 0 12px 30px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.05);
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"]:hover {
+    transform: translateY(-2px);
+    border-color: rgba(229,57,53,.32);
+    box-shadow: 0 16px 34px rgba(0,0,0,.16), 0 0 0 1px rgba(229,57,53,.05);
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) {
+    border-color: rgba(229,57,53,.58);
+    background: linear-gradient(135deg, rgba(229,57,53,.14), rgba(139,92,246,.12) 50%, rgba(29,161,242,.12));
+    box-shadow: 0 18px 38px rgba(229,57,53,.12), 0 0 0 1px rgba(229,57,53,.08), inset 0 1px 0 rgba(255,255,255,.07);
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,.40);
+    background: rgba(255,255,255,.05);
+    transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) > div:first-child {
+    border-color: rgba(229,57,53,.00);
+    background: linear-gradient(135deg, #E53935, #8B5CF6);
+    box-shadow: 0 0 0 4px rgba(229,57,53,.16);
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"] > div:last-child {
+    color: rgba(255,255,255,.90);
+    font-family: "Plus Jakarta Sans", sans-serif;
+    font-size: 14px;
+    font-weight: 850;
+    letter-spacing: -.01em;
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) > div:last-child {
+    color: #FFFFFF;
+}
+
+@media (max-width: 920px) {
+    .rec-account-filter-head {
+        flex-direction: column;
+    }
+
+    .rec-account-filter-badge {
+        width: fit-content;
+    }
+
+    .rec-account-filter-stats,
+    div[data-testid="stRadio"] div[role="radiogroup"] {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+"""
+
 PHASE12_AI_CSS = """
 <style>
 /* ========================================================================== */
@@ -4570,6 +4805,7 @@ div[data-testid="stElementContainer"]:has(div[data-testid="stCode"]) {
     .rec-business-topic { max-width: none; width: 100%; }
 }
 
+
 </style>
 """
 
@@ -5513,6 +5749,92 @@ div[data-testid="stCode"] code {
     color: inherit;
 }
 
+
+/* Filter tipe akun: surface khusus Light Mode */
+.rec-account-filter-shell {
+    border-color: #D9E0E8;
+    background:
+        radial-gradient(circle at 8% 18%, rgba(229,57,53,.10), transparent 30%),
+        radial-gradient(circle at 92% 16%, rgba(29,161,242,.10), transparent 32%),
+        linear-gradient(145deg, #FFFFFF, #F7F9FC);
+    box-shadow: 0 16px 38px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.92);
+}
+
+.rec-account-filter-eyebrow {
+    color: #C62828;
+    background: rgba(229,57,53,.08);
+}
+
+.rec-account-filter-title,
+.rec-account-filter-stat-value,
+.rec-account-filter-foot strong {
+    color: #172033;
+}
+
+.rec-account-filter-desc,
+.rec-account-filter-foot {
+    color: #5F6B7A;
+}
+
+.rec-account-filter-badge {
+    border-color: rgba(76,175,80,.24);
+    color: #2E7D32;
+    background: rgba(76,175,80,.10);
+}
+
+.rec-account-filter-stat {
+    border-color: #DCE3EB;
+    background: #FFFFFF;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 8px 20px rgba(15,23,42,.05);
+}
+
+.rec-account-filter-stat-label {
+    color: #7B8797;
+}
+
+.rec-account-filter-stat-hint {
+    color: #8A95A4;
+}
+
+.rec-account-filter-foot {
+    border-color: #DCE3EB;
+    background: #F8FAFC;
+}
+
+.rec-account-filter-foot .accent {
+    color: #C62828;
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"] {
+    border-color: #DCE3EB;
+    background: linear-gradient(145deg, #FFFFFF, #F8FAFC);
+    box-shadow: 0 10px 24px rgba(15,23,42,.06), inset 0 1px 0 rgba(255,255,255,.96);
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"]:hover {
+    border-color: rgba(229,57,53,.36);
+    box-shadow: 0 14px 28px rgba(15,23,42,.08), 0 0 0 1px rgba(229,57,53,.05);
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) {
+    border-color: rgba(229,57,53,.56);
+    background: linear-gradient(135deg, rgba(229,57,53,.10), rgba(139,92,246,.08) 52%, rgba(29,161,242,.10));
+    box-shadow: 0 16px 30px rgba(229,57,53,.10), 0 0 0 1px rgba(229,57,53,.06), inset 0 1px 0 rgba(255,255,255,.98);
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {
+    border-color: #C2CDD9;
+    background: #FFFFFF;
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"] > div:last-child {
+    color: #253041;
+}
+
+div[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) > div:last-child {
+    color: #172033;
+}
+
 </style>
 """
 
@@ -5700,6 +6022,93 @@ def _filter_influencers_by_account_type(
             f"Detail: {type(error).__name__}."
         )
         return influencers.iloc[0:0].copy()
+
+
+def _render_account_type_filter_panel(influencers: pd.DataFrame) -> str:
+    """Render panel filter akun media vs influencer yang lebih informatif."""
+    try:
+        total_count = int(len(influencers)) if isinstance(influencers, pd.DataFrame) else 0
+        if isinstance(influencers, pd.DataFrame) and not influencers.empty and "tipe_akun" in influencers.columns:
+            media_count = int(influencers["tipe_akun"].astype(str).str.lower().eq("media").sum())
+            influencer_count = int(influencers["tipe_akun"].astype(str).str.lower().eq("influencer").sum())
+        else:
+            media_count = 0
+            influencer_count = total_count
+
+        st.markdown(
+            f"""
+            <section class="rec-account-filter-shell">
+                <div class="rec-account-filter-head">
+                    <div class="rec-account-filter-copy">
+                        <div class="rec-account-filter-eyebrow">● Kurasi akun rekomendasi</div>
+                        <h3 class="rec-account-filter-title">Pilih tampilan kandidat influencer</h3>
+                        <p class="rec-account-filter-desc">
+                            Pisahkan akun personal dan akun media agar proses kurasi lebih fokus.
+                            Gunakan opsi ini untuk menyesuaikan gaya kolaborasi, format konten, dan arah komunikasi.
+                        </p>
+                    </div>
+                    <div class="rec-account-filter-badge">✦ Filter visual aktif</div>
+                </div>
+                <div class="rec-account-filter-stats">
+                    <div class="rec-account-filter-stat">
+                        <span class="rec-account-filter-stat-label">Total Kandidat</span>
+                        <div class="rec-account-filter-stat-value">{total_count}<span class="rec-account-filter-stat-hint">akun</span></div>
+                    </div>
+                    <div class="rec-account-filter-stat">
+                        <span class="rec-account-filter-stat-label">Influencer</span>
+                        <div class="rec-account-filter-stat-value">{influencer_count}<span class="rec-account-filter-stat-hint">akun personal</span></div>
+                    </div>
+                    <div class="rec-account-filter-stat">
+                        <span class="rec-account-filter-stat-label">Akun Media</span>
+                        <div class="rec-account-filter-stat-value">{media_count}<span class="rec-account-filter-stat-hint">akun informasi</span></div>
+                    </div>
+                </div>
+            </section>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        selected_account_type = st.radio(
+            "Tampilkan:",
+            options=["Semua", "Influencer", "Akun Media"],
+            horizontal=True,
+            key=ACCOUNT_TYPE_FILTER_KEY,
+            label_visibility="collapsed",
+        )
+
+        selection_note_map = {
+            "Semua": "Seluruh kandidat ditampilkan agar peneliti dapat membandingkan peran akun personal dan akun media secara bersamaan.",
+            "Influencer": "Mode aktif menampilkan akun personal atau kreator yang lebih relevan untuk kolaborasi organik dan pendekatan komunitas.",
+            "Akun Media": "Mode aktif menampilkan akun media atau portal informasi yang lebih kuat untuk amplifikasi isu, berita, dan publikasi cepat.",
+        }
+        selection_title_map = {
+            "Semua": "Semua kandidat",
+            "Influencer": "Fokus influencer personal",
+            "Akun Media": "Fokus akun media",
+        }
+
+        st.markdown(
+            f"""
+            <div class="rec-account-filter-foot">
+                <strong>{escape(selection_title_map.get(selected_account_type, 'Semua kandidat'))}</strong>
+                <span class="accent"> • </span>
+                {escape(selection_note_map.get(selected_account_type, 'Filter akun siap digunakan.'))}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return selected_account_type
+    except Exception as error:
+        st.error(
+            "Panel filter tipe akun belum dapat ditampilkan. "
+            f"Detail: {type(error).__name__}."
+        )
+        return st.radio(
+            "Tampilkan:",
+            options=["Semua", "Influencer", "Akun Media"],
+            horizontal=True,
+            key=ACCOUNT_TYPE_FILTER_KEY,
+        )
 
 
 def _topic_regex(keywords: tuple[str, ...]) -> str:
@@ -12313,6 +12722,7 @@ def render_recommendation() -> None:
             RECOMMENDATION_CSS,
             PHASE12_AI_CSS,
             RECOMMENDATION_FILTER_FORM_CSS,
+            RECOMMENDATION_ACCOUNT_FILTER_CSS,
         ]
 
         # Light Mode adalah tema default dan override tetap berada paling akhir.
@@ -12397,12 +12807,7 @@ def render_recommendation() -> None:
                 "konten asli yang relevan pada dataset layanan terpilih."
             ),
         )
-        selected_account_type = st.radio(
-            "Tampilkan:",
-            options=["Semua", "Influencer", "Akun Media"],
-            horizontal=True,
-            key=ACCOUNT_TYPE_FILTER_KEY,
-        )
+        selected_account_type = _render_account_type_filter_panel(influencers)
         influencers = _filter_influencers_by_account_type(
             influencers,
             selected_account_type,
