@@ -7246,6 +7246,428 @@ def _ensure_indibiz_platform_representatives(
         st.error(f"Gagal menyiapkan edge komentar Instagram/TikTok IndiBiz: {exc}")
         return graph.copy(), node_df.copy()
 
+
+
+def _ensure_comment_edges_for_visualization(
+    graph: nx.DiGraph,
+    node_df: pd.DataFrame,
+    source_df: pd.DataFrame,
+    service: str,
+    minimum_per_platform: int = 50,
+) -> tuple[nx.DiGraph, pd.DataFrame]:
+    """Bangun ulang node Instagram/TikTok sebagai akun komentar -> akun layanan.
+
+    Fungsi ini KHUSUS untuk Eksplorasi Graf SNA. Statistik dan ranking SNA utama
+    tetap dihitung dari edge list penelitian asli.
+
+    Aturan visual yang dijaga:
+    1. Twitter/X tetap memakai struktur edge SNA asli.
+    2. Instagram dan TikTok hanya memakai akun yang berasal dari data komentar.
+    3. Setiap akun Instagram/TikTok mempunyai tepat satu edge menuju akun layanan.
+    4. Username yang sama di platform berbeda memakai ID internal berbeda agar
+       metadata platform tidak saling menimpa.
+    5. Untuk mode Semua Platform, kandidat disiapkan minimal sesuai kuota slider.
+    """
+    try:
+        if graph is None or node_df is None or node_df.empty:
+            return graph.copy(), node_df.copy()
+
+        service_key = str(service or "").strip().lower()
+        service_hub = {
+            "indihome": "indihome",
+            "indibiz": "indibiz",
+            "telkomsel": "telkomsel",
+        }.get(service_key, service_key)
+        if not service_hub:
+            return graph.copy(), node_df.copy()
+
+        visual_graph = graph.copy()
+        visual_nodes = node_df.copy()
+        if "platform_group" not in visual_nodes.columns:
+            return visual_graph, visual_nodes
+
+        # Instagram/TikTok pada graf visual selalu dibangun ulang dari komentar.
+        # Node lama dihapus agar tidak ada node sosial yang menggantung tanpa edge.
+        social_mask = visual_nodes["platform_group"].astype(str).isin(
+            {"instagram", "tiktok"}
+        ) & ~visual_nodes.get(
+            "is_brand", pd.Series(False, index=visual_nodes.index)
+        ).fillna(False).astype(bool)
+        social_ids = set(visual_nodes.loc[social_mask, "username"].astype(str))
+        if social_ids:
+            visual_graph.remove_nodes_from(
+                [node_id for node_id in social_ids if node_id in visual_graph]
+            )
+            visual_nodes = visual_nodes.loc[~social_mask].copy()
+
+        # Sisakan hanya hub utama layanan sebagai target visual komentar.
+        if service_hub not in visual_graph:
+            visual_graph.add_node(
+                service_hub,
+                followers=0,
+                platform="target",
+                dominant_sentiment="unknown",
+                is_brand=True,
+                display_username=service_hub,
+            )
+
+        if service_hub not in set(visual_nodes["username"].astype(str)):
+            visual_nodes = pd.concat(
+                [
+                    visual_nodes,
+                    pd.DataFrame(
+                        [
+                            {
+                                "username": service_hub,
+                                "display_username": service_hub,
+                                "platform": "target",
+                                "platform_group": "target",
+                                "platform_label": f"Akun Brand {service}",
+                                "followers": 0,
+                                "degree": 0,
+                                "degree_centrality": 0.0,
+                                "betweenness_centrality": 0.0,
+                                "pagerank": 0.0,
+                                "in_degree": 0,
+                                "out_degree": 0,
+                                "dominant_sentiment": "unknown",
+                                "sentiment_label": "Belum tersedia",
+                                "is_brand": True,
+                                "is_platform_representative": False,
+                                "is_comment_interaction": False,
+                                "comment_interactions": 0,
+                            }
+                        ]
+                    ),
+                ],
+                ignore_index=True,
+                sort=False,
+            )
+
+        candidate_frames: list[pd.DataFrame] = []
+
+        # Sumber pertama adalah edge list yang sedang aktif. Ini paling kuat
+        # karena langsung mengikuti filter layanan yang dipilih pengguna.
+        if source_df is not None and not source_df.empty:
+            source_comments = source_df.copy()
+            for column in ["source", "relationship", "platform"]:
+                if column not in source_comments.columns:
+                    source_comments[column] = ""
+            if "followers" not in source_comments.columns:
+                source_comments["followers"] = 0
+
+            source_comments["username"] = source_comments["source"].map(
+                _normalize_username
+            )
+            source_comments["platform_group"] = source_comments["platform"].map(
+                _normalize_platform
+            )
+            source_comments["relationship"] = (
+                source_comments["relationship"]
+                .fillna("")
+                .astype(str)
+                .str.lower()
+                .str.strip()
+            )
+            source_comments = source_comments[
+                source_comments["platform_group"].isin({"instagram", "tiktok"})
+                & source_comments["relationship"].eq("comment")
+            ].copy()
+
+            if not source_comments.empty:
+                source_comments["followers"] = (
+                    pd.to_numeric(source_comments["followers"], errors="coerce")
+                    .fillna(0)
+                    .clip(lower=0)
+                    .astype(int)
+                )
+                source_comments["dominant_sentiment"] = "unknown"
+                source_comments["comment_interactions"] = 1
+                candidate_frames.append(
+                    source_comments[
+                        [
+                            "platform_group",
+                            "username",
+                            "followers",
+                            "comment_interactions",
+                            "dominant_sentiment",
+                        ]
+                    ]
+                )
+
+        # Sumber kedua adalah dataset konten aktual. Ini menutup kasus edge list
+        # Twitter lebih lengkap daripada edge Instagram/TikTok pada file SNA.
+        try:
+            if sentiment_file_exists(service):
+                content_df = load_influencer_content_data(service)
+            else:
+                content_df = pd.DataFrame()
+
+            if content_df is not None and not content_df.empty:
+                comments = content_df.copy()
+                comments["username"] = comments["username"].map(_normalize_username)
+                comments["platform_group"] = comments["platform"].map(
+                    _normalize_platform
+                )
+
+                specific_type = comments.get(
+                    "specific_type",
+                    pd.Series("", index=comments.index, dtype="object"),
+                ).fillna("").astype(str).str.lower().str.strip()
+                content_type = comments.get(
+                    "content_type",
+                    pd.Series("", index=comments.index, dtype="object"),
+                ).fillna("").astype(str).str.lower().str.strip()
+                post_type = comments.get(
+                    "post_type",
+                    pd.Series("", index=comments.index, dtype="object"),
+                ).fillna("").astype(str).str.lower().str.strip()
+
+                has_type_metadata = bool(
+                    specific_type.ne("").any()
+                    or content_type.ne("").any()
+                    or post_type.ne("").any()
+                )
+                if has_type_metadata:
+                    comment_mask = (
+                        specific_type.eq("comment")
+                        | content_type.eq("comment")
+                        | post_type.eq("comment")
+                    )
+                else:
+                    # Beberapa output prediksi hanya menyisakan akun + konten
+                    # tanpa kolom tipe. Untuk Instagram/TikTok, baris ini tetap
+                    # dipakai sebagai sumber akun visual, tetapi edge yang dibuat
+                    # selalu akun -> layanan dan tidak pernah antarpengguna.
+                    comment_mask = pd.Series(True, index=comments.index)
+
+                comments = comments[
+                    comments["platform_group"].isin({"instagram", "tiktok"})
+                    & comment_mask
+                ].copy()
+
+                invalid = {"", "nan", "none", "null"}
+                comments = comments[
+                    ~comments["username"].isin(invalid)
+                    & ~comments["username"].map(
+                        _hide_service_account_from_exploration_graph
+                    )
+                ].copy()
+
+                if not comments.empty:
+                    if "followers" not in comments.columns:
+                        comments["followers"] = 0
+                    comments["followers"] = (
+                        pd.to_numeric(comments["followers"], errors="coerce")
+                        .fillna(0)
+                        .clip(lower=0)
+                        .astype(int)
+                    )
+                    sentiment_column = next(
+                        (
+                            column
+                            for column in [
+                                "predicted_sentiment",
+                                "sentiment",
+                                "label",
+                                "sentimen",
+                            ]
+                            if column in comments.columns
+                        ),
+                        None,
+                    )
+                    if sentiment_column is None:
+                        comments["dominant_sentiment"] = "unknown"
+                    else:
+                        comments["dominant_sentiment"] = comments[
+                            sentiment_column
+                        ].map(_normalize_sentiment)
+
+                    content_candidates = (
+                        comments.groupby(
+                            ["platform_group", "username"], as_index=False
+                        )
+                        .agg(
+                            followers=("followers", "max"),
+                            comment_interactions=("username", "size"),
+                            dominant_sentiment=("dominant_sentiment", "first"),
+                        )
+                    )
+                    candidate_frames.append(content_candidates)
+        except Exception:
+            # Edge list aktif tetap dapat dipakai jika sumber konten tidak siap.
+            pass
+
+        if not candidate_frames:
+            return visual_graph, visual_nodes.reset_index(drop=True)
+
+        candidates = pd.concat(candidate_frames, ignore_index=True, sort=False)
+        candidates["username"] = candidates["username"].map(_normalize_username)
+        candidates["platform_group"] = candidates["platform_group"].map(
+            _normalize_platform
+        )
+        candidates["followers"] = (
+            pd.to_numeric(candidates.get("followers", 0), errors="coerce")
+            .fillna(0)
+            .clip(lower=0)
+            .astype(int)
+        )
+        candidates["comment_interactions"] = (
+            pd.to_numeric(
+                candidates.get("comment_interactions", 1), errors="coerce"
+            )
+            .fillna(1)
+            .clip(lower=1)
+            .astype(int)
+        )
+        candidates["dominant_sentiment"] = candidates.get(
+            "dominant_sentiment", "unknown"
+        ).map(_normalize_sentiment)
+
+        invalid = {"", "nan", "none", "null"}
+        candidates = candidates[
+            candidates["platform_group"].isin({"instagram", "tiktok"})
+            & ~candidates["username"].isin(invalid)
+            & ~candidates["username"].map(
+                _hide_service_account_from_exploration_graph
+            )
+        ].copy()
+        if candidates.empty:
+            return visual_graph, visual_nodes.reset_index(drop=True)
+
+        # Gabungkan kandidat tanpa menggandakan akun pada platform yang sama.
+        candidates = (
+            candidates.sort_values(
+                [
+                    "platform_group",
+                    "username",
+                    "followers",
+                    "comment_interactions",
+                ],
+                ascending=[True, True, False, False],
+                kind="mergesort",
+            )
+            .groupby(["platform_group", "username"], as_index=False)
+            .agg(
+                followers=("followers", "max"),
+                comment_interactions=("comment_interactions", "max"),
+                dominant_sentiment=("dominant_sentiment", "first"),
+            )
+        )
+
+        target_minimum = max(1, int(minimum_per_platform))
+        addition_rows: list[dict[str, Any]] = []
+
+        for platform in ("instagram", "tiktok"):
+            platform_candidates = candidates[
+                candidates["platform_group"].eq(platform)
+            ].copy()
+            if platform_candidates.empty:
+                continue
+
+            # Followers dipakai sebagai indikator jangkauan visual, kemudian
+            # frekuensi komentar menjadi tie-breaker.
+            platform_candidates = platform_candidates.sort_values(
+                ["followers", "comment_interactions", "username"],
+                ascending=[False, False, True],
+                kind="mergesort",
+            ).head(target_minimum)
+
+            for row in platform_candidates.itertuples(index=False):
+                display_username = str(row.username)
+                visual_node_id = f"__{platform}__{display_username}"
+                followers = int(getattr(row, "followers", 0) or 0)
+                comment_count = max(
+                    1, int(getattr(row, "comment_interactions", 1) or 1)
+                )
+                sentiment = _normalize_sentiment(
+                    getattr(row, "dominant_sentiment", "unknown")
+                )
+
+                visual_graph.add_node(
+                    visual_node_id,
+                    followers=followers,
+                    platform=platform,
+                    dominant_sentiment=sentiment,
+                    platform_representative=True,
+                    comment_interaction=True,
+                    display_username=display_username,
+                )
+                visual_graph.add_edge(
+                    visual_node_id,
+                    service_hub,
+                    relationship="comment",
+                    weight=comment_count,
+                    platform=platform,
+                    visual_comment_edge=True,
+                )
+
+                addition_rows.append(
+                    {
+                        "username": visual_node_id,
+                        "display_username": display_username,
+                        "platform": platform,
+                        "platform_group": platform,
+                        "platform_label": PLATFORM_DISPLAY.get(
+                            platform, platform.title()
+                        ),
+                        "followers": followers,
+                        "degree": 1,
+                        "degree_centrality": 0.0,
+                        "betweenness_centrality": 0.0,
+                        "pagerank": 0.0,
+                        "in_degree": 0,
+                        "out_degree": 1,
+                        "dominant_sentiment": sentiment,
+                        "sentiment_label": SENTIMENT_DISPLAY.get(
+                            sentiment, "Belum tersedia"
+                        ),
+                        "is_brand": False,
+                        "is_platform_representative": True,
+                        "is_comment_interaction": True,
+                        "comment_interactions": comment_count,
+                    }
+                )
+
+        if addition_rows:
+            visual_nodes = pd.concat(
+                [visual_nodes, pd.DataFrame(addition_rows)],
+                ignore_index=True,
+                sort=False,
+            )
+
+        if "display_username" not in visual_nodes.columns:
+            visual_nodes["display_username"] = visual_nodes["username"].astype(str)
+        visual_nodes["display_username"] = (
+            visual_nodes["display_username"]
+            .fillna(visual_nodes["username"])
+            .astype(str)
+        )
+        if "is_platform_representative" not in visual_nodes.columns:
+            visual_nodes["is_platform_representative"] = False
+        visual_nodes["is_platform_representative"] = (
+            visual_nodes["is_platform_representative"].fillna(False).astype(bool)
+        )
+        if "is_comment_interaction" not in visual_nodes.columns:
+            visual_nodes["is_comment_interaction"] = False
+        visual_nodes["is_comment_interaction"] = (
+            visual_nodes["is_comment_interaction"].fillna(False).astype(bool)
+        )
+        if "comment_interactions" not in visual_nodes.columns:
+            visual_nodes["comment_interactions"] = 0
+        visual_nodes["comment_interactions"] = (
+            pd.to_numeric(visual_nodes["comment_interactions"], errors="coerce")
+            .fillna(0)
+            .astype(int)
+        )
+
+        return visual_graph, visual_nodes.reset_index(drop=True)
+    except Exception as exc:
+        st.error(
+            f"Gagal menyiapkan edge komentar Instagram/TikTok {service}: {exc}"
+        )
+        return graph.copy(), node_df.copy()
+
 def _ensure_telkomsel_platform_representatives(
     graph: nx.DiGraph,
     node_df: pd.DataFrame,
@@ -7483,11 +7905,10 @@ def _limit_graph_nodes(
             selected_df = work[work["username"].isin(selected_nodes)].copy()
             return subgraph, selected_df.reset_index(drop=True)
 
-        # Mode Semua Platform. Untuk IndiBiz, selalu gunakan ketiga kuota resmi,
-        # bukan hanya platform yang kebetulan tersedia pada edge Twitter lama.
-        quota_platforms = (
-            PLATFORM_ORDER if service_key == "indibiz" else available_platforms
-        )
+        # Mode Semua Platform selalu memakai tiga kuota resmi. Jika slider
+        # bernilai 160, targetnya adalah 60 Twitter/X, 50 Instagram, dan 50
+        # TikTok. Kekurangan satu platform tidak boleh diisi platform lain.
+        quota_platforms = PLATFORM_ORDER
         platform_quotas = _calculate_graph_platform_quotas(
             limit,
             list(quota_platforms),
@@ -7541,30 +7962,11 @@ def _limit_graph_nodes(
 
         selected = list(dict.fromkeys(selected))
 
-        if service_key != "indibiz":
-            # Layanan lain mempertahankan fallback lama: jika salah satu platform
-            # kekurangan akun, sisa slot boleh diisi akun nyata platform lain.
-            if len(selected) < limit:
-                remaining_non_brand = _rank(
-                    non_brand[~non_brand["username"].isin(selected)]
-                )
-                selected.extend(
-                    remaining_non_brand.head(limit - len(selected))["username"].tolist()
-                )
-                selected = list(dict.fromkeys(selected))
-            if len(selected) < limit:
-                remaining_brand = _rank(
-                    brand[~brand["username"].isin(selected)]
-                )
-                selected.extend(
-                    remaining_brand.head(limit - len(selected))["username"].tolist()
-                )
-                selected = list(dict.fromkeys(selected))
-
-        # IndiBiz sengaja TIDAK backfill kekurangan Instagram/TikTok dengan
-        # Twitter/X. Ini mencegah kondisi 160 node berubah menjadi hampir semua
-        # Twitter seperti bug sebelumnya. Jika sumber aktual belum menyediakan
-        # cukup akun pada suatu platform, jumlah nyata yang tersedia ditampilkan.
+        # Tidak ada backfill lintas platform. Dengan demikian kuota 60:50:50
+        # tidak pernah berubah menjadi dominasi Twitter/X ketika kandidat
+        # Instagram atau TikTok kurang. Jika data aktual suatu platform benar-
+        # benar tidak cukup, dashboard menampilkan jumlah nyata yang tersedia
+        # daripada mengganti slot dengan platform lain.
         selected_nodes = selected[:limit]
         subgraph = graph_work.subgraph(selected_nodes).copy()
         selected_df = work[work["username"].isin(selected_nodes)].copy()
@@ -9164,6 +9566,7 @@ def _render_network_graph(
     node_limit: int,
     service: str = "",
     selected_platform: str = "all",
+    source_df: pd.DataFrame | None = None,
 ) -> None:
     """Render graf jaringan interaktif Pyvis full width."""
     try:
@@ -9185,24 +9588,22 @@ def _render_network_graph(
             graph_for_visual = graph
             nodes_for_visual = node_df
             platform_filter_key = _normalize_platform(selected_platform) if selected_platform != "all" else "all"
-            if platform_filter_key == "all":
+            # Instagram dan TikTok selalu dibangun sebagai edge komentar
+            # akun -> akun layanan. Aturan ini berlaku baik saat Semua Platform
+            # dipilih maupun saat pengguna memfilter Instagram/TikTok saja.
+            if platform_filter_key in {"all", "instagram", "tiktok"}:
                 desired_quotas = _calculate_graph_platform_quotas(
                     int(node_limit),
-                    PLATFORM_ORDER,
+                    PLATFORM_ORDER if platform_filter_key == "all" else [platform_filter_key],
                 )
-                representative_minimum = max(desired_quotas.values(), default=2)
-                if service_key == "indibiz":
-                    graph_for_visual, nodes_for_visual = _ensure_indibiz_platform_representatives(
-                        graph,
-                        node_df,
-                        minimum_per_platform=representative_minimum,
-                    )
-                elif service_key == "telkomsel":
-                    graph_for_visual, nodes_for_visual = _ensure_telkomsel_platform_representatives(
-                        graph,
-                        node_df,
-                        minimum_per_platform=representative_minimum,
-                    )
+                representative_minimum = max(desired_quotas.values(), default=int(node_limit))
+                graph_for_visual, nodes_for_visual = _ensure_comment_edges_for_visualization(
+                    graph,
+                    node_df,
+                    source_df if isinstance(source_df, pd.DataFrame) else pd.DataFrame(),
+                    service,
+                    minimum_per_platform=representative_minimum,
+                )
 
             visual_graph, visual_nodes = _limit_graph_nodes(
                 graph_for_visual,
@@ -9334,19 +9735,14 @@ def _render_network_graph(
                         f"{PLATFORM_DISPLAY.get(platform, platform.title())} {int(count)}"
                         for platform, count in quotas.items()
                     )
-                    if service_key == "indibiz":
-                        st.caption(
-                            f"Alokasi mode Semua Platform mengikuti rasio 60:50:50. Batas aktif {int(node_limit)} node menargetkan {quota_text}. Untuk IndiBiz, kuota Instagram dan TikTok tidak boleh digantikan oleh Twitter/X. Akun Instagram/TikTok pada Eksplorasi Graf dihubungkan langsung ke akun layanan IndiBiz berdasarkan relasi komentar yang tersedia."
-                        )
-                    else:
-                        st.caption(
-                            f"Alokasi node mode Semua Platform mengikuti rasio 60:50:50. Batas aktif {int(node_limit)} node dibagi menjadi {quota_text}. Hub layanan utama dihitung ke kuota Twitter/X agar total node tetap mengikuti slider."
-                        )
+                    st.caption(
+                        f"Alokasi mode Semua Platform mengikuti rasio 60:50:50. Batas aktif {int(node_limit)} node menargetkan {quota_text}. Kuota Instagram dan TikTok tidak digantikan oleh Twitter/X. Pada Eksplorasi Graf, akun Instagram/TikTok dihubungkan satu arah langsung ke akun layanan berdasarkan komentar yang tersedia pada data."
+                    )
             service_key = str(service).strip().lower()
             if service_key == "indihome":
                 st.caption(
                     "Ukuran node Twitter/X mengikuti degree. Ukuran node Instagram dan TikTok mengikuti jumlah followers. "
-                    "Akun layanan turunan disembunyikan dari graf IndiHome; akun utama IndiHome, IndiBiz, dan Telkomsel tetap dapat tampil sebagai hub merah bila terdapat pada jaringan aktif."
+                    "Pada Eksplorasi Graf, setiap akun Instagram dan TikTok dihubungkan satu arah langsung ke akun layanan IndiHome berdasarkan komentar yang tersedia. Akun layanan turunan tetap disembunyikan dari graf visual."
                 )
             elif service_key == "indibiz":
                 st.caption(
@@ -9355,7 +9751,7 @@ def _render_network_graph(
                 )
             elif service_key == "telkomsel":
                 st.caption(
-                    "Ukuran node mengikuti PageRank untuk node jaringan. Jika edge Instagram/TikTok belum tersedia pada file SNA Telkomsel, akun nyata dari dataset Telkomsel dapat ditambahkan sebagai wakil platform sampai kuota visual terpenuhi tanpa membuat edge baru. Data SNA asli tidak diubah."
+                    "Ukuran node Twitter/X mengikuti metrik jaringan. Akun Instagram dan TikTok pada Eksplorasi Graf diambil dari data komentar dan masing-masing memiliki satu edge langsung menuju akun layanan Telkomsel. Edge visual ini tidak mengubah statistik SNA utama."
                 )
             else:
                 st.caption("Ukuran node mengikuti PageRank. Isi node menunjukkan sentimen; garis tepi menunjukkan platform. Jika sentimen node belum tersedia, isi node memakai warna platform agar jaringan tetap mudah dibaca.")
@@ -10507,6 +10903,7 @@ def render_sna() -> None:
             node_limit,
             selected_service,
             selected_platform,
+            filtered_df,
         )
         _render_influencer_tables(node_df, selected_service, selected_platform)
         _render_statistics_expander(node_df)
