@@ -22,10 +22,8 @@ from utils.loading_screen import (
     selesaikan_loading_aksi,
 )
 from utils.data_loader import (
-    load_indibiz_sentiment,
-    load_sentiment_data,
-    load_sna_data,
-    load_telkomsel_sentiment,
+    load_home_sentiment_projection,
+    load_home_sna_projection,
     sentiment_file_exists,
     sna_file_exists,
 )
@@ -4014,64 +4012,110 @@ def _prepare_sentiment_dataframe(
     df: pd.DataFrame,
     layanan: str = "IndiHome",
 ) -> pd.DataFrame:
-    """Validasi dan normalisasi dataset sentimen untuk kebutuhan Beranda."""
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        raise ValueError(f"Dataset sentimen {layanan} kosong atau tidak valid.")
+    """Validasi dan normalisasi dataset ringkas untuk kebutuhan Beranda."""
+    try:
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            raise ValueError(f"Dataset sentimen {layanan} kosong atau tidak valid.")
 
-    platform_col = _find_column(
-        df,
-        ["platform", "specific_resource_type", "source_platform"],
-    )
-    sentiment_col = _find_column(
-        df,
-        ["predicted_sentiment", "sentiment", "label", "final_sentiment"],
-    )
-    username_col = _find_column(df, ["username", "user", "author", "screen_name"])
-    date_col = _find_column(
-        df,
-        ["date_created", "date", "created_at", "timestamp", "datetime"],
-    )
-    content_col = _find_column(
-        df,
-        ["content", "text", "full_text", "comment", "cleaned_text"],
-    )
-
-    if platform_col is None:
-        raise ValueError(f"Kolom platform {layanan} tidak ditemukan.")
-    if sentiment_col is None:
-        raise ValueError(f"Kolom sentimen {layanan} tidak ditemukan.")
-
-    result = pd.DataFrame(
-        {
-            "platform": df[platform_col].apply(_normalize_platform),
-            "sentiment": df[sentiment_col].apply(_normalize_sentiment),
-            "username": (
-                df[username_col].astype(str).str.strip().str.lstrip("'").str.lstrip("@")
-                if username_col is not None
-                else pd.Series([""] * len(df), index=df.index, dtype="object")
-            ),
-            "date": (
-                pd.to_datetime(df[date_col], errors="coerce")
-                if date_col is not None
-                else pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
-            ),
-            "content": (
-                df[content_col].astype(str)
-                if content_col is not None
-                else pd.Series([""] * len(df), index=df.index, dtype="object")
-            ),
-        }
-    )
-    result["layanan"] = str(layanan).strip().title().replace("Indihome", "IndiHome").replace("Indibiz", "IndiBiz")
-    result = result[
-        result["platform"].isin(PLATFORM_ORDER)
-        & result["sentiment"].isin(SENTIMENT_ORDER)
-    ].copy()
-    if result.empty:
-        raise ValueError(
-            f"Tidak ada data {layanan} yang valid untuk Twitter/X, Instagram, atau TikTok."
+        platform_col = _find_column(
+            df,
+            ["platform", "specific_resource_type", "source_platform"],
         )
-    return result.reset_index(drop=True)
+        sentiment_col = _find_column(
+            df,
+            ["predicted_sentiment", "sentiment", "label", "final_sentiment"],
+        )
+        username_col = _find_column(df, ["username", "user", "author", "screen_name"])
+        date_col = _find_column(
+            df,
+            ["date_created", "date", "created_at", "timestamp", "datetime"],
+        )
+
+        if platform_col is None:
+            raise ValueError(f"Kolom platform {layanan} tidak ditemukan.")
+        if sentiment_col is None:
+            raise ValueError(f"Kolom sentimen {layanan} tidak ditemukan.")
+
+        platform_series = (
+            df[platform_col]
+            .astype("string")
+            .fillna("")
+            .str.strip()
+            .str.lower()
+            .str.lstrip("'")
+            .replace(
+                {
+                    "x": "twitter",
+                    "twitter/x": "twitter",
+                    "twitter": "twitter",
+                    "ig": "instagram",
+                    "instagram": "instagram",
+                    "tik tok": "tiktok",
+                    "tiktok": "tiktok",
+                }
+            )
+        )
+        sentiment_series = (
+            df[sentiment_col]
+            .astype("string")
+            .fillna("")
+            .str.strip()
+            .str.lower()
+            .str.lstrip("'")
+            .replace(
+                {
+                    "label_0": "positive",
+                    "positive": "positive",
+                    "positif": "positive",
+                    "label_1": "neutral",
+                    "neutral": "neutral",
+                    "netral": "neutral",
+                    "label_2": "negative",
+                    "negative": "negative",
+                    "negatif": "negative",
+                }
+            )
+        )
+
+        result = pd.DataFrame(
+            {
+                "platform": platform_series,
+                "sentiment": sentiment_series,
+                "username": (
+                    df[username_col]
+                    .astype("string")
+                    .fillna("")
+                    .str.strip()
+                    .str.lstrip("'")
+                    .str.lstrip("@")
+                    if username_col is not None
+                    else pd.Series([""] * len(df), index=df.index, dtype="string")
+                ),
+                "date": (
+                    pd.to_datetime(df[date_col], errors="coerce")
+                    if date_col is not None
+                    else pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
+                ),
+            }
+        )
+        result["layanan"] = (
+            str(layanan)
+            .strip()
+            .title()
+            .replace("Indihome", "IndiHome")
+            .replace("Indibiz", "IndiBiz")
+        )
+        result = result[
+            result["platform"].isin(PLATFORM_ORDER)
+            & result["sentiment"].isin(SENTIMENT_ORDER)
+        ].copy()
+        if result.empty:
+            raise ValueError(
+                f"Tidak ada data {layanan} yang valid untuk Twitter/X, Instagram, atau TikTok."
+            )
+        return result.reset_index(drop=True)
+    except Exception as error:
+        raise ValueError(f"Normalisasi data Beranda {layanan} gagal: {error}") from error
 
 
 @st.cache_data(show_spinner=False, max_entries=6)
@@ -4082,7 +4126,7 @@ def load_indihome_data(demo_mode: bool = False) -> pd.DataFrame:
             return _prepare_sentiment_dataframe(
                 get_demo_sentiment("IndiHome"), "IndiHome"
             )
-        loaded = load_sentiment_data("IndiHome")
+        loaded = load_home_sentiment_projection("IndiHome")
         if (
             not isinstance(loaded, pd.DataFrame)
             or loaded.empty
@@ -4112,7 +4156,6 @@ def load_indihome_data(demo_mode: bool = False) -> pd.DataFrame:
                     "sentiment": "neutral",
                     "username": "pengguna",
                     "date": pd.Timestamp("2025-11-01"),
-                    "content": "Data sementara IndiHome",
                     "layanan": "IndiHome",
                 }
             ]
@@ -4127,7 +4170,7 @@ def load_indibiz_data(demo_mode: bool = False) -> pd.DataFrame:
             return _prepare_sentiment_dataframe(
                 get_demo_sentiment("IndiBiz"), "IndiBiz"
             )
-        loaded = load_indibiz_sentiment()
+        loaded = load_home_sentiment_projection("IndiBiz")
         if not sentiment_file_exists("IndiBiz"):
             loaded = get_dummy_indibiz_sentiment()
         return _prepare_sentiment_dataframe(loaded, "IndiBiz")
@@ -4140,7 +4183,7 @@ def load_indibiz_data(demo_mode: bool = False) -> pd.DataFrame:
             )
         except Exception:
             return pd.DataFrame(
-                columns=["platform", "sentiment", "username", "date", "content", "layanan"]
+                columns=["platform", "sentiment", "username", "date", "layanan"]
             )
 
 
@@ -4152,7 +4195,7 @@ def load_telkomsel_data(demo_mode: bool = False) -> pd.DataFrame:
             return _prepare_sentiment_dataframe(
                 get_demo_sentiment("Telkomsel"), "Telkomsel"
             )
-        loaded = load_telkomsel_sentiment()
+        loaded = load_home_sentiment_projection("Telkomsel")
         if not sentiment_file_exists("Telkomsel"):
             loaded = get_dummy_sentiment_data("Telkomsel")
         return _prepare_sentiment_dataframe(loaded, "Telkomsel")
@@ -4165,7 +4208,7 @@ def load_telkomsel_data(demo_mode: bool = False) -> pd.DataFrame:
             )
         except Exception:
             return pd.DataFrame(
-                columns=["platform", "sentiment", "username", "date", "content", "layanan"]
+                columns=["platform", "sentiment", "username", "date", "layanan"]
             )
 
 
@@ -4198,7 +4241,7 @@ def load_all_data(demo_mode: bool = False) -> pd.DataFrame:
                 continue
         if not frames:
             return pd.DataFrame(
-                columns=["platform", "sentiment", "username", "date", "content", "layanan"]
+                columns=["platform", "sentiment", "username", "date", "layanan"]
             )
         return pd.concat(frames, ignore_index=True)
 
@@ -4657,12 +4700,51 @@ def _prepare_influencer_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Kolom SNA belum lengkap: {', '.join(missing)}.")
 
+    source_series = (
+        df[required["source"]]
+        .astype("string")
+        .fillna("")
+        .str.strip()
+        .str.lstrip("'")
+        .str.lstrip("@")
+        .str.strip()
+    )
+    target_series = (
+        df[required["target"]]
+        .astype("string")
+        .fillna("")
+        .str.strip()
+        .str.lstrip("'")
+        .str.lstrip("@")
+        .str.strip()
+    )
+    platform_series = (
+        df[required["platform"]]
+        .astype("string")
+        .fillna("")
+        .str.strip()
+        .str.lower()
+        .str.lstrip("'")
+        .replace(
+            {
+                "x": "twitter",
+                "twitter/x": "twitter",
+                "twitter": "twitter",
+                "ig": "instagram",
+                "instagram": "instagram",
+                "tik tok": "tiktok",
+                "tiktok": "tiktok",
+            }
+        )
+    )
     work = pd.DataFrame(
         {
-            "source": df[required["source"]].apply(_normalize_username),
-            "target": df[required["target"]].apply(_normalize_username),
-            "platform": df[required["platform"]].apply(_normalize_platform),
-            "followers": pd.to_numeric(df[required["followers"]], errors="coerce").fillna(0),
+            "source": source_series,
+            "target": target_series,
+            "platform": platform_series,
+            "followers": pd.to_numeric(
+                df[required["followers"]], errors="coerce"
+            ).fillna(0),
         }
     )
     invalid = {"", "nan", "none", "null"}
@@ -4707,9 +4789,16 @@ def _prepare_influencer_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     nodes["degree"] = nodes["out_degree"] + nodes["in_degree"]
     nodes["interaksi"] = nodes["outgoing_interactions"] + nodes["incoming_interactions"]
     nodes["followers"] = nodes["followers"].astype(int)
+    brand_keys = (
+        nodes["username"]
+        .astype("string")
+        .fillna("")
+        .str.lower()
+        .str.replace(r"[^a-z0-9]", "", regex=True)
+    )
     nodes = nodes[
         nodes["platform"].isin(PLATFORM_ORDER)
-        & ~nodes["username"].apply(_is_brand_account)
+        & ~brand_keys.isin(BRAND_ALIASES)
     ].copy()
     nodes["kategori"] = "Akun Partisipan"
 
@@ -4765,7 +4854,7 @@ def _load_home_influencer_data(demo_mode: bool = False) -> tuple[pd.DataFrame, b
             )
             prepared = _prepare_influencer_dataframe(demo_edges)
             return prepared, False, "Data Sample Demo"
-        loaded = load_sna_data()
+        loaded = load_home_sna_projection()
         prepared = _prepare_influencer_dataframe(loaded)
         is_real = bool(sna_file_exists())
         status = "Data Aktual" if is_real else "Data Dummy"
@@ -6492,7 +6581,16 @@ def render_home() -> None:
         indihome_df = load_indihome_data(demo_mode)
         indibiz_df = load_indibiz_data(demo_mode)
         telkomsel_df = load_telkomsel_data(demo_mode)
-        all_sentiment_df = load_all_data(demo_mode)
+
+        # Ketiga dataset sudah berada di memori. Gabungkan langsung agar Beranda
+        # tidak memanggil cache loader gabungan yang melakukan hashing/copy lagi.
+        all_sentiment_df = pd.concat(
+            [indihome_df, indibiz_df, telkomsel_df],
+            ignore_index=True,
+        )
+        if all_sentiment_df.empty:
+            raise ValueError("Gabungan data tiga layanan kosong.")
+
         influencer_df, influencer_real, _ = _load_home_influencer_data(demo_mode)
 
         service_status = (

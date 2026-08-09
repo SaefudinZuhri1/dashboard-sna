@@ -431,6 +431,29 @@ def _find_source_columns(
         if schema == "sna":
             aliases = CANONICAL_SNA_COLS
             required = {"source", "target", "relationship"}
+        elif schema == "home_sna":
+            # Beranda hanya membutuhkan struktur edge, platform, dan followers.
+            # Kolom content/time/sentiment pada file SNA besar tidak dibaca.
+            aliases = {
+                "source": CANONICAL_SNA_COLS["source"],
+                "target": CANONICAL_SNA_COLS["target"],
+                "relationship": CANONICAL_SNA_COLS["relationship"],
+                "followers": CANONICAL_SNA_COLS["followers"],
+                "platform": CANONICAL_SNA_COLS["platform"],
+            }
+            required = {"source", "target", "relationship"}
+        elif schema == "home_sentiment":
+            # Beranda hanya membutuhkan kolom ringkas untuk KPI dan chart.
+            # content tetap dibaca agar deduplikasi sama dengan loader utama,
+            # tetapi preprocessing content_clean/IndoBERT tidak dijalankan.
+            aliases = {
+                "date": CANONICAL_SENTIMENT_COLS["date"],
+                "platform": CANONICAL_SENTIMENT_COLS["platform"],
+                "username": CANONICAL_SENTIMENT_COLS["username"],
+                "content": CANONICAL_SENTIMENT_COLS["content"],
+                "predicted_sentiment": CANONICAL_SENTIMENT_COLS["predicted_sentiment"],
+            }
+            required = {"platform", "content", "predicted_sentiment"}
         elif schema == "followers":
             # Pembaruan followers SNA hanya membutuhkan identitas akun dan
             # jumlah followers. File output Telkomsel Fase 2 memang tidak wajib
@@ -604,6 +627,193 @@ def _read_sentiment_source_flexible(path: str) -> pd.DataFrame | None:
             return None
 
     return None
+
+
+def _read_home_sentiment_source_flexible(path: str) -> pd.DataFrame | None:
+    """Baca proyeksi sentimen minimal khusus Beranda.
+
+    Beranda tidak membutuhkan confidence, followers, atau content_clean. Membaca
+    hanya kolom yang benar-benar dipakai mengurangi penggunaan RAM dan waktu
+    normalisasi, terutama pada file Telkomsel yang berukuran besar.
+    """
+    source = Path(path)
+    suffix = source.suffix.lower()
+
+    if _is_compressed_csv_path(source):
+        return _read_csv_flexible(str(source), schema="home_sentiment")
+
+    if suffix in {".xlsx", ".xls"}:
+        return _read_excel_flexible(source, schema="home_sentiment")
+
+    if suffix == ".zip":
+        try:
+            with zipfile.ZipFile(source) as archive:
+                members = [
+                    name
+                    for name in archive.namelist()
+                    if not name.endswith("/")
+                    and Path(name).suffix.lower() in {".csv", ".xlsx", ".xls"}
+                ]
+                members.sort(
+                    key=lambda name: 0 if Path(name).suffix.lower() == ".csv" else 1
+                )
+                for member in members:
+                    raw = archive.read(member)
+                    member_suffix = Path(member).suffix.lower()
+                    if member_suffix == ".csv":
+                        frame = _read_csv_bytes_flexible(
+                            raw,
+                            schema="home_sentiment",
+                        )
+                    else:
+                        frame = _read_excel_flexible(
+                            BytesIO(raw),
+                            schema="home_sentiment",
+                        )
+                    if frame is not None and not frame.empty:
+                        return frame
+        except Exception:
+            return None
+
+    return None
+
+
+def _normalize_home_sentiment_df(
+    dataframe: pd.DataFrame,
+    layanan: str,
+) -> pd.DataFrame:
+    """Normalisasi data ringkas Beranda tanpa preprocessing teks IndoBERT.
+
+    Aturan platform, sentimen, tanggal, dan deduplikasi konten tetap mengikuti
+    loader utama. Tahap content_clean sengaja dilewati karena Beranda tidak pernah
+    menggunakan kolom tersebut.
+    """
+    try:
+        if dataframe is None or dataframe.empty:
+            raise ValueError("Data sentimen Beranda kosong.")
+
+        work = dataframe.copy()
+        work = _normalize_columns(work, CANONICAL_SENTIMENT_COLS)
+        work = _clean_string_columns(work)
+        work = _repair_sentiment_platform_column(work)
+
+        for column in ("platform", "content", "predicted_sentiment"):
+            if column not in work.columns:
+                raise ValueError(f"Kolom wajib '{column}' tidak ditemukan.")
+
+        work["platform"] = _normalize_platform_series(work["platform"])
+        work = work[work["platform"].isin(["twitter", "instagram", "tiktok"])].copy()
+
+        work["content"] = work["content"].astype("string").fillna("").str.strip()
+        work = work[
+            work["content"].ne("")
+            & work["content"].str.lower().ne("nan")
+            & work["content"].str.lower().ne("none")
+        ].copy()
+        work.drop_duplicates(subset=["content"], keep="first", inplace=True)
+
+        work["predicted_sentiment"] = (
+            work["predicted_sentiment"]
+            .astype(str)
+            .str.lower()
+            .str.strip()
+            .map(SENTIMENT_MAP)
+            .fillna("neutral")
+        )
+
+        if "username" not in work.columns:
+            work["username"] = ""
+        else:
+            work["username"] = (
+                work["username"]
+                .astype("string")
+                .fillna("")
+                .str.strip()
+                .str.lstrip("'")
+                .str.lstrip("@")
+            )
+
+        if "date" not in work.columns:
+            work["date"] = pd.NaT
+        elif pd.api.types.is_datetime64_any_dtype(work["date"]):
+            work["date"] = pd.to_datetime(work["date"], errors="coerce")
+        else:
+            date_text = work["date"].astype("string").fillna("").str.strip()
+            date_text = date_text.str.replace(
+                r"(\d{1,2})\.(\d{2})\.(\d{2})$",
+                r"\1:\2:\3",
+                regex=True,
+            )
+            work["date"] = pd.to_datetime(
+                date_text,
+                errors="coerce",
+                dayfirst=True,
+                format="mixed",
+            )
+
+        work["layanan"] = str(layanan).strip() or "IndiHome"
+        return work[
+            ["date", "platform", "username", "predicted_sentiment", "layanan"]
+        ].reset_index(drop=True)
+    except Exception as error:
+        raise ValueError(
+            f"Normalisasi data ringkas Beranda {layanan} gagal: {error}"
+        ) from error
+
+
+@st.cache_data(show_spinner=False, max_entries=12)
+def _load_home_sentiment_cached(
+    layanan: str,
+    file_signature: str,
+) -> pd.DataFrame:
+    """Muat proyeksi sentimen Beranda dan cache berdasarkan versi file."""
+    del file_signature
+    try:
+        source = _resolve_sentiment_source(layanan)
+        if source is None or not source.exists():
+            fallback = _fallback_sentiment_df(layanan)
+            return _normalize_home_sentiment_df(fallback, layanan)
+
+        projected = _read_home_sentiment_source_flexible(str(source))
+        if projected is None or projected.empty:
+            fallback = _fallback_sentiment_df(layanan)
+            return _normalize_home_sentiment_df(fallback, layanan)
+
+        normalized = _normalize_home_sentiment_df(projected, layanan)
+        if normalized.empty:
+            fallback = _fallback_sentiment_df(layanan)
+            return _normalize_home_sentiment_df(fallback, layanan)
+        return normalized
+    except Exception:
+        fallback = _fallback_sentiment_df(layanan)
+        return _normalize_home_sentiment_df(fallback, layanan)
+
+
+@st.cache_data(show_spinner=False, ttl=60, max_entries=12)
+def load_home_sentiment_projection(layanan: str) -> pd.DataFrame:
+    """Muat dataset ringkas untuk Beranda tanpa preprocessing teks yang berat."""
+    try:
+        signature = get_sentiment_file_signature(layanan)
+        dataframe = _load_home_sentiment_cached(layanan, signature)
+        if dataframe is None or dataframe.empty:
+            fallback = _fallback_sentiment_df(layanan)
+            return _normalize_home_sentiment_df(fallback, layanan)
+        return dataframe
+    except Exception as error:
+        st.error(f"Data ringkas Beranda {layanan} gagal dimuat: {error}")
+        try:
+            fallback = _fallback_sentiment_df(layanan)
+            return _normalize_home_sentiment_df(fallback, layanan)
+        except Exception:
+            return pd.DataFrame(
+                columns=[
+                    "date",
+                    "platform",
+                    "username",
+                    "predicted_sentiment",
+                    "layanan",
+                ]
+            )
 
 
 def _read_followers_source_flexible(path: str) -> pd.DataFrame | None:
@@ -1086,11 +1296,10 @@ def _update_sna_followers_from_prediction(
     df_pred: pd.DataFrame,
     layanan: str = "IndiBiz",
 ) -> pd.DataFrame:
-    """Perbarui followers SNA memakai nilai maksimum dari hasil prediksi sentimen.
+    """Perbarui followers SNA secara vectorized dari hasil prediksi sentimen.
 
-    Fungsi ini mengadaptasi logika Cell [8] notebook ke sisi dashboard. Nilai
-    followers yang sudah ada pada SNA tidak pernah diperkecil. Jika username
-    yang sama ditemukan pada hasil prediksi, dashboard memakai nilai terbesar.
+    Nilai followers pada SNA tidak pernah diperkecil. Implementasi vectorized
+    menghindari DataFrame.apply per baris yang sangat lambat pada edge list besar.
     """
     try:
         if df_sna is None or df_sna.empty:
@@ -1109,47 +1318,58 @@ def _update_sna_followers_from_prediction(
             return df_sna.copy()
 
         sna_work = df_sna.copy()
-        pred_work = df_pred.copy()
+        pred_work = df_pred[["username", "followers"]].copy()
 
-        sna_work["_source_username_key"] = sna_work["source"].map(_username_match_key)
-        pred_work["_username_key"] = pred_work["username"].map(_username_match_key)
+        source_keys = (
+            sna_work["source"]
+            .astype("string")
+            .fillna("")
+            .str.strip()
+            .str.lstrip("'@")
+            .str.lower()
+        )
+        pred_work["_username_key"] = (
+            pred_work["username"]
+            .astype("string")
+            .fillna("")
+            .str.strip()
+            .str.lstrip("'@")
+            .str.lower()
+        )
         pred_work["followers"] = (
             pd.to_numeric(pred_work["followers"], errors="coerce")
             .fillna(0)
             .clip(lower=0, upper=2_147_483_647)
         )
 
-        followers_from_pred = (
-            pred_work[pred_work["_username_key"].ne("")]
+        followers_lookup = (
+            pred_work.loc[pred_work["_username_key"].ne("")]
             .groupby("_username_key")["followers"]
             .max()
-            .to_dict()
         )
-
-        def update_sna_followers(row: pd.Series) -> int:
-            """Pilih followers terbesar antara data SNA dan hasil prediksi."""
-            current_followers = pd.to_numeric(
-                pd.Series([row.get("followers", 0)]), errors="coerce"
-            ).fillna(0).iloc[0]
-            source_username = str(row.get("_source_username_key", ""))
-            pred_followers = followers_from_pred.get(source_username, 0)
-            return int(max(float(current_followers), float(pred_followers)))
-
-        sna_work["followers"] = sna_work.apply(update_sna_followers, axis=1)
-        sna_work["followers"] = (
+        current_followers = (
             pd.to_numeric(sna_work["followers"], errors="coerce")
             .fillna(0)
             .clip(lower=0, upper=2_147_483_647)
+        )
+        predicted_followers = (
+            source_keys.map(followers_lookup)
+            .fillna(0)
+            .astype("float64")
+        )
+
+        sna_work["followers"] = (
+            current_followers.where(current_followers.ge(predicted_followers), predicted_followers)
+            .clip(lower=0, upper=2_147_483_647)
             .astype("int32")
         )
-        return sna_work.drop(columns=["_source_username_key"], errors="ignore")
+        return sna_work
     except Exception as error:
         st.error(
             f"Gagal memperbarui followers SNA {layanan} dari hasil prediksi "
             f"sentimen: {error}"
         )
         return df_sna.copy() if isinstance(df_sna, pd.DataFrame) else pd.DataFrame()
-
 
 def _enrich_indibiz_sna_followers(df_sna: pd.DataFrame) -> pd.DataFrame:
     """Perbarui followers IndiBiz hanya jika file sentimen aktual tersedia.
@@ -1171,16 +1391,20 @@ def _enrich_indibiz_sna_followers(df_sna: pd.DataFrame) -> pd.DataFrame:
         if not source.exists():
             return df_sna.copy()
 
-        raw_pred = _read_sentiment_source_flexible(str(source))
-        if raw_pred is None or raw_pred.empty:
+        followers_source = _read_followers_source_flexible(str(source))
+        if followers_source is None or followers_source.empty:
             st.error(
-                "File sentimen IndiBiz ditemukan, tetapi isinya belum dapat "
-                "dibaca. Followers SNA tetap memakai nilai sebelumnya."
+                "File sentimen IndiBiz ditemukan, tetapi kolom username/followers "
+                "belum dapat dibaca. Followers SNA tetap memakai nilai sebelumnya."
             )
             return df_sna.copy()
 
-        df_pred = _normalize_sentiment_df(raw_pred, "IndiBiz")
-        return _update_sna_followers_from_prediction(df_sna, df_pred, "IndiBiz")
+        followers_source = _clean_string_columns(followers_source)
+        return _update_sna_followers_from_prediction(
+            df_sna,
+            followers_source,
+            "IndiBiz",
+        )
     except Exception as error:
         st.error(
             "File sentimen IndiBiz belum dapat dipakai untuk memperbarui "
@@ -1547,6 +1771,109 @@ def _load_sna_cached(
     # kepada node pusat. Edge berulang tersebut dibutuhkan agar frekuensi
     # interaksi dapat dihitung sebagai weight pada tahap analisis NetworkX.
     return combined.reset_index(drop=True)
+
+
+def _read_home_sna_source_frame(path: Path) -> pd.DataFrame | None:
+    """Baca edge SNA minimal khusus Beranda tanpa kolom konten dan waktu."""
+    try:
+        suffix = path.suffix.lower()
+        if _is_compressed_csv_path(path):
+            return _read_csv_flexible(str(path), schema="home_sna")
+        if suffix in {".xlsx", ".xls"}:
+            return _read_excel_flexible(path, schema="home_sna")
+        if suffix == ".zip":
+            with zipfile.ZipFile(path) as archive:
+                members = [
+                    name
+                    for name in archive.namelist()
+                    if not name.endswith("/")
+                    and Path(name).suffix.lower() in {".csv", ".xlsx", ".xls"}
+                ]
+                members.sort(
+                    key=lambda name: 0 if Path(name).suffix.lower() == ".csv" else 1
+                )
+                for member in members:
+                    raw = archive.read(member)
+                    member_suffix = Path(member).suffix.lower()
+                    if member_suffix == ".csv":
+                        frame = _read_csv_bytes_flexible(raw, schema="home_sna")
+                    else:
+                        frame = _read_excel_flexible(BytesIO(raw), schema="home_sna")
+                    if frame is not None and not frame.empty:
+                        return frame
+        return None
+    except Exception:
+        return None
+
+
+@st.cache_data(show_spinner=False, max_entries=6)
+def _load_home_sna_cached(
+    file_signature: str,
+    followers_signature: str,
+) -> pd.DataFrame:
+    """Muat proyeksi SNA minimal Beranda berdasarkan signature file aktual."""
+    del file_signature, followers_signature
+    try:
+        sources = _select_sna_sources_for_service(None)
+        if not sources:
+            return _fallback_sna_df(None)
+
+        frames: list[pd.DataFrame] = []
+        for path in sources:
+            try:
+                frame = _read_home_sna_source_frame(path)
+                if frame is None or frame.empty:
+                    continue
+                service = _infer_sna_service_from_name(path.name)
+                normalized = _normalize_sna_df(
+                    frame,
+                    layanan=service,
+                    source_name=path.name,
+                )
+                if normalized.empty:
+                    continue
+                keep_columns = [
+                    column
+                    for column in [
+                        "source",
+                        "target",
+                        "followers",
+                        "platform",
+                        "layanan",
+                    ]
+                    if column in normalized.columns
+                ]
+                frames.append(normalized[keep_columns].copy())
+            except Exception:
+                continue
+
+        if not frames:
+            return _fallback_sna_df(None)
+
+        combined = pd.concat(frames, ignore_index=True, sort=False)
+        combined = _enrich_combined_sna_followers(combined, None)
+        return combined.reset_index(drop=True)
+    except Exception:
+        return _fallback_sna_df(None)
+
+
+@st.cache_data(show_spinner=False, ttl=60, max_entries=6)
+def load_home_sna_projection() -> pd.DataFrame:
+    """Muat data SNA minimal yang dipakai tabel influencer Beranda."""
+    try:
+        file_signature = get_sna_file_signature(None)
+        followers_signature = (
+            get_sentiment_file_signature("IndiBiz")
+            + "|"
+            + get_sentiment_file_signature("Telkomsel")
+        )
+        dataframe = _load_home_sna_cached(file_signature, followers_signature)
+        if dataframe is None or dataframe.empty:
+            return _fallback_sna_df(None)
+        return dataframe
+    except Exception as error:
+        st.error(f"Data SNA ringkas Beranda gagal dimuat: {error}")
+        return _fallback_sna_df(None)
 
 
 @st.cache_data(show_spinner=False, ttl=60, max_entries=12)
