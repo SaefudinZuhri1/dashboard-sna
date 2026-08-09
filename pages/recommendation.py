@@ -54,10 +54,17 @@ from utils.data_loader import (
 )
 
 try:
-    from utils.loading_screen import mulai_loading_aksi, selesaikan_loading_aksi
+    from utils.loading_screen import (
+        mulai_loading_aksi,
+        mulai_loading_global,
+        selesaikan_loading_aksi,
+        selesaikan_loading_global,
+    )
 except Exception:  # pragma: no cover - fallback jika utilitas loading belum tersedia
     mulai_loading_aksi = None
+    mulai_loading_global = None
     selesaikan_loading_aksi = None
+    selesaikan_loading_global = None
 
 # Fragment menjaga perubahan kontrol matriks tetap lokal. Hasil analisis utama
 # baru dirender ulang setelah tombol Apply atau Reset benar-benar mengubah state.
@@ -10550,6 +10557,31 @@ def _render_interactive_matrix(score_matrix: pd.DataFrame, layanan: str) -> None
 # -----------------------------------------------------------------------------
 
 
+def _start_recommendation_page_loading():
+    """Tampilkan loader halaman hanya saat pengguna baru masuk ke Rekomendasi.
+
+    Loader memakai desain global proyek, tetapi ditutup segera setelah area awal
+    halaman (hero, filter, ringkasan topik, dan studio AI) siap. Section yang lebih
+    bawah tetap dirender progresif agar pengguna tidak kembali menunggu seluruh
+    halaman sampai selesai.
+    """
+    try:
+        if callable(mulai_loading_global):
+            return mulai_loading_global("Rekomendasi")
+    except Exception:
+        return None
+    return None
+
+
+def _finish_recommendation_page_loading(handle: Any) -> None:
+    """Tutup loader awal halaman tanpa memengaruhi loader aksi lain."""
+    try:
+        if handle is not None and callable(selesaikan_loading_global):
+            selesaikan_loading_global(handle)
+    except Exception:
+        return None
+
+
 def _start_recommendation_loading(label: str):
     """Tampilkan overlay loading custom bawaan proyek untuk aksi halaman rekomendasi."""
     try:
@@ -12254,8 +12286,18 @@ def render_recommendation() -> None:
     """Render halaman Rekomendasi Konten & Influencer untuk tiga layanan."""
     action_loading_handle = None
     topic_ai_loading_handle = None
+    page_loading_handle = None
 
     try:
+        # Router memberi flag ini hanya ketika pengguna benar-benar berpindah ke
+        # halaman Rekomendasi. Pada rerun tombol/filter di halaman yang sama flag
+        # sudah tidak ada, sehingga loader halaman tidak muncul berulang kali.
+        entering_recommendation = (
+            st.session_state.get("_active_service_sync_target") == "Rekomendasi"
+        )
+        if entering_recommendation:
+            page_loading_handle = _start_recommendation_page_loading()
+
         loading_label = st.session_state.pop(RECOMMENDATION_ACTION_LOADING_KEY, None)
         if loading_label:
             action_loading_handle = _start_recommendation_loading(str(loading_label))
@@ -12325,6 +12367,12 @@ def render_recommendation() -> None:
         )
 
         _render_ai_generator(layanan, platform, topik, topic_summary)
+
+        # Area awal halaman sudah siap. Tutup loader sekarang agar pengguna dapat
+        # langsung melihat hero, filter, dan Generator Ide Konten. Bagian sentimen,
+        # influencer, strategi topik, dan matriks dilanjutkan secara progresif.
+        _finish_recommendation_page_loading(page_loading_handle)
+        page_loading_handle = None
 
         _render_section_header(
             "Sentiment Response Framework",
@@ -12440,6 +12488,10 @@ def render_recommendation() -> None:
                 "Periksa keberadaan file data pada folder data/, kemudian muat ulang halaman."
             )
     finally:
+        # Jika error terjadi sebelum area awal selesai, pastikan loader halaman
+        # tetap ditutup agar layar tidak terkunci oleh overlay.
+        _finish_recommendation_page_loading(page_loading_handle)
+
         # Loading Gemini ditutup paling akhir setelah seluruh halaman selesai dirender.
         # Ini mencegah overlay menghilang di tengah render lalu muncul kembali (flicker).
         _finish_recommendation_loading(topic_ai_loading_handle)
