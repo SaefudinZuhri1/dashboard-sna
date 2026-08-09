@@ -9820,9 +9820,30 @@ def _render_hero(service: str, has_real_data: bool) -> None:
 @_FRAGMENT_DECORATOR
 
 def _render_filter_controls_fragment(available_services: list[str]) -> None:
-    """Render kontrol filter secara terisolasi agar perubahan belum memuat analisis."""
+    """Render hero dan kontrol filter dalam satu fragment yang stabil."""
     try:
         _ensure_filter_widget_state(available_services)
+
+        # Hero sengaja berada di fragment yang sama dengan kontrol filter.
+        # Pada Streamlit versi yang mendukung st.fragment, rerun lokal pada
+        # kontrol filter dapat mengganti subtree fragment. Jika hero dirender
+        # di luar fragment, pada kondisi tertentu banner dapat hilang setelah
+        # interaksi/rerun. Menaruh hero di sini menjaga banner selalu menjadi
+        # elemen pertama halaman SNA tanpa mengubah layout atau logika analisis.
+        applied_service, _, _ = _applied_filter_values()
+        hero_service = str(applied_service)
+        if hero_service not in available_services:
+            hero_service = (
+                "IndiHome"
+                if "IndiHome" in available_services
+                else available_services[0]
+            )
+        _render_hero(
+            hero_service,
+            False
+            if bool(st.session_state.get("demo_mode", False))
+            else sna_file_exists(hero_service),
+        )
 
         with st.container(border=True):
             st.markdown('<span class="sna-v9-control-marker"></span>', unsafe_allow_html=True)
@@ -10408,24 +10429,9 @@ def render_sna() -> None:
         _inject_sna_light_mode_patch()
         render_analytics_control_style()
 
-        # Hero tetap ditampilkan sebagai bagian pertama halaman. Nilai layanan
-        # awal dibaca dari state filter yang sudah tersimpan pada rerun sebelumnya.
-        active_service = str(
-            st.session_state.get(
-                SNA_FILTER_APPLIED_SERVICE_KEY,
-                st.session_state.get("sna_v9_service_filter", "IndiHome"),
-            )
-        )
-        if active_service not in SERVICE_OPTIONS:
-            active_service = "IndiHome"
-        _render_hero(
-            active_service,
-            False
-            if bool(st.session_state.get("demo_mode", False))
-            else sna_file_exists(active_service),
-        )
-
-        # Daftar layanan bersifat baku. Setelah pengguna memilih layanan,
+        # Hero dirender bersama fragment kontrol filter agar tidak hilang pada
+        # rerun lokal Streamlit. Daftar layanan tetap menjadi sumber filter.
+        # Setelah pengguna memilih layanan,
         # dashboard hanya memuat sumber kanonik yang relevan. Khusus IndiBiz,
         # sumber Twitter/X dan Instagram–TikTok digabung tanpa membaca file mentah.
         filter_seed = pd.DataFrame({"layanan": SERVICE_OPTIONS})
