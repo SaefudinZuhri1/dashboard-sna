@@ -11369,6 +11369,13 @@ def _render_ai_generator(
                 platform=platform,
                 metadata={"topic": topik, "sentiment": sentimen, "refresh": refresh_clicked},
             )
+
+            # Setelah generate pertama berhasil, jalankan ulang satu kali agar
+            # status tombol Refresh Ide langsung membaca payload terbaru.
+            # Tanpa rerun ini, CSS pengunci tombol masih berasal dari state
+            # sebelum payload dibuat sehingga tombol baru aktif pada interaksi berikutnya.
+            if generate_clicked:
+                st.rerun()
         except Exception as error:
             log_activity(
                 "GEMINI_CONTENT",
