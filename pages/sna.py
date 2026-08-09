@@ -63,6 +63,14 @@ PLATFORM_OPTIONS = {
     "TikTok": "tiktok",
 }
 PLATFORM_ORDER = ["twitter", "instagram", "tiktok"]
+# Komposisi visual graf untuk mode Semua Platform. Rasio ini membuat batas
+# 160 node menjadi 60 Twitter/X, 50 Instagram, dan 50 TikTok. Pada batas lain,
+# kuota dihitung proporsional dan tetap dijumlahkan tepat sesuai nilai slider.
+GRAPH_PLATFORM_RATIO = {
+    "twitter": 60 / 160,
+    "instagram": 50 / 160,
+    "tiktok": 50 / 160,
+}
 PLATFORM_GRAPH_COLORS = {
     "twitter": "#1DA1F2",
     "instagram": "#833AB4",
@@ -5477,153 +5485,263 @@ def _build_top40_balanced_by_platform(
         return influencer_ranking.head(total_limit).copy(), False
 
 
-def _render_pagerank_overview(node_df: pd.DataFrame, service: str) -> None:
-    """Render chart Top 10 PageRank dan tabel Top 40 metrik akun non-layanan."""
+def _build_platform_influencer_ranking(
+    service_df: pd.DataFrame,
+    fallback_node_df: pd.DataFrame,
+    platform: str,
+    service: str,
+) -> tuple[pd.DataFrame, str, str]:
+    """Siapkan ranking influencer per platform dengan metrik yang relevan.
+
+    Twitter/X menggunakan PageRank karena relasi mention/reply/retweet membentuk
+    struktur jaringan. Instagram dan TikTok menggunakan followers sebagai
+    indikator jangkauan tambahan sesuai karakter data komentar pada penelitian.
+    """
     try:
-        if node_df is None or node_df.empty:
-            st.info("Belum ada node untuk menampilkan ranking PageRank.")
-            return
+        platform_key = _normalize_platform(platform)
+        source = service_df.copy() if isinstance(service_df, pd.DataFrame) else pd.DataFrame()
 
-        ranking = node_df.copy()
-        numeric_columns = [
-            "followers", "degree_centrality", "in_degree", "out_degree",
-            "betweenness_centrality", "pagerank",
-        ]
-        for column in numeric_columns:
-            ranking[column] = pd.to_numeric(
-                ranking.get(column, 0), errors="coerce"
-            ).fillna(0)
-        ranking = ranking.sort_values(
-            ["pagerank", "degree_centrality", "followers", "username"],
-            ascending=[False, False, False, True],
-            kind="mergesort",
-        ).reset_index(drop=True)
+        if platform_key == "twitter" and not source.empty and "platform" in source.columns:
+            platform_edges = source[source["platform"].map(_normalize_platform).eq("twitter")].copy()
+            if not platform_edges.empty:
+                _, platform_nodes, _, _ = _analyze_network(
+                    platform_edges,
+                    calculate_pagerank=True,
+                )
+            else:
+                platform_nodes = pd.DataFrame()
+        else:
+            platform_nodes = pd.DataFrame()
 
-        # Top Influencer hanya berisi akun non-brand. Akun layanan resmi dan
-        # turunannya tetap dipertahankan pada graph, tetapi dikeluarkan dari ranking.
+        if platform_key in {"instagram", "tiktok"}:
+            candidate_source = source.copy()
+            username_column = "source" if "source" in candidate_source.columns else "username"
+
+            def _platform_rows_available(frame: pd.DataFrame, username_col: str) -> bool:
+                try:
+                    return (
+                        not frame.empty
+                        and username_col in frame.columns
+                        and "platform" in frame.columns
+                        and frame["platform"].map(_normalize_platform).eq(platform_key).any()
+                    )
+                except Exception:
+                    return False
+
+            if not _platform_rows_available(candidate_source, username_column):
+                try:
+                    sentiment_source = load_sentiment_data(service)
+                    if isinstance(sentiment_source, pd.DataFrame) and not sentiment_source.empty:
+                        candidate_source = sentiment_source.copy()
+                        username_column = "username"
+                except Exception:
+                    candidate_source = pd.DataFrame()
+
+            required = {username_column, "platform"}
+            if required.issubset(candidate_source.columns):
+                selected_columns = [username_column, "platform"]
+                if "followers" in candidate_source.columns:
+                    selected_columns.append("followers")
+                candidates = candidate_source[selected_columns].copy()
+                if "followers" not in candidates.columns:
+                    candidates["followers"] = 0
+                candidates["platform"] = candidates["platform"].map(_normalize_platform)
+                candidates = candidates[candidates["platform"].eq(platform_key)].copy()
+                candidates["username"] = candidates[username_column].map(_normalize_username)
+                candidates["followers"] = (
+                    pd.to_numeric(candidates["followers"], errors="coerce")
+                    .fillna(0)
+                    .clip(lower=0)
+                )
+                candidates = candidates[candidates["username"].astype(str).ne("")].copy()
+                if not candidates.empty:
+                    candidates = (
+                        candidates.groupby("username", as_index=False)["followers"]
+                        .max()
+                    )
+                    candidates["platform_group"] = platform_key
+                    candidates["platform_label"] = PLATFORM_DISPLAY.get(
+                        platform_key,
+                        platform_key.title(),
+                    )
+                    candidates["pagerank"] = 0.0
+                    candidates["degree_centrality"] = 0.0
+                    candidates["is_brand"] = candidates["username"].map(_is_brand_account)
+                    platform_nodes = candidates
+
+        if platform_nodes is None or platform_nodes.empty:
+            fallback = fallback_node_df.copy() if isinstance(fallback_node_df, pd.DataFrame) else pd.DataFrame()
+            if not fallback.empty and "platform_group" in fallback.columns:
+                platform_nodes = fallback[
+                    fallback["platform_group"].map(_normalize_platform).eq(platform_key)
+                ].copy()
+
+        if platform_nodes is None or platform_nodes.empty:
+            metric = "pagerank" if platform_key == "twitter" else "followers"
+            label = "PageRank Score" if platform_key == "twitter" else "Jumlah Followers"
+            return pd.DataFrame(), metric, label
+
+        ranking = platform_nodes.copy()
         if "is_brand" in ranking.columns:
-            brand_mask = ranking["is_brand"].astype(bool)
+            brand_mask = ranking["is_brand"].fillna(False).astype(bool)
         else:
             brand_mask = ranking["username"].map(_is_brand_account)
         excluded_mask = ranking["username"].map(_is_excluded_from_influencer)
-        external_entity_mask = ranking["username"].map(_is_external_brand_or_institution)
-        influencer_ranking = ranking[
-            (~brand_mask) & (~excluded_mask) & (~external_entity_mask)
-        ].copy()
+        external_mask = ranking["username"].map(_is_external_brand_or_institution)
+        ranking = ranking[(~brand_mask) & (~excluded_mask) & (~external_mask)].copy()
 
-        if influencer_ranking.empty:
-            st.info("Belum ada akun non-brand untuk ditampilkan pada Top 10 Influencer.")
-        else:
-            top10 = influencer_ranking.head(10).sort_values("pagerank", ascending=True)
-            fig = go.Figure(
-                go.Bar(
-                    x=top10["pagerank"],
-                    y=top10["username"],
-                    orientation="h",
-                    marker={"color": "#E53935"},
-                    customdata=top10[["platform_label", "followers"]],
-                    hovertemplate=(
-                        "<b>%{y}</b><br>PageRank: %{x:.8f}<br>"
-                        "Platform: %{customdata[0]}<br>Followers: %{customdata[1]:,.0f}"
-                        "<extra></extra>"
-                    ),
-                )
+        if platform_key == "twitter":
+            ranking["pagerank"] = pd.to_numeric(
+                ranking.get("pagerank", 0), errors="coerce"
+            ).fillna(0)
+            ranking["followers"] = pd.to_numeric(
+                ranking.get("followers", 0), errors="coerce"
+            ).fillna(0)
+            ranking["degree_centrality"] = pd.to_numeric(
+                ranking.get("degree_centrality", 0), errors="coerce"
+            ).fillna(0)
+            ranking = ranking.sort_values(
+                ["pagerank", "degree_centrality", "followers", "username"],
+                ascending=[False, False, False, True],
+                kind="mergesort",
             )
-            fig.update_layout(
-                height=430,
-                xaxis_title="PageRank Score",
-                yaxis_title="Akun / Username",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                showlegend=False,
-            )
-            fig = _apply_plotly_theme(fig, f"Top 10 Influencer — {service}")
-            _plotly_chart_aman(
-                fig,
-                use_container_width=True,
-                key=f"sna_pagerank_{service.lower()}",
-            )
-            st.caption(
-                "* Akun layanan, perusahaan, brand, dan instansi resmi dikeluarkan "
-                "dari ranking influencer, tetapi tetap dipertahankan pada graph dan "
-                "perhitungan metrik jaringan."
-            )
+            return ranking.head(10).reset_index(drop=True), "pagerank", "PageRank Score"
 
-        # Tabel semua metrik tetap memakai ranking akun non-layanan. Khusus
-        # Telkomsel, pertahankan minimal dua wakil real Instagram dan TikTok
-        # jika kedua platform tersedia pada dataset. Nilai metrik jaringan untuk
-        # wakil yang tidak ada pada file SNA dibiarkan kosong, bukan dikarang.
-        top40, has_platform_representatives = _build_top40_balanced_by_platform(
-            influencer_ranking,
-            service,
-            total_limit=40,
+        ranking["followers"] = pd.to_numeric(
+            ranking.get("followers", 0), errors="coerce"
+        ).fillna(0)
+        ranking = ranking.sort_values(
+            ["followers", "username"],
+            ascending=[False, True],
+            kind="mergesort",
         )
-        top40.insert(0, "Rank", range(1, len(top40) + 1))
-        top40 = top40[
-            [
-                "Rank", "username", "platform_label", "followers",
-                "degree_centrality", "in_degree", "out_degree",
-                "betweenness_centrality", "pagerank",
-            ]
-        ].rename(
-            columns={
-                "username": "Username",
-                "platform_label": "Platform",
-                "followers": "Followers",
-                "degree_centrality": "Degree Centrality",
-                "in_degree": "In-Degree",
-                "out_degree": "Out-Degree",
-                "betweenness_centrality": "Betweenness Centrality",
-                "pagerank": "PageRank",
-            }
-        )
-
-        with st.container(border=True):
-            st.markdown('<span class="sna-v9-section-marker"></span>', unsafe_allow_html=True)
-            st.markdown(
-                f"""
-                <div class="sna-v9-section-head">
-                    <div>
-                        <h2 class="sna-v9-section-title">Top 40 Node — Semua Metrik</h2>
-                        <p class="sna-v9-section-subtitle">Default diurutkan berdasarkan PageRank tertinggi. Akun layanan, perusahaan, brand, dan instansi resmi tidak disertakan. Khusus Telkomsel, wakil Instagram dan TikTok dari data real dipertahankan jika tersedia. Klik judul kolom pada tabel untuk mengurutkan ulang.</p>
-                    </div>
-                    <span class="sna-v12-live-badge"><span class="sna-v12-live-dot"></span>{escape(service)}</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.dataframe(
-                top40,
-                use_container_width=True,
-                hide_index=True,
-                height=520,
-                column_config={
-                    "Rank": st.column_config.NumberColumn(format="%d"),
-                    "Followers": st.column_config.NumberColumn(format="%d"),
-                    "Degree Centrality": st.column_config.NumberColumn(format="%.8f"),
-                    "In-Degree": st.column_config.NumberColumn(format="%d"),
-                    "Out-Degree": st.column_config.NumberColumn(format="%d"),
-                    "Betweenness Centrality": st.column_config.NumberColumn(format="%.8f"),
-                    "PageRank": st.column_config.NumberColumn(format="%.8f"),
-                },
-            )
-            if has_platform_representatives:
-                st.caption(
-                    "* Wakil Instagram/TikTok berasal dari data real Telkomsel dan dipilih "
-                    "berdasarkan followers tertinggi. Metrik Degree/PageRank dibiarkan kosong "
-                    "jika akun tersebut tidak tersedia pada file edge SNA Telkomsel, agar "
-                    "dashboard tidak membuat nilai jaringan palsu."
-                )
-            st.download_button(
-                label="⬇️ Unduh CSV Top 40 Node",
-                data=top40.to_csv(index=False).encode("utf-8-sig"),
-                file_name=f"top40_node_sna_{service.lower()}.csv",
-                mime="text/csv",
-                use_container_width=True,
-                key=f"download_top40_sna_{service.lower()}",
-            )
+        return ranking.head(10).reset_index(drop=True), "followers", "Jumlah Followers"
     except Exception as exc:
-        st.error(f"Gagal menampilkan ranking PageRank dan tabel Top 40: {exc}")
+        st.error(f"Gagal menyiapkan ranking influencer {platform}: {exc}")
+        metric = "pagerank" if _normalize_platform(platform) == "twitter" else "followers"
+        label = "PageRank Score" if metric == "pagerank" else "Jumlah Followers"
+        return pd.DataFrame(), metric, label
+
+
+def _render_platform_influencer_chart(
+    ranking: pd.DataFrame,
+    platform: str,
+    service: str,
+    metric: str,
+    axis_title: str,
+) -> None:
+    """Render satu grafik Top 10 influencer untuk platform tertentu."""
+    try:
+        platform_key = _normalize_platform(platform)
+        platform_label = PLATFORM_DISPLAY.get(platform_key, platform_key.title())
+        if ranking is None or ranking.empty:
+            with st.container(border=True):
+                st.markdown(
+                    f"**Top 10 Influencer {platform_label} — {escape(service)}**"
+                )
+                st.info(f"Belum ada akun {platform_label} yang dapat diranking pada data aktif.")
+            return
+
+        plot_df = ranking.sort_values(metric, ascending=True).copy()
+        color = PLATFORM_GRAPH_COLORS.get(
+            platform_key,
+            PLATFORM_GRAPH_COLORS["unknown"],
+        )
+        custom_columns = [column for column in ["followers", "degree_centrality", "pagerank"] if column in plot_df.columns]
+        customdata = plot_df[custom_columns] if custom_columns else None
+
+        fig = go.Figure(
+            go.Bar(
+                x=plot_df[metric],
+                y=plot_df["username"],
+                orientation="h",
+                marker={"color": color},
+                customdata=customdata,
+            )
+        )
+
+        if metric == "pagerank":
+            fig.update_traces(
+                hovertemplate=(
+                    "<b>%{y}</b><br>PageRank: %{x:.8f}<br>"
+                    "Followers: %{customdata[0]:,.0f}<br>"
+                    "Degree Centrality: %{customdata[1]:.8f}<extra></extra>"
+                )
+            )
+        else:
+            fig.update_traces(
+                hovertemplate=(
+                    "<b>%{y}</b><br>Followers: %{x:,.0f}<extra></extra>"
+                )
+            )
+
+        fig.update_layout(
+            height=410,
+            xaxis_title=axis_title,
+            yaxis_title="Akun / Username",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            showlegend=False,
+        )
+        fig = _apply_plotly_theme(
+            fig,
+            f"Top 10 Influencer {platform_label} — {service}",
+        )
+        _plotly_chart_aman(
+            fig,
+            use_container_width=True,
+            key=f"sna_top10_{platform_key}_{service.lower()}",
+        )
+    except Exception as exc:
+        st.error(f"Gagal menampilkan Top 10 Influencer {platform}: {exc}")
+
+
+def _render_pagerank_overview(
+    node_df: pd.DataFrame,
+    service: str,
+    service_df: pd.DataFrame | None = None,
+) -> None:
+    """Render tiga grafik Top 10 influencer per platform tanpa tabel Top 40."""
+    try:
+        if node_df is None or node_df.empty:
+            st.info("Belum ada node untuk menampilkan ranking influencer.")
+            return
+
+        st.markdown(
+            """
+            <div class="sna-v9-section-head">
+                <div>
+                    <h2 class="sna-v9-section-title">Top 10 Influencer per Platform</h2>
+                    <p class="sna-v9-section-subtitle">Twitter/X diranking dengan PageRank untuk menangkap posisi struktural jaringan. Instagram dan TikTok diranking berdasarkan followers sebagai indikator potensi jangkauan akun.</p>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        source = service_df.copy() if isinstance(service_df, pd.DataFrame) else pd.DataFrame()
+        for platform_key in ["twitter", "tiktok", "instagram"]:
+            ranking, metric, axis_title = _build_platform_influencer_ranking(
+                source,
+                node_df,
+                platform_key,
+                service,
+            )
+            _render_platform_influencer_chart(
+                ranking,
+                platform_key,
+                service,
+                metric,
+                axis_title,
+            )
+
+        st.caption(
+            "* Akun layanan, perusahaan, brand, dan instansi resmi dikeluarkan dari "
+            "ranking influencer, tetapi tetap dipertahankan pada graph dan perhitungan "
+            "metrik jaringan."
+        )
+    except Exception as exc:
+        st.error(f"Gagal menampilkan ranking influencer per platform: {exc}")
 
 
 def _display_node_table(df: pd.DataFrame, height: int = 390, mode: str = "degree") -> None:
@@ -6945,6 +7063,53 @@ def _ensure_telkomsel_platform_representatives(
         return graph.copy(), node_df.copy()
 
 
+def _calculate_graph_platform_quotas(
+    node_limit: int,
+    available_platforms: list[str],
+) -> dict[str, int]:
+    """Hitung kuota node per platform dengan rasio 60:50:50.
+
+    Jika tiga platform tersedia dan batas graf 160, hasilnya tepat 60 Twitter/X,
+    50 Instagram, dan 50 TikTok. Pada batas lain, pembagian dilakukan secara
+    proporsional dengan metode sisa terbesar sehingga total selalu sama dengan
+    nilai slider. Bila hanya satu atau dua platform tersedia, kuota platform yang
+    tidak ada dibagikan ulang secara proporsional ke platform yang tersedia.
+    """
+    try:
+        limit = max(1, int(node_limit))
+        active = [
+            platform for platform in PLATFORM_ORDER
+            if platform in set(available_platforms)
+        ]
+        if not active:
+            return {}
+        if len(active) == 1:
+            return {active[0]: limit}
+
+        total_weight = sum(GRAPH_PLATFORM_RATIO.get(platform, 1.0) for platform in active)
+        raw_quota = {
+            platform: limit * GRAPH_PLATFORM_RATIO.get(platform, 1.0) / total_weight
+            for platform in active
+        }
+        quotas = {platform: int(np.floor(raw_quota[platform])) for platform in active}
+        remaining = limit - sum(quotas.values())
+
+        priority = {platform: index for index, platform in enumerate(PLATFORM_ORDER)}
+        remainder_order = sorted(
+            active,
+            key=lambda platform: (
+                -(raw_quota[platform] - quotas[platform]),
+                priority.get(platform, 99),
+            ),
+        )
+        for platform in remainder_order[:remaining]:
+            quotas[platform] += 1
+        return quotas
+    except Exception as exc:
+        st.error(f"Gagal menghitung kuota platform graf: {exc}")
+        return {}
+
+
 @st.cache_data(
     show_spinner=False,
     max_entries=24,
@@ -6959,8 +7124,8 @@ def _limit_graph_nodes(
     """Batasi node secara adil agar semua platform tetap terwakili.
 
     Pada filter satu platform, pemilihan tetap memakai ranking metrik jaringan.
-    Pada filter Semua Platform, slot non-brand dibagi merata antara Twitter/X,
-    Instagram, dan TikTok yang tersedia. Khusus IndiHome dan IndiBiz, akun
+    Pada filter Semua Platform, slot dibagi dengan rasio 60:50:50 untuk
+    Twitter/X, Instagram, dan TikTok yang tersedia. Khusus IndiHome dan IndiBiz, akun
     layanan turunan disembunyikan dari visualisasi. Hanya akun utama
     ``indihome``, ``indibiz``, atau ``telkomsel`` yang boleh tetap tampil
     sebagai node brand/hub merah.
@@ -7055,58 +7220,94 @@ def _limit_graph_nodes(
             selected_df = work[work["username"].isin(selected_nodes[:limit])].copy()
             return subgraph, selected_df
 
-        # Maksimal 10 akun brand atau sekitar 10% dari batas node. Dengan batas
-        # 80 node, hasilnya paling banyak 8 akun brand sehingga platform pengguna
-        # tidak tersingkir dari graf gabungan.
-        brand_quota = min(len(brand), max(1, min(10, round(limit * 0.10))))
-        selected: list[str] = _rank(brand).head(brand_quota)["username"].tolist()
-        remaining_slots = max(0, limit - len(selected))
+        # Mode Semua Platform memakai pembagian kuota yang konsisten. Dengan
+        # batas 160 node, alokasinya tepat 60 Twitter/X, 50 Instagram, dan
+        # 50 TikTok. Hub layanan utama tetap dipertahankan sebagai penghubung
+        # jaringan dan dihitung ke kuota Twitter/X agar total node tidak melebihi
+        # nilai slider.
+        platform_quotas = _calculate_graph_platform_quotas(
+            limit,
+            available_platforms,
+        )
+        if not platform_quotas:
+            ranked = pd.concat([_rank(non_brand), _rank(brand)], ignore_index=True)
+            selected_nodes = ranked.drop_duplicates("username").head(limit)["username"].tolist()
+            subgraph = graph_work.subgraph(selected_nodes).copy()
+            selected_df = work[work["username"].isin(selected_nodes)].copy()
+            return subgraph, selected_df
+
+        selected: list[str] = []
+        quota_remaining = dict(platform_quotas)
+
+        # Pertahankan maksimal tiga hub utama. Karena node brand adalah hub lintas
+        # platform pada edge gabungan, slotnya dimasukkan ke kuota Twitter/X agar
+        # jumlah keseluruhan tetap persis sama dengan batas node yang dipilih.
+        primary_brand = brand[
+            brand["username"].map(_compact_username).isin(
+                PRIMARY_SERVICE_GRAPH_ACCOUNTS
+            )
+        ].copy()
+        hub_bucket = "twitter" if "twitter" in quota_remaining else available_platforms[0]
+        hub_limit = min(3, quota_remaining.get(hub_bucket, 0), len(primary_brand))
+        primary_names = _rank(primary_brand).head(hub_limit)["username"].tolist()
+        selected.extend(primary_names)
+        quota_remaining[hub_bucket] = max(
+            0,
+            quota_remaining.get(hub_bucket, 0) - len(primary_names),
+        )
 
         platform_frames = {
-            platform: _rank(non_brand[non_brand["platform_group"].eq(platform)].copy())
+            platform: _rank(
+                non_brand[non_brand["platform_group"].eq(platform)].copy()
+            )
             for platform in available_platforms
         }
-        platform_quotas = {platform: 0 for platform in available_platforms}
 
-        # Sisihkan minimal 1-2 akun per platform, lalu isi seluruh slot sisa
-        # berdasarkan ranking global. Tujuannya bukan membagi node secara sama
-        # rata, tetapi memastikan Twitter/X, Instagram, dan TikTok tetap punya
-        # representasi saat data platform tersebut memang tersedia.
-        if available_platforms and remaining_slots > 0:
-            minimum_target = 2 if remaining_slots >= (2 * len(available_platforms)) else 1
-            for platform in available_platforms:
-                if remaining_slots <= 0:
-                    break
-                quota = min(
-                    minimum_target,
-                    len(platform_frames[platform]),
-                    remaining_slots,
-                )
-                platform_quotas[platform] = quota
-                remaining_slots -= quota
-
+        # Isi kuota utama per platform.
         for platform in available_platforms:
-            quota = platform_quotas[platform]
-            selected.extend(platform_frames[platform].head(quota)["username"].tolist())
+            quota = max(0, int(quota_remaining.get(platform, 0)))
+            if quota <= 0:
+                continue
+            selected.extend(
+                platform_frames[platform].head(quota)["username"].tolist()
+            )
 
-        # Setelah kuota minimum terpenuhi, ranking jaringan kembali menjadi
-        # prioritas agar sebagian besar node tetap mencerminkan struktur SNA.
         selected = list(dict.fromkeys(selected))
+
+        # Bila satu platform tidak memiliki cukup akun, slot kosong dialihkan ke
+        # akun terbaik dari platform lain agar jumlah node tetap mendekati limit.
         if len(selected) < limit:
-            remaining_non_brand = _rank(non_brand[~non_brand["username"].isin(selected)])
-            selected.extend(remaining_non_brand.head(limit - len(selected))["username"].tolist())
+            remaining_non_brand = _rank(
+                non_brand[~non_brand["username"].isin(selected)]
+            )
+            selected.extend(
+                remaining_non_brand.head(limit - len(selected))["username"].tolist()
+            )
             selected = list(dict.fromkeys(selected))
 
-        # Fallback terakhir bila jumlah akun non-brand memang lebih sedikit dari
-        # batas visualisasi: tambahkan akun brand lain sesuai ranking.
+        # Fallback terakhir hanya jika jumlah akun pengguna memang tidak cukup.
         if len(selected) < limit:
-            remaining_brand = _rank(brand[~brand["username"].isin(selected)])
-            selected.extend(remaining_brand.head(limit - len(selected))["username"].tolist())
+            remaining_brand = _rank(
+                brand[~brand["username"].isin(selected)]
+            )
+            selected.extend(
+                remaining_brand.head(limit - len(selected))["username"].tolist()
+            )
             selected = list(dict.fromkeys(selected))
 
         selected_nodes = selected[:limit]
         subgraph = graph_work.subgraph(selected_nodes).copy()
         selected_df = work[work["username"].isin(selected_nodes)].copy()
+
+        # Kolom ini hanya untuk menampilkan komposisi kuota. Hub layanan utama
+        # tetap berwarna merah karena is_brand tidak diubah, tetapi slot hub
+        # dihitung ke kelompok Twitter/X agar total 160 = 60 + 50 + 50.
+        selected_df["_quota_platform_group"] = selected_df["platform_group"].astype(str)
+        if primary_names:
+            selected_df.loc[
+                selected_df["username"].isin(primary_names),
+                "_quota_platform_group",
+            ] = hub_bucket
         return subgraph, selected_df
     except Exception as exc:
         st.error(f"Gagal membatasi jumlah node graf: {exc}")
@@ -8669,7 +8870,13 @@ def _queue_network_graph_render(request_id: str) -> None:
     except Exception as exc:
         st.error(f"Permintaan graf belum dapat disiapkan: {exc}")
 
-def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: int, service: str = "") -> None:
+def _render_network_graph(
+    graph: nx.DiGraph,
+    node_df: pd.DataFrame,
+    node_limit: int,
+    service: str = "",
+    selected_platform: str = "all",
+) -> None:
     """Render graf jaringan interaktif Pyvis full width."""
     try:
         with st.container(border=True):
@@ -8689,18 +8896,25 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
             service_key = str(service).strip().lower()
             graph_for_visual = graph
             nodes_for_visual = node_df
-            if service_key == "indibiz":
-                graph_for_visual, nodes_for_visual = _ensure_indibiz_platform_representatives(
-                    graph,
-                    node_df,
-                    minimum_per_platform=2,
+            platform_filter_key = _normalize_platform(selected_platform) if selected_platform != "all" else "all"
+            if platform_filter_key == "all":
+                desired_quotas = _calculate_graph_platform_quotas(
+                    int(node_limit),
+                    PLATFORM_ORDER,
                 )
-            elif service_key == "telkomsel":
-                graph_for_visual, nodes_for_visual = _ensure_telkomsel_platform_representatives(
-                    graph,
-                    node_df,
-                    minimum_per_platform=2,
-                )
+                representative_minimum = max(desired_quotas.values(), default=2)
+                if service_key == "indibiz":
+                    graph_for_visual, nodes_for_visual = _ensure_indibiz_platform_representatives(
+                        graph,
+                        node_df,
+                        minimum_per_platform=representative_minimum,
+                    )
+                elif service_key == "telkomsel":
+                    graph_for_visual, nodes_for_visual = _ensure_telkomsel_platform_representatives(
+                        graph,
+                        node_df,
+                        minimum_per_platform=representative_minimum,
+                    )
 
             visual_graph, visual_nodes = _limit_graph_nodes(
                 graph_for_visual,
@@ -8737,7 +8951,12 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
             )
             # Tampilkan komposisi node terpilih agar pengguna dapat memastikan
             # ketiga platform benar-benar masuk pada mode Semua Platform.
-            composition_counts = visual_nodes["platform_group"].value_counts().to_dict()
+            composition_column = (
+                "_quota_platform_group"
+                if "_quota_platform_group" in visual_nodes.columns
+                else "platform_group"
+            )
+            composition_counts = visual_nodes[composition_column].value_counts().to_dict()
             composition_order = ["twitter", "instagram", "tiktok", "target"]
             composition_chips = []
             for platform_key in composition_order:
@@ -8753,7 +8972,7 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
                 )
             st.markdown(
                 '<div class="sna-v9-platform-legend" style="margin-top:.8rem;">'
-                '<span class="sna-v9-section-subtitle" style="margin:0 .35rem 0 0;">Komposisi node terpilih:</span>'
+                '<span class="sna-v9-section-subtitle" style="margin:0 .35rem 0 0;">Komposisi kuota node:</span>'
                 + "".join(composition_chips)
                 + '</div>',
                 unsafe_allow_html=True,
@@ -8811,6 +9030,25 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
                 _render_networkx_fallback(visual_graph, visual_nodes)
 
             _render_graph_legend(service)
+            if platform_filter_key == "all" and len([
+                platform for platform in PLATFORM_ORDER
+                if platform in set(visual_nodes.get("_quota_platform_group", visual_nodes.get("platform_group", pd.Series(dtype=str))).astype(str))
+            ]) >= 2:
+                quotas = _calculate_graph_platform_quotas(
+                    int(node_limit),
+                    [
+                        platform for platform in PLATFORM_ORDER
+                        if platform in set(visual_nodes.get("_quota_platform_group", visual_nodes.get("platform_group", pd.Series(dtype=str))).astype(str))
+                    ],
+                )
+                if quotas:
+                    quota_text = ", ".join(
+                        f"{PLATFORM_DISPLAY.get(platform, platform.title())} {int(count)}"
+                        for platform, count in quotas.items()
+                    )
+                    st.caption(
+                        f"Alokasi node mode Semua Platform mengikuti rasio 60:50:50. Batas aktif {int(node_limit)} node dibagi menjadi {quota_text}. Hub layanan utama dihitung ke kuota Twitter/X agar total node tetap mengikuti slider."
+                    )
             service_key = str(service).strip().lower()
             if service_key == "indihome":
                 st.caption(
@@ -8820,7 +9058,11 @@ def _render_network_graph(graph: nx.DiGraph, node_df: pd.DataFrame, node_limit: 
             elif service_key == "indibiz":
                 st.caption(
                     "Ukuran node Twitter/X mengikuti degree. Ukuran node Instagram dan TikTok mengikuti jumlah followers. "
-                    "Akun layanan turunan/regional/care disembunyikan dari graf IndiBiz; hanya akun utama IndiHome, IndiBiz, dan Telkomsel yang tetap dapat tampil sebagai hub merah bila terdapat pada jaringan aktif. Jika edge suatu platform belum tersedia, maksimal dua akun nyata dari dataset IndiBiz ditampilkan sebagai wakil platform tanpa membuat edge baru. Data SNA asli tidak diubah."
+                    "Akun layanan turunan/regional/care disembunyikan dari graf IndiBiz; hanya akun utama IndiHome, IndiBiz, dan Telkomsel yang tetap dapat tampil sebagai hub merah bila terdapat pada jaringan aktif. Jika edge suatu platform belum tersedia, akun nyata dari dataset IndiBiz dapat ditambahkan sebagai wakil platform sampai kuota visual terpenuhi tanpa membuat edge baru. Data SNA asli tidak diubah."
+                )
+            elif service_key == "telkomsel":
+                st.caption(
+                    "Ukuran node mengikuti PageRank untuk node jaringan. Jika edge Instagram/TikTok belum tersedia pada file SNA Telkomsel, akun nyata dari dataset Telkomsel dapat ditambahkan sebagai wakil platform sampai kuota visual terpenuhi tanpa membuat edge baru. Data SNA asli tidak diubah."
                 )
             else:
                 st.caption("Ukuran node mengikuti PageRank. Isi node menunjukkan sentimen; garis tepi menunjukkan platform. Jika sentimen node belum tersedia, isi node memakai warna platform agar jaringan tetap mudah dibaca.")
@@ -9946,7 +10188,7 @@ def render_sna() -> None:
             return
 
         _render_metric_cards(summary, node_df)
-        _render_pagerank_overview(node_df, selected_service)
+        _render_pagerank_overview(node_df, selected_service, clean_df)
 
         # Fase 8: hitung dan simpan statistik yang setara dengan Cell [10] IndiBiz.
         if selected_service == "IndiBiz":
@@ -9959,7 +10201,13 @@ def render_sna() -> None:
             )
             _render_indibiz_static_network_graph(clean_df)
 
-        _render_network_graph(graph, node_df, node_limit, selected_service)
+        _render_network_graph(
+            graph,
+            node_df,
+            node_limit,
+            selected_service,
+            selected_platform,
+        )
         _render_influencer_tables(node_df, selected_service, selected_platform)
         _render_statistics_expander(node_df)
         _render_method_card()
