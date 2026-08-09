@@ -33,6 +33,7 @@ from utils.data_loader import (
     get_sna_source_names,
     load_indibiz_sna,
     load_indihome_sna,
+    load_influencer_content_data,
     load_sentiment_data,
     load_sna_data,
     sentiment_file_exists,
@@ -6815,13 +6816,17 @@ def _ensure_indibiz_platform_representatives(
     node_df: pd.DataFrame,
     minimum_per_platform: int = 2,
 ) -> tuple[nx.DiGraph, pd.DataFrame]:
-    """Pastikan graf visual IndiBiz memiliki wakil nyata dari tiap platform.
+    """Tambahkan akun komentar Instagram/TikTok IndiBiz ke graf eksplorasi.
 
-    Sumber SNA IndiBiz lama dapat hanya berisi edge Twitter/X. Saat itu terjadi,
-    fungsi ini mengambil akun non-brand yang benar-benar ada pada dataset
-    sentimen IndiBiz untuk menjadi wakil Instagram/TikTok pada visualisasi.
-    Akun tambahan tidak diberi edge buatan, sehingga struktur relasi SNA asli
-    tidak dipalsukan. Statistik utama tetap dihitung dari graf SNA asli.
+    Edge Twitter/X tetap berasal dari edge list SNA utama. Untuk Instagram dan
+    TikTok, dashboard membaca data konten aktual IndiBiz lalu memilih baris yang
+    benar-benar bertipe ``comment``. Setiap akun komentar dibuat terhubung satu
+    arah ke akun layanan utama ``indibiz`` melalui edge ``comment``.
+
+    Jika satu akun menulis beberapa komentar, node tetap satu dan edge tetap satu;
+    jumlah komentar disimpan pada atribut ``weight``. Edge tambahan ini hanya
+    dipakai pada Eksplorasi Graf SNA agar struktur komentar Instagram/TikTok
+    terbaca secara visual. Statistik SNA utama tetap dihitung dari edge list asli.
     """
     try:
         if graph is None or node_df is None or node_df.empty:
@@ -6832,44 +6837,57 @@ def _ensure_indibiz_platform_representatives(
         if "platform_group" not in visual_nodes.columns:
             return visual_graph, visual_nodes
 
-        target_minimum = max(1, int(minimum_per_platform))
-        current_counts = (
-            visual_nodes.loc[~visual_nodes["is_brand"].astype(bool), "platform_group"]
-            .astype(str)
-            .value_counts()
-            .to_dict()
-        )
-        missing_platforms = [
-            platform
-            for platform in PLATFORM_ORDER
-            if int(current_counts.get(platform, 0)) < target_minimum
-        ]
-        if not missing_platforms:
-            return visual_graph, visual_nodes
-
-        # Jangan memakai dummy untuk membuat representasi platform. Wakil
-        # Instagram/TikTok hanya boleh berasal dari sumber IndiBiz aktual.
+        # Data komentar visual hanya boleh berasal dari sumber IndiBiz aktual.
+        # Jangan membuat relasi dari dummy karena dapat terbaca sebagai temuan.
         if not sentiment_file_exists("IndiBiz"):
             return visual_graph, visual_nodes
 
-        sentiment_df = load_sentiment_data("IndiBiz")
-        if (
-            sentiment_df is None
-            or sentiment_df.empty
-            or bool(sentiment_df.attrs.get("is_dummy", False))
-            or str(sentiment_df.attrs.get("data_source", "")).lower() == "dummy"
-        ):
-            return visual_graph, visual_nodes
-        if "username" not in sentiment_df.columns or "platform" not in sentiment_df.columns:
+        content_df = load_influencer_content_data("IndiBiz")
+        if content_df is None or content_df.empty:
             return visual_graph, visual_nodes
 
-        candidates = sentiment_df.copy()
-        candidates["username"] = candidates["username"].map(_normalize_username)
-        candidates["platform_group"] = candidates["platform"].map(_normalize_platform)
-        if "followers" not in candidates.columns:
-            candidates["followers"] = 0
-        candidates["followers"] = (
-            pd.to_numeric(candidates["followers"], errors="coerce")
+        required_columns = {"username", "platform", "content"}
+        if not required_columns.issubset(content_df.columns):
+            return visual_graph, visual_nodes
+
+        comments = content_df.copy()
+        comments["username"] = comments["username"].map(_normalize_username)
+        comments["platform_group"] = comments["platform"].map(_normalize_platform)
+
+        # Kolom specific_type adalah penanda utama komentar pada sumber aktual.
+        # content_type dipakai sebagai fallback jika suatu hasil ekspor memakai
+        # nama kolom berbeda. Baris media/video tidak boleh dibuat menjadi edge.
+        specific_type = comments.get(
+            "specific_type",
+            pd.Series("", index=comments.index, dtype="object"),
+        ).astype(str).str.lower().str.strip()
+        content_type = comments.get(
+            "content_type",
+            pd.Series("", index=comments.index, dtype="object"),
+        ).astype(str).str.lower().str.strip()
+        comment_mask = specific_type.eq("comment") | (
+            specific_type.eq("") & content_type.eq("comment")
+        )
+
+        comments = comments[
+            comments["platform_group"].isin({"instagram", "tiktok"})
+            & comment_mask
+        ].copy()
+        if comments.empty:
+            return visual_graph, visual_nodes
+
+        invalid_usernames = {"", "nan", "none", "null"}
+        comments = comments[
+            ~comments["username"].isin(invalid_usernames)
+            & ~comments["username"].map(_hide_service_account_from_exploration_graph)
+        ].copy()
+        if comments.empty:
+            return visual_graph, visual_nodes
+
+        if "followers" not in comments.columns:
+            comments["followers"] = 0
+        comments["followers"] = (
+            pd.to_numeric(comments["followers"], errors="coerce")
             .fillna(0)
             .clip(lower=0)
             .astype(int)
@@ -6879,76 +6897,219 @@ def _ensure_indibiz_platform_representatives(
             (
                 column
                 for column in ["predicted_sentiment", "sentiment", "label", "sentimen"]
-                if column in candidates.columns
+                if column in comments.columns
             ),
             None,
         )
         if sentiment_column is None:
-            candidates["dominant_sentiment"] = "unknown"
+            comments["_sentiment"] = "unknown"
         else:
-            candidates["dominant_sentiment"] = candidates[sentiment_column].map(
+            comments["_sentiment"] = comments[sentiment_column].map(
                 _normalize_sentiment
             )
 
-        invalid_usernames = {"", "nan", "none", "null"}
-        candidates = candidates[
-            candidates["platform_group"].isin(PLATFORM_ORDER)
-            & ~candidates["username"].isin(invalid_usernames)
-        ].copy()
-        candidates = candidates[
-            ~candidates["username"].map(_hide_service_account_from_exploration_graph)
-        ].copy()
-        if candidates.empty:
-            return visual_graph, visual_nodes
+        # Hitung jumlah komentar per akun. Satu akun tetap menjadi satu node dan
+        # satu edge ke IndiBiz, sedangkan banyaknya komentar menjadi weight edge.
+        interaction_counts = (
+            comments.groupby(["platform_group", "username"], as_index=False)
+            .size()
+            .rename(columns={"size": "comment_interactions"})
+        )
+        follower_max = (
+            comments.groupby(["platform_group", "username"], as_index=False)["followers"]
+            .max()
+        )
+        sentiment_counts = (
+            comments.groupby(
+                ["platform_group", "username", "_sentiment"],
+                as_index=False,
+            )
+            .size()
+            .rename(columns={"size": "sentiment_count"})
+        )
+        sentiment_counts["_sentiment_priority"] = sentiment_counts["_sentiment"].map(
+            SENTIMENT_PRIORITY
+        ).fillna(0)
+        dominant_sentiment = (
+            sentiment_counts.sort_values(
+                [
+                    "platform_group",
+                    "username",
+                    "sentiment_count",
+                    "_sentiment_priority",
+                ],
+                ascending=[True, True, False, False],
+                kind="mergesort",
+            )
+            .drop_duplicates(["platform_group", "username"], keep="first")
+            [["platform_group", "username", "_sentiment"]]
+            .rename(columns={"_sentiment": "dominant_sentiment"})
+        )
 
-        # Satu username cukup satu kali per platform. Followers maksimum dipakai
-        # agar ukuran node Instagram/TikTok mengikuti jangkauan akun terbaru.
+        candidates = (
+            interaction_counts.merge(
+                follower_max,
+                on=["platform_group", "username"],
+                how="left",
+            )
+            .merge(
+                dominant_sentiment,
+                on=["platform_group", "username"],
+                how="left",
+            )
+        )
+        candidates["dominant_sentiment"] = candidates["dominant_sentiment"].fillna(
+            "unknown"
+        )
         candidates = candidates.sort_values(
-            ["platform_group", "followers", "username"],
-            ascending=[True, False, True],
+            ["platform_group", "followers", "comment_interactions", "username"],
+            ascending=[True, False, False, True],
             kind="mergesort",
-        ).drop_duplicates(["platform_group", "username"], keep="first")
+        )
 
+        # Pastikan node layanan utama tersedia sebagai target seluruh komentar.
+        service_hub = "indibiz"
+        if service_hub not in visual_graph:
+            visual_graph.add_node(
+                service_hub,
+                followers=0,
+                platform="target",
+                dominant_sentiment="unknown",
+                is_brand=True,
+            )
+
+        if service_hub not in set(visual_nodes["username"].astype(str)):
+            hub_row = {
+                "username": service_hub,
+                "platform": "target",
+                "platform_group": "target",
+                "platform_label": "Akun Brand IndiBiz",
+                "followers": 0,
+                "degree": 0,
+                "degree_centrality": 0.0,
+                "betweenness_centrality": 0.0,
+                "pagerank": 0.0,
+                "in_degree": 0,
+                "out_degree": 0,
+                "dominant_sentiment": "unknown",
+                "sentiment_label": "Belum tersedia",
+                "is_brand": True,
+                "is_platform_representative": False,
+                "is_comment_interaction": False,
+                "comment_interactions": 0,
+            }
+            visual_nodes = pd.concat(
+                [visual_nodes, pd.DataFrame([hub_row])],
+                ignore_index=True,
+                sort=False,
+            )
+
+        target_minimum = max(1, int(minimum_per_platform))
+        current_counts = (
+            visual_nodes.loc[~visual_nodes["is_brand"].astype(bool), "platform_group"]
+            .astype(str)
+            .value_counts()
+            .to_dict()
+        )
         existing_usernames = set(visual_nodes["username"].astype(str))
-        representative_rows: list[dict[str, Any]] = []
+        addition_rows: list[dict[str, Any]] = []
 
-        for platform in missing_platforms:
-            current = int(current_counts.get(platform, 0))
-            needed = max(0, target_minimum - current)
-            if needed <= 0:
-                continue
-
+        for platform in ("instagram", "tiktok"):
             platform_candidates = candidates[
                 candidates["platform_group"].eq(platform)
-                & ~candidates["username"].isin(existing_usernames)
             ].copy()
             if platform_candidates.empty:
                 continue
 
-            for row in platform_candidates.head(needed).itertuples(index=False):
+            current = int(current_counts.get(platform, 0))
+            needed = max(0, target_minimum - current)
+
+            # Akun yang sudah ada pada graph tetap dapat memperoleh edge comment
+            # jika username yang sama memang memiliki komentar pada platform ini.
+            existing_platform_names = set(
+                visual_nodes.loc[
+                    visual_nodes["platform_group"].astype(str).eq(platform),
+                    "username",
+                ].astype(str)
+            )
+            existing_commenters = platform_candidates[
+                platform_candidates["username"].isin(existing_platform_names)
+            ]
+
+            new_candidates = platform_candidates[
+                ~platform_candidates["username"].isin(existing_usernames)
+            ].head(needed)
+
+            selected_commenters = pd.concat(
+                [existing_commenters, new_candidates],
+                ignore_index=True,
+            ).drop_duplicates("username", keep="first")
+
+            for row in selected_commenters.itertuples(index=False):
                 username = str(row.username)
                 followers = int(getattr(row, "followers", 0) or 0)
+                comment_count = max(
+                    1,
+                    int(getattr(row, "comment_interactions", 1) or 1),
+                )
                 sentiment = _normalize_sentiment(
                     getattr(row, "dominant_sentiment", "unknown")
                 )
 
-                # Node representatif berasal dari data aktual platform, tetapi
-                # tidak diberi relasi sintetis. Dengan begitu graf tidak
-                # menyatakan adanya edge yang memang tidak tersedia di SNA.
-                visual_graph.add_node(
-                    username,
-                    followers=followers,
-                    platform=platform,
-                    dominant_sentiment=sentiment,
-                    platform_representative=True,
-                )
-                representative_rows.append(
+                if username not in visual_graph:
+                    visual_graph.add_node(
+                        username,
+                        followers=followers,
+                        platform=platform,
+                        dominant_sentiment=sentiment,
+                        platform_representative=True,
+                        comment_interaction=True,
+                    )
+
+                # Satu akun komentar hanya mempunyai satu relasi menuju akun
+                # layanan utama. Jika edge sudah ada dari sumber yang sah, edge
+                # tersebut dipertahankan dan tidak ditimpa.
+                if not visual_graph.has_edge(username, service_hub):
+                    visual_graph.add_edge(
+                        username,
+                        service_hub,
+                        relationship="comment",
+                        weight=comment_count,
+                        platform=platform,
+                        visual_comment_edge=True,
+                    )
+
+                existing_mask = visual_nodes["username"].astype(str).eq(username)
+                if existing_mask.any():
+                    current_followers = pd.to_numeric(
+                        visual_nodes.loc[existing_mask, "followers"],
+                        errors="coerce",
+                    ).fillna(0).astype(int)
+                    visual_nodes.loc[existing_mask, "followers"] = np.maximum(
+                        current_followers.to_numpy(),
+                        followers,
+                    )
+                    visual_nodes.loc[existing_mask, "is_comment_interaction"] = True
+                    visual_nodes.loc[existing_mask, "comment_interactions"] = comment_count
+                    unknown_sentiment_mask = existing_mask & visual_nodes[
+                        "dominant_sentiment"
+                    ].astype(str).str.lower().isin({"", "unknown", "nan", "none"})
+                    visual_nodes.loc[
+                        unknown_sentiment_mask, "dominant_sentiment"
+                    ] = sentiment
+                    continue
+
+                addition_rows.append(
                     {
                         "username": username,
                         "platform": platform,
                         "platform_group": platform,
-                        "platform_label": PLATFORM_DISPLAY.get(platform, platform.title()),
+                        "platform_label": PLATFORM_DISPLAY.get(
+                            platform, platform.title()
+                        ),
                         "followers": followers,
+                        # Degree/centrality utama tetap nol karena metrik penelitian
+                        # tidak dihitung ulang dari edge visual komentar ini.
                         "degree": 0,
                         "degree_centrality": 0.0,
                         "betweenness_centrality": 0.0,
@@ -6961,24 +7122,41 @@ def _ensure_indibiz_platform_representatives(
                         ),
                         "is_brand": False,
                         "is_platform_representative": True,
+                        "is_comment_interaction": True,
+                        "comment_interactions": comment_count,
                     }
                 )
                 existing_usernames.add(username)
 
-        if representative_rows:
-            additions = pd.DataFrame(representative_rows)
-            visual_nodes = pd.concat([visual_nodes, additions], ignore_index=True, sort=False)
-            if "is_platform_representative" not in visual_nodes.columns:
-                visual_nodes["is_platform_representative"] = False
-            visual_nodes["is_platform_representative"] = (
-                visual_nodes["is_platform_representative"].fillna(False).astype(bool)
+        if addition_rows:
+            visual_nodes = pd.concat(
+                [visual_nodes, pd.DataFrame(addition_rows)],
+                ignore_index=True,
+                sort=False,
             )
+
+        if "is_platform_representative" not in visual_nodes.columns:
+            visual_nodes["is_platform_representative"] = False
+        visual_nodes["is_platform_representative"] = (
+            visual_nodes["is_platform_representative"].fillna(False).astype(bool)
+        )
+        if "is_comment_interaction" not in visual_nodes.columns:
+            visual_nodes["is_comment_interaction"] = False
+        visual_nodes["is_comment_interaction"] = (
+            visual_nodes["is_comment_interaction"].fillna(False).astype(bool)
+        )
+        if "comment_interactions" not in visual_nodes.columns:
+            visual_nodes["comment_interactions"] = 0
+        visual_nodes["comment_interactions"] = (
+            pd.to_numeric(visual_nodes["comment_interactions"], errors="coerce")
+            .fillna(0)
+            .astype(int)
+        )
 
         return visual_graph, visual_nodes.reset_index(drop=True)
     except Exception as exc:
-        st.error(f"Gagal menyiapkan wakil platform pada graf IndiBiz: {exc}")
+        st.error(f"Gagal menyiapkan edge komentar Instagram/TikTok IndiBiz: {exc}")
         return graph.copy(), node_df.copy()
-
 
 def _ensure_telkomsel_platform_representatives(
     graph: nx.DiGraph,
@@ -7434,8 +7612,11 @@ def generate_pyvis_graph(
             is_key_label = is_brand or str(username) in key_label_nodes
             visible_label = label if is_key_label else ""
             is_platform_representative = bool(row.get("is_platform_representative", False))
+            is_comment_interaction = bool(row.get("is_comment_interaction", False))
             if is_brand:
                 node_role = "Akun Brand / Hub"
+            elif is_comment_interaction:
+                node_role = "Akun komentar → layanan"
             elif is_platform_representative:
                 node_role = "Wakil platform (tanpa edge SNA)"
             else:
@@ -9046,9 +9227,14 @@ def _render_network_graph(
                         f"{PLATFORM_DISPLAY.get(platform, platform.title())} {int(count)}"
                         for platform, count in quotas.items()
                     )
-                    st.caption(
-                        f"Alokasi node mode Semua Platform mengikuti rasio 60:50:50. Batas aktif {int(node_limit)} node dibagi menjadi {quota_text}. Hub layanan utama dihitung ke kuota Twitter/X agar total node tetap mengikuti slider."
-                    )
+                    if service_key == "indibiz":
+                        st.caption(
+                            f"Target alokasi mode Semua Platform mengikuti rasio 60:50:50. Batas aktif {int(node_limit)} node menargetkan {quota_text}. Untuk Instagram dan TikTok, hanya akun yang benar-benar memiliki komentar pada data IndiBiz yang diberi edge ke akun layanan. Jika jumlah komentator aktual tidak cukup memenuhi kuota, slot tersisa dialihkan ke akun aktual platform lain tanpa membuat akun atau komentar palsu."
+                        )
+                    else:
+                        st.caption(
+                            f"Alokasi node mode Semua Platform mengikuti rasio 60:50:50. Batas aktif {int(node_limit)} node dibagi menjadi {quota_text}. Hub layanan utama dihitung ke kuota Twitter/X agar total node tetap mengikuti slider."
+                        )
             service_key = str(service).strip().lower()
             if service_key == "indihome":
                 st.caption(
@@ -9058,7 +9244,7 @@ def _render_network_graph(
             elif service_key == "indibiz":
                 st.caption(
                     "Ukuran node Twitter/X mengikuti degree. Ukuran node Instagram dan TikTok mengikuti jumlah followers. "
-                    "Akun layanan turunan/regional/care disembunyikan dari graf IndiBiz; hanya akun utama IndiHome, IndiBiz, dan Telkomsel yang tetap dapat tampil sebagai hub merah bila terdapat pada jaringan aktif. Jika edge suatu platform belum tersedia, akun nyata dari dataset IndiBiz dapat ditambahkan sebagai wakil platform sampai kuota visual terpenuhi tanpa membuat edge baru. Data SNA asli tidak diubah."
+                    "Akun layanan turunan/regional/care disembunyikan dari graf IndiBiz. Pada Eksplorasi Graf, akun Instagram dan TikTok hanya diambil dari baris komentar aktual dan masing-masing dihubungkan satu arah ke node layanan utama IndiBiz. Jika satu akun menulis beberapa komentar, edge tetap satu dan weight menyimpan jumlah komentarnya. Edge komentar ini hanya untuk visualisasi; statistik SNA utama tetap menggunakan edge list penelitian asli."
                 )
             elif service_key == "telkomsel":
                 st.caption(
