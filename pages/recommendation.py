@@ -4569,6 +4569,948 @@ div[data-testid="stElementContainer"]:has(div[data-testid="stCode"]) {
 """
 
 
+RECOMMENDATION_LIGHT_MODE_CSS = """
+<style>
+/* ========================================================================== */
+/* LIGHT MODE KHUSUS HALAMAN REKOMENDASI                                     */
+/* Hanya mengubah warna/surface. Struktur, spacing, ukuran, animasi, dan       */
+/* urutan komponen tetap mengikuti baseline UI/UX yang sudah dikunci.          */
+/* ========================================================================== */
+
+:root {
+    --rec-bg-main: #F5F7FA;
+    --rec-bg-card: #FFFFFF;
+    --rec-bg-soft: #F8FAFC;
+    --rec-bg-input: #FFFFFF;
+    --rec-border: #D9E0E8;
+    --rec-text: #172033;
+    --rec-text-secondary: #5F6B7A;
+    --rec-text-muted: #7B8797;
+}
+
+/* -------------------------------------------------------------------------- */
+/* HERO, KONTEKS, FILTER, DAN STATUS                                          */
+/* -------------------------------------------------------------------------- */
+.rec-hero {
+    border-color: #D9E0E8;
+    background:
+        radial-gradient(circle at 88% 15%, rgba(229,57,53,.12), transparent 31%),
+        linear-gradient(135deg, rgba(255,255,255,.99), rgba(247,249,252,.99));
+    box-shadow: 0 16px 40px rgba(15,23,42,.08);
+}
+
+.rec-eyebrow {
+    color: #C62828;
+    background: rgba(229,57,53,.07);
+}
+
+.rec-context-card {
+    border-color: #D9E0E8;
+    background: #FFFFFF;
+    box-shadow: 0 10px 28px rgba(15,23,42,.06);
+}
+
+.rec-status {
+    border-color: #D9E0E8;
+    color: #5F6B7A;
+    background: #F8FAFC;
+}
+
+.rec-status.actual {
+    color: #2E7D32;
+    background: rgba(76,175,80,.08);
+}
+
+.rec-status.fallback {
+    color: #B26A00;
+    background: rgba(255,152,0,.09);
+}
+
+.rec-status.model {
+    color: #C62828;
+    background: rgba(229,57,53,.08);
+}
+
+.rec-filter-active-note {
+    border-color: #DCE3EB;
+    background: #F8FAFC;
+    color: #5F6B7A;
+}
+
+.rec-filter-active-note strong {
+    color: #172033;
+}
+
+.rec-filter-active-note span {
+    color: #C62828;
+}
+
+.rec-service-note {
+    color: #687386;
+    background: linear-gradient(90deg, rgba(229,57,53,.07), rgba(229,57,53,0));
+}
+
+/* -------------------------------------------------------------------------- */
+/* EMPTY STATE                                                                */
+/* -------------------------------------------------------------------------- */
+.rec-empty-state-panel {
+    border-color: rgba(29,161,242,.22);
+    background:
+        radial-gradient(circle at 12% 12%, rgba(229,57,53,.12), transparent 30%),
+        radial-gradient(circle at 86% 18%, rgba(29,161,242,.11), transparent 32%),
+        linear-gradient(145deg, #FFFFFF, #F7F9FC);
+    box-shadow: 0 18px 42px rgba(15,23,42,.10), inset 0 1px 0 rgba(255,255,255,.90);
+}
+
+.rec-empty-state-panel::before {
+    background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.70) 48%, transparent 68%);
+}
+
+.rec-empty-state-kicker {
+    color: #C62828;
+}
+
+.rec-empty-state-title {
+    color: #172033;
+}
+
+.rec-empty-state-desc,
+.rec-empty-mini-card p {
+    color: #5F6B7A;
+}
+
+.rec-empty-mini-card {
+    border-color: #DEE5ED;
+    background: rgba(255,255,255,.74);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.95);
+}
+
+.rec-empty-mini-card span {
+    color: #9F2020;
+}
+
+/* -------------------------------------------------------------------------- */
+/* AI CONTENT STUDIO                                                          */
+/* -------------------------------------------------------------------------- */
+.rec-ai-shell {
+    border-color: #D9E0E8;
+    background:
+        radial-gradient(circle at 8% 12%, rgba(229,57,53,.13), transparent 30%),
+        radial-gradient(circle at 92% 12%, rgba(29,161,242,.11), transparent 32%),
+        radial-gradient(circle at 72% 100%, rgba(76,175,80,.08), transparent 30%),
+        linear-gradient(145deg, #FFFFFF, #F7F9FC);
+    box-shadow: 0 22px 54px rgba(15,23,42,.10), inset 0 1px 0 rgba(255,255,255,.94);
+}
+
+.rec-ai-shell:hover {
+    border-color: #C8D1DD;
+    box-shadow: 0 28px 62px rgba(15,23,42,.13), 0 0 0 1px rgba(229,57,53,.05), inset 0 1px 0 #FFFFFF;
+}
+
+.rec-ai-shell::before {
+    background-image:
+        linear-gradient(rgba(36,50,74,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(36,50,74,.035) 1px, transparent 1px);
+}
+
+.rec-ai-eyebrow,
+.rec-ai-result-kicker,
+.rec-ai-content-title strong {
+    color: #C62828;
+}
+
+.rec-ai-heading h2,
+.rec-ai-result-heading,
+.rec-ai-content-title,
+.rec-ai-copy-heading {
+    color: #172033;
+}
+
+.rec-ai-heading p,
+.rec-ai-result-body,
+.rec-ai-idea-row p,
+.rec-ai-copy-text {
+    color: #5F6B7A;
+}
+
+.rec-ai-feature-chip,
+.rec-ai-source-pill,
+.rec-ai-meta-chip {
+    border-color: #DCE3EB;
+    color: #586577;
+    background: rgba(255,255,255,.78);
+}
+
+.rec-ai-feature-chip:hover,
+.rec-ai-meta-chip:hover {
+    color: #172033;
+    border-color: #C7D0DC;
+    background: #FFFFFF;
+}
+
+.rec-gemini-badge.online {
+    color: #247A3A;
+    background: rgba(76,175,80,.09);
+}
+
+.rec-gemini-badge.offline {
+    color: #A86100;
+    background: rgba(255,152,0,.10);
+}
+
+.rec-ai-refresh-notice {
+    color: #246B35;
+    background: linear-gradient(90deg, rgba(76,175,80,.11), rgba(76,175,80,.04));
+}
+
+.rec-ai-offline-note,
+.rec-ai-fallback-note {
+    color: #8B5900;
+    background: linear-gradient(90deg, rgba(255,152,0,.12), rgba(255,152,0,.04));
+}
+
+.rec-ai-result {
+    border-color: #DCE3EB;
+    background:
+        radial-gradient(circle at 95% 0%, rgba(139,92,246,.08), transparent 28%),
+        linear-gradient(145deg, #FFFFFF, #F8FAFD);
+    box-shadow: inset 0 1px 0 #FFFFFF, 0 16px 38px rgba(15,23,42,.09);
+}
+
+.rec-ai-result:hover {
+    border-color: rgba(139,92,246,.28);
+    box-shadow: inset 0 1px 0 #FFFFFF, 0 22px 48px rgba(15,23,42,.12);
+}
+
+.rec-ai-result-header {
+    border-bottom-color: #E2E7EE;
+    background: linear-gradient(90deg, rgba(139,92,246,.045), transparent);
+}
+
+.rec-ai-source-pill.live {
+    color: #2E7D32;
+}
+
+.rec-ai-source-pill.fallback {
+    color: #A86100;
+}
+
+.rec-ai-content-title {
+    border-color: rgba(229,57,53,.18);
+    background: linear-gradient(90deg, rgba(229,57,53,.075), rgba(139,92,246,.04));
+}
+
+.rec-ai-idea-row {
+    border-color: #E0E6ED;
+    background: #FAFBFD;
+}
+
+.rec-ai-idea-row:hover {
+    border-color: rgba(29,161,242,.26);
+    background: linear-gradient(90deg, rgba(29,161,242,.07), rgba(139,92,246,.025));
+}
+
+.rec-ai-idea-number {
+    color: #1776AD;
+    background: rgba(29,161,242,.08);
+}
+
+.rec-ai-result-meta {
+    border-top-color: #E2E7EE;
+}
+
+/* -------------------------------------------------------------------------- */
+/* STRATEGI PER SENTIMEN                                                      */
+/* -------------------------------------------------------------------------- */
+.rec-sentiment-strategy-card {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(var(--sentiment-rgb), .15), transparent 28%),
+        radial-gradient(circle at 6% 94%, rgba(var(--sentiment-rgb), .08), transparent 32%),
+        linear-gradient(145deg, rgba(var(--sentiment-rgb), .055), #FFFFFF 44%, #F8FAFC);
+    box-shadow: inset 0 1px 0 #FFFFFF, 0 16px 36px rgba(15,23,42,.09), 0 0 0 1px rgba(15,23,42,.015);
+}
+
+.rec-sentiment-strategy-card:hover,
+.rec-sentiment-strategy-card:focus-visible {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(var(--sentiment-rgb), .20), transparent 31%),
+        radial-gradient(circle at 6% 94%, rgba(var(--sentiment-rgb), .11), transparent 35%),
+        linear-gradient(145deg, rgba(var(--sentiment-rgb), .08), #FFFFFF 44%, #F7F9FC);
+    box-shadow: inset 0 1px 0 #FFFFFF, 0 24px 54px rgba(15,23,42,.13), 0 0 30px rgba(var(--sentiment-rgb), .10);
+}
+
+.rec-sentiment-strategy-state,
+.rec-sentiment-strategy-description,
+.rec-sentiment-strategy-footer {
+    color: #667285;
+}
+
+.rec-sentiment-strategy-card h3 {
+    color: #172033;
+}
+
+.rec-sentiment-strategy-card ul {
+    color: #37465A;
+}
+
+.rec-sentiment-strategy-card li {
+    border-color: #E1E7EE;
+    background: linear-gradient(110deg, #FAFBFD, rgba(var(--sentiment-rgb), .035));
+}
+
+.rec-sentiment-strategy-card li:hover {
+    color: #172033;
+    background: linear-gradient(110deg, rgba(var(--sentiment-rgb), .09), #FFFFFF);
+    box-shadow: 0 9px 20px rgba(15,23,42,.08);
+}
+
+/* -------------------------------------------------------------------------- */
+/* KARTU INFLUENCER DAN DETAIL                                                */
+/* -------------------------------------------------------------------------- */
+.rec-influencer-card {
+    border-color: #D9E0E8;
+    background: linear-gradient(160deg, #FFFFFF, #F8FAFC);
+    box-shadow: 0 10px 28px rgba(15,23,42,.07);
+}
+
+.rec-influencer-card.rec-placeholder-card {
+    background: linear-gradient(160deg, #FAFBFD, #F3F6F9);
+}
+
+.rec-influencer-card.rec-placeholder-card:hover {
+    border-color: #CDD5E0;
+}
+
+.rec-placeholder-icon {
+    border-color: #D9E0E8;
+    color: #7B8797;
+    background: #F4F6F9;
+}
+
+.rec-placeholder-title {
+    color: #344054;
+}
+
+.rec-placeholder-text {
+    color: #7B8797;
+}
+
+.rec-influencer-card:hover {
+    box-shadow: 0 15px 34px rgba(15,23,42,.11), 0 0 22px rgba(229,57,53,.06);
+}
+
+.rec-avatar {
+    border-color: rgba(255,255,255,.72);
+    box-shadow: 0 8px 18px rgba(15,23,42,.14);
+}
+
+.rec-platform-badge,
+.rec-mini-badge {
+    color: var(--platform-color, #C62828);
+    background: color-mix(in srgb, var(--platform-color, #E53935) 9%, #FFFFFF);
+}
+
+.rec-username,
+.rec-mini-value,
+.rec-content-preview-title,
+.rec-detail-block-title {
+    color: #172033;
+}
+
+.rec-mini-metric,
+.rec-content-preview,
+.rec-detail-block {
+    border-color: #E0E6ED;
+    background: #F8FAFC;
+}
+
+.rec-mini-label,
+.rec-content-preview-meta,
+.rec-detail-content-meta {
+    color: #7B8797;
+}
+
+.rec-content-list li {
+    color: #4B586B;
+}
+
+.rec-content-scroll {
+    scrollbar-color: #E53935 #E7ECF2;
+}
+
+.rec-content-scroll::-webkit-scrollbar-track {
+    border-color: #DDE4EC;
+    background: #E7ECF2;
+}
+
+.rec-content-scroll::-webkit-scrollbar-thumb {
+    border-color: #E7ECF2;
+}
+
+.rec-detail-content-list::-webkit-scrollbar-track {
+    background: #E7ECF2;
+}
+
+.rec-detail-content-list::-webkit-scrollbar-thumb {
+    background: #AAB4C2;
+}
+
+.rec-detail-content-item,
+.rec-detail-strategy-card {
+    border-color: #E1E7EE;
+    background: #FFFFFF;
+}
+
+.rec-detail-content-text,
+.rec-detail-recommendation {
+    color: #445166;
+}
+
+.rec-detail-note {
+    color: #5F6B7A;
+    background: rgba(255,152,0,.08);
+}
+
+.rec-detail-panel {
+    border-color: color-mix(in srgb, var(--detail-accent, #E53935) 38%, #D9E0E8);
+    background:
+        radial-gradient(circle at 7% 0%, color-mix(in srgb, var(--detail-accent, #E53935) 9%, transparent), transparent 28%),
+        radial-gradient(circle at 95% 100%, color-mix(in srgb, var(--detail-accent, #E53935) 6%, transparent), transparent 31%),
+        linear-gradient(145deg, #FFFFFF, #F7F9FC);
+    box-shadow: 0 20px 52px rgba(15,23,42,.11), inset 0 1px 0 #FFFFFF;
+}
+
+.rec-detail-panel::before {
+    background: linear-gradient(90deg, transparent, var(--detail-accent), #FFFFFF, var(--detail-accent), transparent);
+}
+
+.rec-detail-panel h4,
+.rec-detail-stat-value,
+.rec-detail-block-title,
+.rec-detail-strategy-title,
+.rec-detail-basis-row strong {
+    color: #172033;
+}
+
+.rec-detail-panel h4 strong {
+    color: color-mix(in srgb, var(--detail-accent) 82%, #172033);
+}
+
+.rec-detail-subtitle,
+.rec-detail-stat-label,
+.rec-detail-stat-note,
+.rec-detail-topic-label,
+.rec-detail-basis-row {
+    color: #758195;
+}
+
+.rec-detail-live-badge {
+    border-color: color-mix(in srgb, var(--detail-accent) 28%, #D9E0E8);
+    color: #344054;
+    background: rgba(255,255,255,.78);
+}
+
+.rec-detail-stat-card {
+    border-color: #E1E7EE;
+    background: linear-gradient(145deg, rgba(255,255,255,.92), transparent 44%), #F8FAFC;
+}
+
+.rec-detail-stat-card:hover {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--detail-accent) 5%, #FFFFFF), #FFFFFF);
+    box-shadow: 0 12px 26px rgba(15,23,42,.09);
+}
+
+.rec-detail-topic-row {
+    border-color: #E1E7EE;
+    background: #F8FAFC;
+}
+
+.rec-detail-topic-chip {
+    color: #344054;
+    background: color-mix(in srgb, var(--detail-accent) 7%, #FFFFFF);
+}
+
+.rec-detail-topic-chip:hover {
+    color: #172033;
+}
+
+.rec-detail-block {
+    background: linear-gradient(150deg, rgba(255,255,255,.80), transparent 46%), #F8FAFC;
+}
+
+.rec-detail-block:hover,
+.rec-detail-block:focus-visible {
+    box-shadow: 0 16px 32px rgba(15,23,42,.09);
+}
+
+.rec-detail-count-badge {
+    border-color: #D9E0E8;
+    color: #667285;
+    background: #FFFFFF;
+}
+
+.rec-detail-content-list {
+    scrollbar-color: var(--detail-accent) #E7ECF2;
+}
+
+.rec-detail-content-item:hover,
+.rec-detail-strategy-card:hover {
+    background: color-mix(in srgb, var(--detail-accent) 5%, #FFFFFF);
+}
+
+.rec-detail-basis-row {
+    background: color-mix(in srgb, var(--detail-accent) 4%, #FFFFFF);
+}
+
+/* -------------------------------------------------------------------------- */
+/* RINGKASAN TOPIK DAN PLAYBOOK                                               */
+/* -------------------------------------------------------------------------- */
+.rec-topic-summary {
+    border-color: #E0E6ED;
+    background: #F8FAFC;
+}
+
+.rec-topic-meta {
+    color: #455267;
+}
+
+.rec-progress {
+    background: #E3E8EF;
+}
+
+.rec-platform-label {
+    color: #172033;
+}
+
+.rec-influencer-pill {
+    color: #B42318;
+    background: rgba(229,57,53,.07);
+}
+
+.rec-topic-pill {
+    color: #344054;
+    background: color-mix(in srgb, var(--topic-color, #E53935) 8%, #FFFFFF);
+    box-shadow: inset 0 0 0 1px rgba(15,23,42,.02);
+}
+
+.rec-topic-hero {
+    border-color: color-mix(in srgb, var(--topic-color, #E53935) 28%, #D9E0E8);
+    background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--topic-color, #E53935) 10%, transparent), transparent 34%),
+        linear-gradient(145deg, #FFFFFF, #F8FAFC);
+    box-shadow: 0 14px 34px rgba(15,23,42,.08);
+}
+
+.rec-topic-icon {
+    box-shadow: 0 8px 20px rgba(15,23,42,.10), inset 0 0 0 1px rgba(255,255,255,.74);
+}
+
+.rec-topic-hero h3,
+.rec-topic-stat-value,
+.rec-copy-header strong,
+.rec-platform-card-head strong,
+.rec-topic-footer-label span {
+    color: #172033;
+}
+
+.rec-topic-stat-card {
+    border-color: #E1E7EE;
+    background: linear-gradient(145deg, rgba(255,255,255,.86), transparent 42%), #F8FAFC;
+}
+
+.rec-topic-stat-label,
+.rec-topic-stat-unit,
+.rec-topic-stat-note,
+.rec-topic-footer-label small,
+.rec-platform-card-head span {
+    color: #748094;
+}
+
+.rec-topic-stat-icon {
+    color: #172033;
+}
+
+.rec-topic-sentiment-pill {
+    color: color-mix(in srgb, var(--sentiment-color, #667085) 82%, #172033);
+    background: color-mix(in srgb, var(--sentiment-color, #9E9E9E) 9%, #FFFFFF);
+}
+
+.rec-topic-progress-row {
+    border-color: #E1E7EE;
+    background: #F8FAFC;
+}
+
+.rec-topic-progress-info {
+    color: #455267;
+}
+
+.rec-topic-insight {
+    border-color: color-mix(in srgb, var(--topic-color, #E53935) 22%, #D9E0E8);
+    background: color-mix(in srgb, var(--topic-color, #E53935) 7%, #FFFFFF);
+}
+
+.rec-topic-insight p {
+    color: #455267;
+}
+
+.rec-copy-header {
+    border-color: color-mix(in srgb, var(--topic-color, #E53935) 24%, #D9E0E8);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--topic-color, #E53935) 7%, #FFFFFF), #F8FAFC);
+}
+
+.rec-copy-header em {
+    color: #344054;
+    background: #FFFFFF;
+}
+
+.rec-platform-card-head {
+    border-color: color-mix(in srgb, var(--platform-color, #E53935) 28%, #D9E0E8);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--platform-color, #E53935) 9%, #FFFFFF), #F8FAFC);
+}
+
+.rec-topic-footer {
+    border-color: color-mix(in srgb, var(--topic-color, #E53935) 23%, #D9E0E8);
+    background: #F8FAFC;
+}
+
+/* -------------------------------------------------------------------------- */
+/* MATRIKS INFLUENCER × TOPIK                                                 */
+/* -------------------------------------------------------------------------- */
+.rec-matrix-intro {
+    border-color: rgba(229,57,53,.22);
+    background:
+        radial-gradient(circle at top right, rgba(229,57,53,.09), transparent 32%),
+        linear-gradient(135deg, #FFFFFF, #F8FAFC);
+    box-shadow: 0 14px 34px rgba(15,23,42,.08);
+}
+
+.rec-matrix-intro strong {
+    color: #172033;
+}
+
+.rec-matrix-intro p {
+    color: #667285;
+}
+
+.rec-matrix-insight-card {
+    background:
+        radial-gradient(circle at 88% 14%, rgba(var(--rec-card-rgb, 229,57,53), .18), transparent 29%),
+        radial-gradient(circle at 12% 110%, rgba(var(--rec-card-rgb, 229,57,53), .09), transparent 34%),
+        linear-gradient(145deg, rgba(var(--rec-card-rgb, 229,57,53), .075), #FFFFFF 48%, #F8FAFC);
+    box-shadow: 0 17px 38px rgba(15,23,42,.09), 0 0 24px rgba(var(--rec-card-rgb, 229,57,53), .08), inset 0 1px 0 #FFFFFF;
+}
+
+.rec-matrix-insight-card:hover {
+    box-shadow: 0 22px 48px rgba(15,23,42,.13), 0 0 32px rgba(var(--rec-card-rgb, 229,57,53), .13), inset 0 1px 0 #FFFFFF;
+}
+
+.rec-matrix-card-icon {
+    background: linear-gradient(145deg, rgba(var(--rec-card-rgb, 229,57,53), .18), rgba(255,255,255,.80));
+    color: #172033;
+}
+
+.rec-matrix-insight-card span,
+.rec-matrix-insight-card small {
+    color: #657185;
+}
+
+.rec-matrix-insight-card strong {
+    color: #172033;
+    text-shadow: none;
+}
+
+.rec-matrix-rank-card {
+    border-color: color-mix(in srgb, var(--platform-color, #E53935) 26%, #D9E0E8);
+    background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--platform-color, #E53935) 10%, transparent), transparent 35%),
+        #FFFFFF;
+}
+
+.rec-matrix-rank-number {
+    color: #172033;
+    background: color-mix(in srgb, var(--platform-color, #E53935) 13%, #FFFFFF);
+}
+
+.rec-matrix-rank-main span,
+.rec-matrix-rank-score {
+    color: #172033;
+}
+
+.rec-matrix-rank-main small {
+    color: #4F5C70;
+    background: color-mix(in srgb, var(--platform-color, #E53935) 8%, #FFFFFF);
+}
+
+.rec-matrix-rank-score em {
+    color: #7B8797;
+}
+
+.rec-matrix-empty,
+.rec-matrix-table-empty-state {
+    color: #8B5900;
+    background: rgba(255,152,0,.09);
+}
+
+div[data-testid="stPlotlyChart"] {
+    border-color: #DCE3EB;
+    background:
+        radial-gradient(circle at top right, rgba(229,57,53,.055), transparent 30%),
+        linear-gradient(145deg, #FFFFFF, #F8FAFC);
+    box-shadow: 0 14px 34px rgba(15,23,42,.08);
+}
+
+.rec-matrix-table-hero {
+    border-color: rgba(29,161,242,.22);
+    background:
+        radial-gradient(circle at 92% 0%, rgba(29,161,242,.10), transparent 32%),
+        radial-gradient(circle at 8% 100%, rgba(229,57,53,.08), transparent 30%),
+        linear-gradient(145deg, #FFFFFF, #F8FAFC);
+    box-shadow: 0 14px 36px rgba(15,23,42,.09), inset 0 1px 0 #FFFFFF;
+}
+
+.rec-matrix-table-hero strong {
+    color: #172033;
+}
+
+.rec-matrix-table-hero p {
+    color: #667285;
+}
+
+.rec-matrix-table-stat {
+    border-color: color-mix(in srgb, var(--stat-color) 30%, #D9E0E8);
+    background:
+        radial-gradient(circle at 86% 14%, color-mix(in srgb, var(--stat-color) 19%, transparent), transparent 32%),
+        radial-gradient(circle at 0% 100%, color-mix(in srgb, var(--stat-color-2) 12%, transparent), transparent 38%),
+        linear-gradient(145deg, #FFFFFF, #F8FAFC);
+    box-shadow: 0 16px 34px rgba(15,23,42,.09), 0 0 20px color-mix(in srgb, var(--stat-color) 8%, transparent), inset 0 1px 0 #FFFFFF;
+}
+
+.rec-matrix-table-stat:hover {
+    border-color: color-mix(in srgb, var(--stat-color) 52%, #D9E0E8);
+    box-shadow: 0 20px 44px rgba(15,23,42,.12), 0 0 26px color-mix(in srgb, var(--stat-color) 14%, transparent), inset 0 1px 0 #FFFFFF;
+}
+
+.rec-matrix-table-stat span {
+    color: #667285;
+}
+
+.rec-matrix-table-stat-icon {
+    color: #172033;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--stat-color) 20%, #FFFFFF), #FFFFFF);
+}
+
+.rec-matrix-table-stat strong {
+    color: #172033;
+    text-shadow: none;
+}
+
+.rec-matrix-table-stat small {
+    color: color-mix(in srgb, var(--stat-color) 70%, #455267);
+}
+
+.rec-matrix-table-detail {
+    border-color: rgba(229,57,53,.20);
+    background:
+        radial-gradient(circle at 100% 0%, rgba(229,57,53,.09), transparent 30%),
+        radial-gradient(circle at 0% 100%, rgba(255,152,0,.055), transparent 28%),
+        linear-gradient(145deg, #FFFFFF, #F8FAFC);
+    box-shadow: 0 14px 34px rgba(15,23,42,.08);
+}
+
+.rec-matrix-table-detail::after {
+    background: linear-gradient(90deg, transparent, rgba(71,85,105,.18), transparent);
+}
+
+.rec-matrix-table-detail-title strong {
+    color: #172033;
+}
+
+.rec-matrix-table-detail-title span {
+    color: #176B96;
+    background: rgba(29,161,242,.07);
+}
+
+.rec-matrix-table-score-pill {
+    border-color: #DDE4EC;
+    color: #5F6B7A;
+    background: #F8FAFC;
+}
+
+.rec-matrix-table-score-pill:hover {
+    box-shadow: 0 8px 18px rgba(15,23,42,.09);
+}
+
+.rec-matrix-table-score-pill b {
+    color: #172033;
+}
+
+.rec-matrix-table-apply-note {
+    color: #5F6B7A;
+    background: rgba(29,161,242,.055);
+}
+
+.rec-matrix-table-fixed-limit {
+    border-color: rgba(29,161,242,.22);
+    background:
+        radial-gradient(circle at 92% 20%, rgba(29,161,242,.10), transparent 30%),
+        linear-gradient(135deg, #F8FAFC, #FFFFFF);
+    box-shadow: inset 0 1px 0 #FFFFFF, 0 12px 28px rgba(15,23,42,.08);
+}
+
+.rec-matrix-table-fixed-limit span,
+.rec-matrix-table-fixed-limit small {
+    color: #667285;
+}
+
+.rec-matrix-table-fixed-limit strong {
+    color: #172033;
+}
+
+div[data-testid="stDataFrame"] {
+    box-shadow: 0 14px 34px rgba(15,23,42,.08), 0 0 22px rgba(29,161,242,.05) !important;
+}
+
+div[data-testid="stDownloadButton"] button {
+    color: #23643B !important;
+    background: linear-gradient(135deg, rgba(53,217,139,.11), rgba(29,161,242,.055)) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* RINGKASAN STRATEGIS                                                        */
+/* -------------------------------------------------------------------------- */
+.rec-strategy-card {
+    border-color: #D9E0E8;
+    background: linear-gradient(140deg, #FFFFFF, #F8FAFC);
+    box-shadow: 0 12px 30px rgba(15,23,42,.07);
+}
+
+.rec-strategy-item {
+    border-bottom-color: #E2E7EE;
+}
+
+.rec-strategy-text {
+    color: #4B586B;
+}
+
+.rec-strategy-text strong {
+    color: #172033;
+}
+
+/* -------------------------------------------------------------------------- */
+/* PLAYBOOK BISNIS INDIBIZ                                                    */
+/* -------------------------------------------------------------------------- */
+.rec-business-panel {
+    border-color: #D9E0E8;
+    background:
+        radial-gradient(circle at 95% 0%, var(--sentiment-soft), transparent 34%),
+        linear-gradient(145deg, #FFFFFF, #F8FAFC);
+    box-shadow: 0 14px 34px rgba(15,23,42,.08);
+}
+
+.rec-business-topic,
+.rec-business-idea,
+.rec-business-keyword {
+    border-color: #E0E6ED;
+    background: rgba(255,255,255,.82);
+}
+
+.rec-business-topic {
+    color: #455267;
+}
+
+.rec-business-idea:hover {
+    background: color-mix(in srgb, var(--sentiment-color) 6%, #FFFFFF);
+}
+
+.rec-business-idea p {
+    color: #455267;
+}
+
+.rec-business-keyword {
+    color: #667285;
+}
+
+/* -------------------------------------------------------------------------- */
+/* WIDGET STREAMLIT KHUSUS HALAMAN REKOMENDASI                               */
+/* -------------------------------------------------------------------------- */
+div[data-testid="stSelectbox"] > label {
+    color: #273548 !important;
+}
+
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+    border-color: #D5DCE5 !important;
+    background: #FFFFFF !important;
+    color: #273548 !important;
+}
+
+div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
+    color: #273548 !important;
+}
+
+div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button[kind="secondary"],
+div[data-testid="stButton"] button[kind="secondary"] {
+    border-color: #E53935 !important;
+    color: #B42318 !important;
+    background: linear-gradient(145deg, #FFFFFF, #F6F8FB) !important;
+    box-shadow: 0 8px 20px rgba(15,23,42,.07) !important;
+}
+
+div[data-testid="stForm"] div[data-testid="stFormSubmitButton"] button[kind="secondary"]:hover,
+div[data-testid="stButton"] button[kind="secondary"]:hover {
+    border-color: #FF5252 !important;
+    color: #9F1D14 !important;
+    background: #FFF4F3 !important;
+    box-shadow: 0 11px 24px rgba(229,57,53,.10) !important;
+}
+
+div[data-testid="stExpander"] {
+    border-color: #DCE3EB !important;
+    background: linear-gradient(145deg, #FFFFFF, #F8FAFC) !important;
+    box-shadow: 0 12px 28px rgba(15,23,42,.08) !important;
+}
+
+div[data-testid="stExpander"]:hover {
+    border-color: #CBD4DF !important;
+    box-shadow: 0 16px 34px rgba(15,23,42,.10) !important;
+}
+
+div[data-testid="stExpander"] summary {
+    color: #273548 !important;
+    background: linear-gradient(90deg, rgba(139,92,246,.055), rgba(29,161,242,.025)) !important;
+}
+
+div[data-testid="stExpander"] summary:hover {
+    color: #172033 !important;
+    background: linear-gradient(90deg, rgba(139,92,246,.09), rgba(29,161,242,.04)) !important;
+}
+
+div[data-testid="stCode"] {
+    border-color: #DCE3EB !important;
+    background: #F7F9FC !important;
+    box-shadow: inset 0 1px 0 #FFFFFF, 0 10px 24px rgba(15,23,42,.06) !important;
+}
+
+div[data-testid="stCode"] pre {
+    scrollbar-color: rgba(229,57,53,.75) #E7ECF2 !important;
+}
+
+div[data-testid="stCode"] pre::-webkit-scrollbar-track {
+    background: #E7ECF2 !important;
+}
+
+div[data-testid="stCode"] code {
+    color: #273548 !important;
+}
+
+/* Teks caption Streamlit di akhir halaman tetap terbaca pada latar terang. */
+.rec-page + div,
+.rec-page ~ div {
+    color: inherit;
+}
+
+</style>
+"""
+
 # -----------------------------------------------------------------------------
 # UTILITAS DATA
 # -----------------------------------------------------------------------------
@@ -11278,6 +12220,13 @@ def render_recommendation() -> None:
         st.markdown(RECOMMENDATION_CSS, unsafe_allow_html=True)
         st.markdown(PHASE12_AI_CSS, unsafe_allow_html=True)
         st.markdown(RECOMMENDATION_FILTER_FORM_CSS, unsafe_allow_html=True)
+
+        # Light Mode adalah tema default. Override ini sengaja dirender paling akhir
+        # agar seluruh komponen kustom halaman Rekomendasi ikut tema aktif tanpa
+        # mengubah struktur, ukuran, spacing, animasi, maupun perilaku Dark Mode.
+        if not bool(st.session_state.get("dark_mode", False)):
+            st.markdown(RECOMMENDATION_LIGHT_MODE_CSS, unsafe_allow_html=True)
+
         st.markdown('<div class="rec-page">', unsafe_allow_html=True)
 
         st.markdown(
