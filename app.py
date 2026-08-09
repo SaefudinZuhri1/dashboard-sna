@@ -359,8 +359,6 @@ if (
 ):
     _STARTUP_LOADING_PLACEHOLDER = tampilkan_loading_awal()
 
-from streamlit_option_menu import option_menu  # noqa: E402
-
 from auth.auth_utils import get_user_by_id, init_database, revoke_remember_token  # noqa: E402
 from auth.login import (  # noqa: E402
     MAX_COOKIE_POLLS,
@@ -372,7 +370,6 @@ from auth.login import (  # noqa: E402
     show_login_page,
     try_restore_remember_login,
 )
-from auth.register import show_register_page  # noqa: E402
 from utils.access_control import (  # noqa: E402
     DEFAULT_ROLE,
     can_access_route,
@@ -452,6 +449,17 @@ ROUTES: dict[str, tuple[str, str]] = {
 PUBLIC_ROUTES: dict[str, tuple[str, str]] = {
     "ai_content_studio": ("pages.public_content_ai", "render_public_content_ai"),
 }
+
+
+@lru_cache(maxsize=1)
+def _resolve_option_menu_callable():
+    """Impor streamlit-option-menu hanya saat sidebar dashboard dipakai."""
+    try:
+        from streamlit_option_menu import option_menu as option_menu_callable
+
+        return option_menu_callable
+    except Exception as exc:
+        raise RuntimeError(f"Komponen menu sidebar gagal dimuat: {exc}") from exc
 
 
 @lru_cache(maxsize=12)
@@ -1969,6 +1977,10 @@ def render_auth_page() -> None:
         # Pemeriksaan sesi sudah memakai loading awal. Halaman login/register
         # dirender langsung agar tidak muncul dua overlay secara berurutan.
         if st.session_state.get("page") == "register":
+            # Form registrasi tidak dibutuhkan pada cold-start halaman Login.
+            # Import ditunda sampai pengguna benar-benar membuka Register.
+            from auth.register import show_register_page
+
             show_register_page()
         else:
             show_login_page()
@@ -2829,6 +2841,7 @@ def _sinkronkan_pilihan_menu(widget_key: str) -> None:
 
 def render_sidebar_menu() -> str:
     """Render header, kartu pengguna, navigasi, tema, logout, dan versi."""
+    option_menu = _resolve_option_menu_callable()
     dark_mode = bool(st.session_state.get("dark_mode", False))
     load_css(dark_mode=dark_mode, hide_sidebar=False)
     _inject_sidebar_css()
@@ -3133,7 +3146,21 @@ def route_page(selected: str) -> None:
         startup_loading_active = bool(
             st.session_state.get("_startup_loading_active", False)
         )
-        if route_changed and not startup_loading_active:
+        skip_route_loader_once = bool(
+            st.session_state.pop("_skip_route_loader_once", False)
+        )
+        # Rekomendasi memiliki banyak section. Overlay global sebelumnya menahan
+        # seluruh halaman sampai section terakhir selesai. Untuk route ini,
+        # biarkan Streamlit mengirim hero, filter, dan section berikutnya secara
+        # progresif tanpa mengubah isi atau tampilan komponennya.
+        progressive_route = selected_route == "Rekomendasi"
+
+        if (
+            route_changed
+            and not startup_loading_active
+            and not skip_route_loader_once
+            and not progressive_route
+        ):
             log_page_view_once(selected_route)
             with layar_loading(selected_route):
                 _render_demo_mode_banner(selected_route)
@@ -3656,8 +3683,13 @@ def main() -> None:
                 restore_status = try_restore_remember_login()
 
             if restore_status == "wait":
-                # Tunggu snapshot cookie dari browser. Komponen akan memicu
-                # rerun alami satu kali ketika nilainya siap.
+                # Snapshot cookie pertama bersifat asinkron. Jangan tahan pengguna
+                # di balik boot overlay hanya untuk menunggu satu rerun browser.
+                # Form login tetap ditampilkan sekarang; bila cookie valid tersedia,
+                # rerun berikutnya akan memulihkan sesi secara otomatis.
+                render_auth_page()
+                _selesaikan_loading_awal()
+                render_footer()
                 st.stop()
 
             if restore_status == "ok" or st.session_state.get(
@@ -3702,13 +3734,24 @@ def main() -> None:
                 else:
                     render_auth_page()
 
-                render_footer()
+                # Form Login/Register sudah siap. Footer tidak perlu menahan
+                # overlay startup sehingga tampilan pertama muncul lebih cepat.
                 _selesaikan_loading_awal()
+                render_footer()
                 if st.session_state.pop("_logout_just_completed_v2", False):
                     _remove_client_logout_overlay()
                 return
 
         selected = render_sidebar_menu()
+
+        # Sidebar menandakan sesi sudah siap. Tutup overlay startup di sini agar
+        # pengguna tidak menunggu render penuh halaman awal dan footer. Route
+        # pertama diberi flag satu-kali supaya tidak langsung diganti overlay
+        # perpindahan halaman lain.
+        if bool(st.session_state.get("_startup_loading_active", False)):
+            st.session_state["_skip_route_loader_once"] = True
+            _selesaikan_loading_awal()
+
         route_page(selected)
         render_footer()
         _selesaikan_loading_awal()

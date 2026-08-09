@@ -17,12 +17,11 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    # Kompatibilitas dengan spesifikasi awal proyek. SDK aktif tetap google-genai
-    # karena sudah digunakan dan diverifikasi pada Fase 10-11.
-    import google.generativeai as genai  # type: ignore
-except Exception:  # pragma: no cover - dependency legacy bersifat opsional
-    genai = None
+# SDK legacy ``google.generativeai`` tidak digunakan oleh alur aktif.
+# Jangan impor package tersebut saat modul dibuka karena dapat memperlambat
+# cold-start halaman Rekomendasi. SDK ``google.genai`` tetap diload secara lazy
+# di ``init_gemini()`` ketika pengguna benar-benar menjalankan generate.
+genai = None
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -1429,7 +1428,12 @@ def check_data_relevance(sample_text: str) -> bool:
 
 
 def get_gemini_runtime_status() -> dict[str, Any]:
-    """Sediakan status aman untuk UI tanpa menampilkan nilai API key."""
+    """Sediakan status konfigurasi Gemini tanpa membuat client saat page-load.
+
+    Client Google GenAI tetap dibuat oleh ``init_gemini()`` ketika pengguna
+    benar-benar menjalankan generate. Badge halaman hanya memerlukan informasi
+    apakah API key tersedia, sehingga import SDK tidak menahan cold-open.
+    """
     try:
         if _demo_mode_active():
             return {
@@ -1437,10 +1441,12 @@ def get_gemini_runtime_status() -> dict[str, Any]:
                 "source": "Mode Demo",
                 "mode": "offline",
             }
-        available = bool(is_gemini_available())
+
+        api_key, source = _ambil_api_key_dengan_sumber()
+        available = bool(api_key)
         return {
             "available": available,
-            "source": get_gemini_key_source(),
+            "source": source if available else "tidak ditemukan",
             "mode": "online" if available else "offline",
         }
     except Exception:

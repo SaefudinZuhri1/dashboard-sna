@@ -18,9 +18,7 @@ from pathlib import Path
 from textwrap import dedent, fill
 from typing import Any
 
-import networkx as nx
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 from utils.streamlit_compat import render_html_iframe
 
@@ -6080,6 +6078,9 @@ def _calculate_influencers_from_sna(
 ) -> pd.DataFrame:
     """Hitung kandidat influencer per platform dari edge list SNA."""
     try:
+        # NetworkX baru dimuat ketika kalkulasi jaringan benar-benar diperlukan.
+        # Cold-open dapat mengirim komponen atas halaman lebih dahulu.
+        import networkx as nx
         if df is None or df.empty:
             return pd.DataFrame()
 
@@ -6216,8 +6217,17 @@ def _build_content_author_stats(layanan: str) -> pd.DataFrame:
             return pd.DataFrame(columns=columns)
 
         work = frame.copy()
+
+        # Operasi pada kolom besar dibuat vectorized. Versi lama memanggil
+        # fungsi Python per baris untuk username dan teks, yang terasa lambat
+        # ketika dataset berisi puluhan ribu komentar.
         work["username"] = work["username"].map(_safe_username)
-        work["username_key"] = work["username"].map(_username_lookup_key)
+        work["username_key"] = (
+            work["username"]
+            .astype(str)
+            .str.lower()
+            .str.replace(r"[^a-z0-9]+", "", regex=True)
+        )
         work["platform"] = (
             work["platform"]
             .fillna("")
@@ -6226,7 +6236,17 @@ def _build_content_author_stats(layanan: str) -> pd.DataFrame:
             .str.strip()
             .replace({"x": "twitter", "twitter/x": "twitter", "ig": "instagram"})
         )
-        work["content_clean"] = work["content"].map(_clean_content_text)
+        work["content_clean"] = (
+            work["content"]
+            .fillna("")
+            .astype(str)
+            .str.replace(r"\s+", " ", regex=True)
+            .str.strip()
+        )
+        work.loc[
+            work["content_clean"].str.lower().isin(["nan", "none"]),
+            "content_clean",
+        ] = ""
         work["followers"] = pd.to_numeric(
             work.get("followers", 0), errors="coerce"
         ).fillna(0)
@@ -6912,17 +6932,35 @@ def _collect_content_items(
     if username_column not in frame.columns or content_column not in frame.columns:
         return result
 
-    work = frame.copy()
-    work["_username_key"] = work[username_column].map(_username_lookup_key)
-
-    # Saring maksimal sembilan akun terpilih lebih dahulu. Versi sebelumnya
-    # membersihkan teks seluruh dataset besar sebelum filter username, padahal
-    # sebagian besar baris tidak pernah ditampilkan pada halaman Rekomendasi.
-    work = work[work["_username_key"].isin(username_keys)].copy()
-    if work.empty:
+    # Normalisasi username secara vectorized dan filter maksimal sembilan akun
+    # sebelum pembersihan konten. Baris yang tidak pernah ditampilkan tidak lagi
+    # menjalani pemrosesan teks Python satu per satu.
+    username_series = (
+        frame[username_column]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .str.lstrip("@")
+        .str.replace(r"[^a-z0-9]+", "", regex=True)
+    )
+    mask = username_series.isin(username_keys)
+    if not bool(mask.any()):
         return result
 
-    work["_content_clean"] = work[content_column].map(_clean_content_text)
+    work = frame.loc[mask].copy()
+    work["_username_key"] = username_series.loc[mask].to_numpy()
+    work["_content_clean"] = (
+        work[content_column]
+        .fillna("")
+        .astype(str)
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+    )
+    work.loc[
+        work["_content_clean"].str.lower().isin(["nan", "none"]),
+        "_content_clean",
+    ] = ""
     work = work[work["_content_clean"].str.len().ge(8)].copy()
     if work.empty:
         return result
@@ -6973,7 +7011,7 @@ def _collect_content_items(
     return result
 
 
-@st.cache_data(show_spinner=False, max_entries=12)
+@st.cache_data(show_spinner=False, max_entries=24)
 def _build_influencer_content_catalog(
     layanan: str,
     usernames: tuple[str, ...],
@@ -10059,8 +10097,11 @@ def _render_matrix_table(filtered_matrix: pd.DataFrame) -> None:
 def _build_heatmap_figure(
     score_matrix: pd.DataFrame,
     focus_topic_key: str | None = None,
-) -> go.Figure:
+) -> Any:
     """Bangun heatmap kesesuaian influencer × topik dengan Plotly."""
+    # Plotly baru dimuat saat section matriks benar-benar dibangun.
+    import plotly.graph_objects as go
+
     topic_keys = [str(item["key"]) for item in TOPIC_CONFIG]
     topic_labels = [str(item["singkat"]) for item in TOPIC_CONFIG]
     focus_label = str(
@@ -12223,16 +12264,24 @@ def render_recommendation() -> None:
         # halaman lain dirender. Ini mencegah halaman sempat terlihat lalu tertutup.
         _process_queued_topic_ai_request()
 
-        st.markdown(RECOMMENDATION_HIDE_NATIVE_LOADING_CSS, unsafe_allow_html=True)
-        st.markdown(RECOMMENDATION_CSS, unsafe_allow_html=True)
-        st.markdown(PHASE12_AI_CSS, unsafe_allow_html=True)
-        st.markdown(RECOMMENDATION_FILTER_FORM_CSS, unsafe_allow_html=True)
+        # Semua aturan CSS dikirim sebagai satu delta Streamlit. Urutan aturan
+        # tetap sama, jadi tampilan tidak berubah, tetapi browser tidak perlu
+        # membuat beberapa blok markdown sebelum first paint halaman.
+        recommendation_style_blocks = [
+            RECOMMENDATION_HIDE_NATIVE_LOADING_CSS,
+            RECOMMENDATION_CSS,
+            PHASE12_AI_CSS,
+            RECOMMENDATION_FILTER_FORM_CSS,
+        ]
 
-        # Light Mode adalah tema default. Override ini sengaja dirender paling akhir
-        # agar seluruh komponen kustom halaman Rekomendasi ikut tema aktif tanpa
-        # mengubah struktur, ukuran, spacing, animasi, maupun perilaku Dark Mode.
+        # Light Mode adalah tema default dan override tetap berada paling akhir.
         if not bool(st.session_state.get("dark_mode", False)):
-            st.markdown(RECOMMENDATION_LIGHT_MODE_CSS, unsafe_allow_html=True)
+            recommendation_style_blocks.append(RECOMMENDATION_LIGHT_MODE_CSS)
+
+        st.markdown(
+            "\n".join(recommendation_style_blocks),
+            unsafe_allow_html=True,
+        )
 
         st.markdown('<div class="rec-page">', unsafe_allow_html=True)
 
