@@ -10558,12 +10558,11 @@ def _render_interactive_matrix(score_matrix: pd.DataFrame, layanan: str) -> None
 
 
 def _start_recommendation_page_loading():
-    """Tampilkan loader halaman hanya saat pengguna baru masuk ke Rekomendasi.
+    """Tampilkan loader halaman saat pengguna baru masuk ke Rekomendasi.
 
-    Loader memakai desain global proyek, tetapi ditutup segera setelah area awal
-    halaman (hero, filter, ringkasan topik, dan studio AI) siap. Section yang lebih
-    bawah tetap dirender progresif agar pengguna tidak kembali menunggu seluruh
-    halaman sampai selesai.
+    Overlay dipertahankan sampai seluruh section halaman selesai dibentuk pada
+    siklus render yang sama. Dengan begitu pengguna tidak melihat halaman setengah
+    jadi ketika Streamlit masih mengirim kartu, tabel, grafik, dan iframe ke browser.
     """
     try:
         if callable(mulai_loading_global):
@@ -12368,11 +12367,11 @@ def render_recommendation() -> None:
 
         _render_ai_generator(layanan, platform, topik, topic_summary)
 
-        # Area awal halaman sudah siap. Tutup loader sekarang agar pengguna dapat
-        # langsung melihat hero, filter, dan Generator Ide Konten. Bagian sentimen,
-        # influencer, strategi topik, dan matriks dilanjutkan secara progresif.
-        _finish_recommendation_page_loading(page_loading_handle)
-        page_loading_handle = None
+        # Jangan tutup loader di tengah render. Halaman Rekomendasi mempunyai
+        # banyak section berat di bawah Generator Ide Konten. Loader baru ditutup
+        # pada blok finally setelah seluruh section selesai dibentuk agar pengguna
+        # tidak melihat halaman setengah jadi atau terasa seperti loading dihentikan
+        # paksa.
 
         _render_section_header(
             "Sentiment Response Framework",
@@ -12488,8 +12487,8 @@ def render_recommendation() -> None:
                 "Periksa keberadaan file data pada folder data/, kemudian muat ulang halaman."
             )
     finally:
-        # Jika error terjadi sebelum area awal selesai, pastikan loader halaman
-        # tetap ditutup agar layar tidak terkunci oleh overlay.
+        # Loader halaman ditutup hanya di titik akhir render. Jika terjadi error,
+        # blok finally tetap memastikan overlay tidak mengunci layar.
         _finish_recommendation_page_loading(page_loading_handle)
 
         # Loading Gemini ditutup paling akhir setelah seluruh halaman selesai dirender.
