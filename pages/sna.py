@@ -10199,7 +10199,8 @@ def render_sna() -> None:
                 get_sna_source_names(selected_service),
                 selected_platform,
             )
-            _render_indibiz_static_network_graph(clean_df)
+            # Graf Statis Akademik IndiBiz tidak ditampilkan lagi.
+            # Visualisasi jaringan difokuskan pada Graf Interaktif agar interpretasi lebih jelas.
 
         _render_network_graph(
             graph,
