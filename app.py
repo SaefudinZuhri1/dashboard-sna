@@ -3089,6 +3089,87 @@ def _render_demo_mode_banner(selected_route: str) -> None:
         LOGGER.warning("Banner Mode Demo gagal ditampilkan (%s).", type(exc).__name__)
 
 
+def _reset_scroll_ke_hero_setelah_pindah_halaman() -> None:
+    """Kembalikan area konten utama ke posisi paling atas setelah ganti route.
+
+    Streamlit/browser dapat mempertahankan posisi scroll halaman sebelumnya.
+    Pada halaman yang panjang, posisi tersebut dapat melewati hero sehingga
+    pengguna mengira hero hilang padahal masih dirender di atas viewport.
+    Skrip kecil ini hanya berjalan ketika route benar-benar berubah dan tidak
+    memengaruhi rerun tombol, filter, tab, atau komponen lain pada route yang sama.
+    """
+    try:
+        render_html_iframe(
+            dedent(
+                r"""
+                <!doctype html>
+                <html lang="id">
+                <head><meta charset="utf-8" /></head>
+                <body>
+                <script>
+                (() => {
+                    try {
+                        const parentWindow = window.parent;
+                        const parentDocument = parentWindow.document;
+
+                        const getCandidates = () => [
+                            parentDocument.querySelector('[data-testid="stMain"]'),
+                            parentDocument.querySelector('section[data-testid="stMain"]'),
+                            parentDocument.querySelector('[data-testid="stAppViewContainer"] .main'),
+                            parentDocument.querySelector('[data-testid="stAppViewContainer"]'),
+                            parentDocument.querySelector('main'),
+                            parentDocument.scrollingElement,
+                            parentDocument.documentElement,
+                            parentDocument.body,
+                        ].filter(Boolean);
+
+                        const forceTop = () => {
+                            const candidates = [...new Set(getCandidates())];
+                            candidates.forEach((element) => {
+                                try {
+                                    if (typeof element.scrollTo === 'function') {
+                                        element.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+                                    }
+                                } catch (error) {}
+                                try {
+                                    if ('scrollTop' in element) element.scrollTop = 0;
+                                } catch (error) {}
+                            });
+
+                            try {
+                                parentWindow.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+                            } catch (error) {}
+                        };
+
+                        // Jalankan beberapa kali karena tinggi halaman dapat berubah
+                        // sesaat setelah loader ditutup, chart selesai mounting, atau
+                        // fragment Streamlit selesai menyusun DOM route baru.
+                        forceTop();
+                        parentWindow.requestAnimationFrame(() => {
+                            forceTop();
+                            parentWindow.requestAnimationFrame(forceTop);
+                        });
+                        [60, 160, 320, 520].forEach((delay) => {
+                            parentWindow.setTimeout(forceTop, delay);
+                        });
+                    } catch (error) {
+                        // Gagal reset scroll tidak boleh menggagalkan render halaman.
+                    }
+                })();
+                </script>
+                </body>
+                </html>
+                """
+            ),
+            width=0,
+            height=0,
+            scrolling=False,
+            tab_index=-1,
+        )
+    except Exception as exc:
+        LOGGER.debug("Reset scroll setelah pindah halaman dilewati: %s", exc)
+
+
 def route_page(selected: str) -> None:
     """Render halaman dengan loading global hanya saat route benar-benar berubah."""
     try:
@@ -3170,6 +3251,11 @@ def route_page(selected: str) -> None:
                 log_page_view_once(selected_route)
             _render_demo_mode_banner(selected_route)
             render_fn()
+
+        # Saat route berubah, pastikan viewport kembali ke hero halaman tujuan.
+        # Ini mencegah posisi scroll halaman sebelumnya membuat hero tampak hilang.
+        if route_changed:
+            _reset_scroll_ke_hero_setelah_pindah_halaman()
 
         st.session_state["_last_rendered_route"] = selected_route
     except Exception as exc:
