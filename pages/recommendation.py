@@ -174,6 +174,7 @@ RECOMMENDATION_FILTER_RESET_PENDING_KEY = "_recommendation_filter_reset_pending"
 RECOMMENDATION_FILTER_FEEDBACK_KEY = "_recommendation_filter_feedback"
 ACCOUNT_TYPE_FILTER_KEY = "recommendation_account_type_filter"
 ACCOUNT_TYPE_CARD_TARGET = 9
+PLATFORM_CARD_TARGET = 3
 
 # Kata kunci klasifikasi akun media. Daftar manual disediakan agar peneliti
 # dapat menambah pengecualian tanpa mengubah fungsi klasifikasi utama.
@@ -5885,6 +5886,95 @@ def _filter_influencers_by_account_type(
     except Exception as error:
         st.error(
             "Influencer belum dapat disaring berdasarkan tipe akun. "
+            f"Detail: {type(error).__name__}."
+        )
+        return influencers.iloc[0:0].copy()
+
+
+def _select_balanced_platform_candidates(
+    influencers: pd.DataFrame,
+    per_platform_limit: int = PLATFORM_CARD_TARGET,
+) -> pd.DataFrame:
+    """Pilih kandidat seimbang: 3 Twitter/X, 3 Instagram, dan 3 TikTok.
+
+    Fungsi ini dipakai setelah filter tipe akun (Influencer/Akun Media), sehingga
+    setiap kategori tetap mempertahankan identitas akun yang sudah diklasifikasikan.
+    Kandidat pada tiap platform diurutkan berdasarkan skor rekomendasi, centrality,
+    dan followers. Hasil diinterleave agar setiap baris grid berisi satu akun dari
+    Twitter/X, Instagram, dan TikTok.
+    """
+    try:
+        if influencers is None or influencers.empty:
+            return pd.DataFrame(columns=getattr(influencers, "columns", None))
+
+        if "platform" not in influencers.columns:
+            return influencers.iloc[0:0].copy()
+
+        work = influencers.copy()
+        work["platform"] = (
+            work["platform"]
+            .fillna("")
+            .astype(str)
+            .str.lower()
+            .str.strip()
+            .replace({
+                "x": "twitter",
+                "twitter/x": "twitter",
+                "twitter (x)": "twitter",
+                "ig": "instagram",
+            })
+        )
+
+        sort_columns = [
+            column
+            for column in (
+                "recommendation_score",
+                "degree_centrality",
+                "followers",
+                "relevant_content_count",
+                "content_count",
+            )
+            if column in work.columns
+        ]
+        if sort_columns:
+            work = work.sort_values(
+                sort_columns,
+                ascending=[False] * len(sort_columns),
+            )
+
+        limit = max(int(per_platform_limit), 1)
+        platform_frames: dict[str, pd.DataFrame] = {}
+        for platform_key in PLATFORM_ORDER:
+            platform_frames[platform_key] = (
+                work[work["platform"].eq(platform_key)]
+                .head(limit)
+                .reset_index(drop=True)
+            )
+
+        # Susunan interleave membuat setiap baris grid 3 kolom konsisten:
+        # Twitter/X | Instagram | TikTok.
+        ordered_rows: list[pd.DataFrame] = []
+        for rank_index in range(limit):
+            for platform_key in PLATFORM_ORDER:
+                platform_frame = platform_frames.get(platform_key, pd.DataFrame())
+                if rank_index < len(platform_frame):
+                    ordered_rows.append(platform_frame.iloc[[rank_index]].copy())
+
+        if not ordered_rows:
+            return work.iloc[0:0].copy()
+
+        result = pd.concat(ordered_rows, ignore_index=True, sort=False)
+        result = result.drop_duplicates(
+            subset=["username_key", "platform"]
+            if "username_key" in result.columns
+            else ["username", "platform"],
+            keep="first",
+        ).reset_index(drop=True)
+        result["recommendation_rank"] = range(1, len(result) + 1)
+        return result
+    except Exception as error:
+        st.error(
+            "Kandidat rekomendasi belum dapat diseimbangkan antarplatform. "
             f"Detail: {type(error).__name__}."
         )
         return influencers.iloc[0:0].copy()
@@ -12665,7 +12755,6 @@ def render_recommendation() -> None:
         _render_sentiment_strategy_cards()
 
         influencers, influencer_meta = _build_influencer_data(layanan, demo_mode)
-        influencers = _filter_influencers_by_active_platform(influencers, platform)
         influencers = _add_account_type_column(influencers)
         influencer_meta = dict(influencer_meta or {})
         influencer_meta["actual_rows"] = int(len(influencers))
@@ -12692,6 +12781,19 @@ def render_recommendation() -> None:
             influencers,
             selected_account_type,
         )
+        if selected_account_type in {"Influencer", "Akun Media"}:
+            influencers = _select_balanced_platform_candidates(
+                influencers,
+                per_platform_limit=PLATFORM_CARD_TARGET,
+            )
+            influencer_meta["active_platform"] = (
+                "Lintas platform · 3 Twitter/X · 3 Instagram · 3 TikTok"
+            )
+        else:
+            influencers = _filter_influencers_by_active_platform(
+                influencers,
+                platform,
+            )
         influencer_meta["actual_rows"] = int(len(influencers))
         influencer_meta["active_account_type"] = selected_account_type
         score_matrix = _build_score_matrix(influencers, layanan)
