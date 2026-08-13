@@ -173,6 +173,7 @@ RECOMMENDATION_FILTER_ACTIVE_KEYS = {
 RECOMMENDATION_FILTER_RESET_PENDING_KEY = "_recommendation_filter_reset_pending"
 RECOMMENDATION_FILTER_FEEDBACK_KEY = "_recommendation_filter_feedback"
 ACCOUNT_TYPE_FILTER_KEY = "recommendation_account_type_filter"
+ACCOUNT_TYPE_CARD_TARGET = 9
 
 # Kata kunci klasifikasi akun media. Daftar manual disediakan agar peneliti
 # dapat menambah pengecualian tanpa mengubah fungsi klasifikasi utama.
@@ -5889,6 +5890,77 @@ def _filter_influencers_by_account_type(
         return influencers.iloc[0:0].copy()
 
 
+def _select_balanced_account_type_candidates(
+    ranked_candidates: pd.DataFrame,
+    per_type_limit: int = ACCOUNT_TYPE_CARD_TARGET,
+) -> pd.DataFrame:
+    """Simpan kandidat terbaik per tipe agar filter dapat mengisi 9 kartu penuh.
+
+    Kandidat tetap berasal dari pool data aktual yang sudah dihitung sebelumnya.
+    Fungsi ini hanya mencegah pemotongan top-9 global terjadi terlalu awal sebelum
+    akun dipisahkan menjadi kategori media dan influencer.
+    """
+    try:
+        if ranked_candidates is None or ranked_candidates.empty:
+            return pd.DataFrame(columns=getattr(ranked_candidates, "columns", None))
+
+        work = ranked_candidates.copy()
+        name_column = next(
+            (
+                column
+                for column in ("name", "nama", "display_name", "fullname", "full_name")
+                if column in work.columns
+            ),
+            None,
+        )
+        account_names = (
+            work[name_column]
+            if name_column is not None
+            else pd.Series("", index=work.index, dtype="object")
+        )
+        work["_candidate_account_type"] = [
+            _classify_account_type(username, account_name)
+            for username, account_name in zip(
+                work.get("username", pd.Series("", index=work.index)),
+                account_names,
+            )
+        ]
+
+        selected_frames: list[pd.DataFrame] = []
+        for account_type in ("influencer", "media"):
+            typed = work[
+                work["_candidate_account_type"].astype(str).str.lower().eq(account_type)
+            ].head(max(int(per_type_limit), 1))
+            if not typed.empty:
+                selected_frames.append(typed)
+
+        # Fallback defensif: bila klasifikasi tidak menghasilkan kedua kategori,
+        # pertahankan kandidat ranking teratas agar perilaku halaman tidak kosong.
+        if not selected_frames:
+            selected = work.head(max(int(per_type_limit), 1)).copy()
+        else:
+            selected = pd.concat(selected_frames, ignore_index=False, sort=False)
+
+        selected = selected.drop_duplicates(
+            subset=["username_key", "platform"],
+            keep="first",
+        )
+        selected = selected.sort_values(
+            [
+                "recommendation_score", "degree_centrality", "followers",
+                "relevant_content_count", "content_count", "username",
+            ],
+            ascending=[False, False, False, False, False, True],
+        )
+        return selected.drop(columns=["_candidate_account_type"], errors="ignore")
+    except Exception as error:
+        st.error(
+            "Kandidat rekomendasi belum dapat diseimbangkan berdasarkan tipe akun. "
+            f"Detail: {type(error).__name__}."
+        )
+        return ranked_candidates.head(max(int(per_type_limit), 1)).copy()
+
+
 def _topic_regex(keywords: tuple[str, ...]) -> str:
     """Bangun pola regex aman dari daftar kata kunci topik."""
     ordered = sorted((str(item) for item in keywords), key=len, reverse=True)
@@ -6657,7 +6729,10 @@ def _build_indibiz_influencer_data() -> tuple[pd.DataFrame, dict[str, Any]]:
 
         selected_frames: list[pd.DataFrame] = []
         for platform in PLATFORM_ORDER:
-            group = ranked[ranked["platform"].eq(platform)].head(9).copy()
+            group = ranked[ranked["platform"].eq(platform)].copy()
+            if group.empty:
+                continue
+            group = _select_balanced_account_type_candidates(group)
             if not group.empty:
                 selected_frames.append(group)
 
@@ -6885,7 +6960,8 @@ def _build_influencer_data(
                     "relevant_content_count", "content_count", "username",
                 ],
                 ascending=[False, False, False, False, False, True],
-            ).head(9)
+            )
+            group = _select_balanced_account_type_candidates(group)
             selected_frames.append(group)
 
         if not selected_frames:
