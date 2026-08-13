@@ -1964,9 +1964,9 @@ div[data-testid="stRadioGroup"] {
     position: relative;
     display: flex;
     flex-direction: column;
-    height: 452px;
-    min-height: 452px;
-    padding: 19px;
+    height: 500px;
+    min-height: 500px;
+    padding: 20px;
     margin-bottom: 8px;
     overflow: hidden;
     border: 1px solid var(--rec-border);
@@ -2092,8 +2092,8 @@ div[data-testid="stRadioGroup"] {
 .rec-metric-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 14px;
+    gap: 9px;
+    margin-bottom: 16px;
 }
 
 .rec-mini-metric {
@@ -2121,9 +2121,10 @@ div[data-testid="stRadioGroup"] {
     display: flex;
     align-content: flex-start;
     flex-wrap: wrap;
-    gap: 6px;
+    column-gap: 7px;
+    row-gap: 8px;
     min-height: 52px;
-    margin-bottom: 12px;
+    margin-bottom: 17px;
 }
 
 .rec-tag {
@@ -2152,11 +2153,10 @@ div[data-testid="stRadioGroup"] {
 .rec-content-preview {
     display: flex;
     flex-direction: column;
-    height: 154px;
-    min-height: 154px;
-    /* Posisi vertikal panel dikendalikan langsung pada outer wrapper HTML. */
-    margin-top: 4px;
-    padding: 12px 10px 12px 13px;
+    height: 176px;
+    min-height: 176px;
+    margin-top: 0;
+    padding: 14px 13px 13px 14px;
     overflow: hidden;
     border: 1px solid #2B2B2B;
     border-radius: 10px;
@@ -2165,24 +2165,27 @@ div[data-testid="stRadioGroup"] {
 
 .rec-content-preview-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 8px;
-    /* Dekatkan area bukti ke judul agar panel tidak menyisakan ruang kosong. */
-    margin-bottom: 3px;
+    flex-wrap: wrap;
+    column-gap: 10px;
+    row-gap: 7px;
+    margin-bottom: 10px;
 }
 
 .rec-content-preview-title {
     color: #F3F3F3;
     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
     font-weight: 800;
+    line-height: 1.35;
     letter-spacing: .055em;
     text-transform: uppercase;
 }
 
 .rec-content-source-badge {
     flex: 0 0 auto;
-    padding: 3px 7px;
+    margin-left: auto;
+    padding: 4px 8px;
     border: 1px solid rgba(76,175,80,.35);
     border-radius: 999px;
     color: #81C784;
@@ -2211,15 +2214,14 @@ div[data-testid="stRadioGroup"] {
  */
 .rec-content-scroll {
     position: relative;
-    /* Isi scroll tetap pada posisi normal di dalam panel. */
     margin-top: 0;
     margin-bottom: 0;
-    flex: 0 0 96px;
+    flex: 1 1 auto;
     width: 100%;
-    height: 96px;
-    min-height: 96px;
-    max-height: 96px;
-    padding: 0 5px 4px 0;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    padding: 2px 5px 4px 0;
     overflow-x: hidden !important;
     overflow-y: scroll !important;
     overscroll-behavior: contain;
@@ -2258,32 +2260,33 @@ div[data-testid="stRadioGroup"] {
 
 .rec-content-list {
     display: grid;
-    gap: 8px;
+    gap: 11px;
     min-width: 0;
     margin: 0;
-    padding: 0 2px 12px 0;
+    padding: 0 2px 6px 0;
     list-style: none;
 }
 
 .rec-content-list li {
     display: grid;
-    grid-template-columns: 18px minmax(0, 1fr);
+    grid-template-columns: 20px minmax(0, 1fr);
     align-items: start;
-    gap: 7px;
+    gap: 9px;
     color: #C8C8C8;
     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
-    line-height: 1.45;
+    line-height: 1.55;
 }
 
 .rec-content-list li > span:last-child {
     min-width: 0;
     overflow-wrap: anywhere;
     word-break: break-word;
+    white-space: normal;
 }
 
 .rec-content-preview-meta {
     display: block;
-    margin-top: 3px;
+    margin-top: 5px;
     color: #777777;
     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
     line-height: 1.3;
@@ -2292,8 +2295,8 @@ div[data-testid="stRadioGroup"] {
 .rec-content-index {
     display: grid;
     place-items: center;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     border: 1px solid rgba(229,57,53,.38);
     border-radius: 5px;
     color: #FF7773;
@@ -2447,8 +2450,8 @@ div[data-testid="stRadioGroup"] {
 
 @media (max-width: 1100px) {
     .rec-influencer-card {
-        height: 470px;
-        min-height: 470px;
+        height: 520px;
+        min-height: 520px;
     }
 }
 
@@ -8275,10 +8278,7 @@ def _render_influencer_card(
                 </div>
             </div>
             <div class="rec-tags">{tag_html}</div>
-            <div
-                class="rec-content-preview"
-                style="position:relative !important; top:-12px !important; margin-bottom:-12px !important; z-index:1;"
-            >
+            <div class="rec-content-preview">
                 <div class="rec-content-preview-head">
                     <span class="rec-content-preview-title">{escape(preview_title)}</span>
                     <span class="rec-content-source-badge">{escape(source_label)}</span>
