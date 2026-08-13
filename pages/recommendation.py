@@ -10791,6 +10791,27 @@ def _finish_recommendation_loading(handle: Any) -> None:
         return None
 
 
+def _show_account_type_filter_loading() -> None:
+    """Aktifkan loading custom saat filter tipe akun rekomendasi diganti."""
+    try:
+        selected_type = str(
+            st.session_state.get(ACCOUNT_TYPE_FILTER_KEY, "Semua")
+        ).strip()
+        loading_labels = {
+            "Semua": "Menampilkan semua akun rekomendasi...",
+            "Influencer": "Memfilter akun influencer...",
+            "Akun Media": "Memfilter akun media...",
+        }
+        st.session_state[RECOMMENDATION_ACTION_LOADING_KEY] = loading_labels.get(
+            selected_type,
+            "Memperbarui filter tipe akun...",
+        )
+    except Exception:
+        st.session_state[RECOMMENDATION_ACTION_LOADING_KEY] = (
+            "Memperbarui filter tipe akun..."
+        )
+
+
 def _show_matrix_account_detail_loading() -> None:
     """Aktifkan loading custom saat akun pada tabel skor detail diganti."""
     try:
@@ -12589,6 +12610,7 @@ def render_recommendation() -> None:
             options=["Semua", "Influencer", "Akun Media"],
             horizontal=True,
             key=ACCOUNT_TYPE_FILTER_KEY,
+            on_change=_show_account_type_filter_loading,
         )
         influencers = _filter_influencers_by_account_type(
             influencers,
