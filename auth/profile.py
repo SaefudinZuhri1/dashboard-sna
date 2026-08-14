@@ -3111,6 +3111,525 @@ def _inject_profile_css() -> None:
                         grid-template-columns: 1fr;
                     }
                 }
+
+                /* V5.12 Light Theme Profile — override terarah, Dark Mode tetap memakai desain existing. */
+                html body:has(.profile-v11-theme-light) {
+                    --profile-light-surface: #FFFFFF;
+                    --profile-light-surface-soft: #F7F9FC;
+                    --profile-light-text: #1F2937;
+                    --profile-light-text-strong: #111827;
+                    --profile-light-muted: #667085;
+                    --profile-light-muted-soft: #7A8698;
+                    --profile-light-border: #DCE3EC;
+                    --profile-light-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+                }
+
+                /* Kartu identitas dan statistik. */
+                html body:has(.profile-v11-theme-light) .profile-v11-profile-card {
+                    background:
+                        radial-gradient(circle at 50% 7%, rgba(229, 57, 53, 0.12), transparent 24%),
+                        radial-gradient(circle at 0% 0%, rgba(229, 57, 53, 0.07), transparent 34%),
+                        linear-gradient(145deg, #FFFFFF, #FAFBFD) !important;
+                    border-color: rgba(229, 57, 53, 0.22) !important;
+                    box-shadow: var(--profile-light-shadow) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-profile-card::before {
+                    background:
+                        radial-gradient(circle at 18% 12%, rgba(255, 82, 82, 0.10), transparent 8%),
+                        radial-gradient(circle at 80% 86%, rgba(229, 57, 53, 0.06), transparent 24%),
+                        repeating-linear-gradient(135deg, rgba(31, 41, 55, 0.018) 0 1px, transparent 1px 14px) !important;
+                    opacity: 1 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-avatar-wrap {
+                    background: conic-gradient(from 210deg, #FFFFFF, rgba(229,57,53,0.10), rgba(255,82,82,0.48), #FFFFFF) !important;
+                    box-shadow: 0 0 0 1px rgba(229,57,53,0.12), 0 18px 40px rgba(229,57,53,0.16) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-avatar-wrap::before {
+                    background: #FFF9F9 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-fullname,
+                html body:has(.profile-v11-theme-light) .profile-v11-joined span {
+                    color: var(--profile-light-text-strong) !important;
+                    text-shadow: none !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-username,
+                html body:has(.profile-v11-theme-light) .profile-v11-joined,
+                html body:has(.profile-v11-theme-light) .profile-v11-joined strong {
+                    color: var(--profile-light-muted) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-joined {
+                    border-top-color: #E7EBF1 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-role-badge {
+                    color: #42526B !important;
+                    border-color: #D9E1EB !important;
+                    background: linear-gradient(135deg, #FFFFFF, #F3F6FA) !important;
+                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 18px rgba(15,23,42,0.05) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-stats-card {
+                    background:
+                        radial-gradient(circle at 92% 8%, rgba(229,57,53,0.08), transparent 28%),
+                        radial-gradient(circle at 8% 92%, rgba(29,161,242,0.06), transparent 26%),
+                        linear-gradient(145deg, #FFFFFF, #F9FBFD) !important;
+                    border-color: var(--profile-light-border) !important;
+                    box-shadow: var(--profile-light-shadow) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-stats-card::before {
+                    background:
+                        linear-gradient(120deg, rgba(255,255,255,0.62), transparent 42%),
+                        radial-gradient(circle at 86% 76%, rgba(229,57,53,0.06), transparent 28%) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-stats-title {
+                    color: var(--profile-light-text-strong) !important;
+                    text-shadow: none !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-stats-note {
+                    color: var(--profile-light-muted) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-metric-card {
+                    border-color: rgba(229,57,53,0.20) !important;
+                    background:
+                        radial-gradient(circle at top right, rgba(229,57,53,0.08), transparent 28%),
+                        linear-gradient(145deg, #FFFFFF, #FFF9F9) !important;
+                    box-shadow: 0 12px 26px rgba(15,23,42,0.06), inset 0 1px 0 rgba(255,255,255,0.9) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-metric-label {
+                    color: #475467 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-metric-value {
+                    color: #D92D20 !important;
+                    text-shadow: none !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-metric-subtitle {
+                    color: var(--profile-light-muted-soft) !important;
+                }
+
+                /* Expander foto profil dan uploader. */
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] {
+                    border-color: var(--profile-light-border) !important;
+                    background: #FFFFFF !important;
+                    box-shadow: 0 12px 28px rgba(15,23,42,0.07) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] summary,
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] summary * {
+                    color: #344054 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-avatar-upload-title,
+                html body:has(.profile-v11-theme-light) .profile-v11-upload-panel-title,
+                html body:has(.profile-v11-theme-light) .profile-v11-current-photo-heading,
+                html body:has(.profile-v11-theme-light) .profile-v11-uploader-title,
+                html body:has(.profile-v11-theme-light) .profile-v11-selected-photo-heading {
+                    color: var(--profile-light-text-strong) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-avatar-upload-desc,
+                html body:has(.profile-v11-theme-light) .profile-v11-upload-panel-note,
+                html body:has(.profile-v11-theme-light) .profile-v11-current-photo-text,
+                html body:has(.profile-v11-theme-light) .profile-v11-uploader-helper,
+                html body:has(.profile-v11-theme-light) .profile-v11-selected-photo-text,
+                html body:has(.profile-v11-theme-light) .profile-v11-selected-photo-meta {
+                    color: var(--profile-light-muted) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-upload-tip,
+                html body:has(.profile-v11-theme-light) .profile-v11-current-photo-card,
+                html body:has(.profile-v11-theme-light) .profile-v11-selected-photo-card,
+                html body:has(.profile-v11-theme-light) .profile-v11-save-photo-box,
+                html body:has(.profile-v11-theme-light) .profile-v11-upload-preview-card {
+                    border-color: #E1E7EF !important;
+                    background: #F9FBFD !important;
+                    color: #344054 !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF, 0 10px 22px rgba(15,23,42,0.045) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] [data-testid="stFileUploader"] section {
+                    border-color: rgba(229,57,53,0.34) !important;
+                    background:
+                        radial-gradient(circle at 15% 20%, rgba(229,57,53,0.07), transparent 36%),
+                        linear-gradient(135deg, #FFFFFF, #F7F9FC) !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF, 0 12px 24px rgba(15,23,42,0.06) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] [data-testid="stFileUploader"] small,
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] [data-testid="stFileUploader"] div {
+                    color: #667085 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] [data-testid="stFileUploader"] button {
+                    background: #FFF4F4 !important;
+                    color: #B42318 !important;
+                    border-color: rgba(229,57,53,0.34) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] [data-testid="stFileUploader"] button:hover {
+                    background: #E53935 !important;
+                    color: #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] [data-testid="stFileUploader"] [data-testid="stFileUploaderFile"] {
+                    border-color: #E1E7EF !important;
+                    background: #F8FAFC !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF, 0 8px 18px rgba(15,23,42,0.045) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] [data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"] {
+                    color: #26364D !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stExpander"] [data-testid="stFileUploader"] [data-testid="stFileUploaderFileData"] {
+                    color: #667085 !important;
+                }
+
+                /* Hero Edit Profil. */
+                html body:has(.profile-v11-theme-light) .profile-v11-edit-hero {
+                    border-color: rgba(229,57,53,0.24) !important;
+                    background:
+                        radial-gradient(circle at 6% 8%, rgba(255,82,82,0.14), transparent 30%),
+                        radial-gradient(circle at 94% 18%, rgba(29,161,242,0.08), transparent 25%),
+                        linear-gradient(135deg, #FFF7F7, #FFFFFF 56%, #F5F9FF) !important;
+                    box-shadow: 0 16px 34px rgba(15,23,42,0.075), inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-edit-hero::before {
+                    background:
+                        linear-gradient(115deg, rgba(255,255,255,0.68), transparent 38%),
+                        repeating-linear-gradient(135deg, rgba(31,41,55,0.018) 0 1px, transparent 1px 16px) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-edit-eyebrow {
+                    color: #B42318 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-edit-title {
+                    color: var(--profile-light-text-strong) !important;
+                    text-shadow: none !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-edit-desc {
+                    color: var(--profile-light-muted) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-edit-chip {
+                    border-color: #D9E1EB !important;
+                    background: rgba(255,255,255,0.78) !important;
+                    color: #344054 !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-edit-chip:hover {
+                    border-color: rgba(229,57,53,0.38) !important;
+                    background: #FFF1F1 !important;
+                    color: #B42318 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-edit-chip:hover span {
+                    color: #D92D20 !important;
+                }
+
+                /* Form Edit Profil dan Ganti Password. */
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] {
+                    border-color: var(--profile-light-border) !important;
+                    background:
+                        radial-gradient(circle at 0% 0%, rgba(229,57,53,0.055), transparent 32%),
+                        radial-gradient(circle at 100% 100%, rgba(29,161,242,0.045), transparent 28%),
+                        linear-gradient(145deg, #FFFFFF, #FAFBFD) !important;
+                    box-shadow: var(--profile-light-shadow), inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-form-tip-card,
+                html body:has(.profile-v11-theme-light) .profile-v11-password-tip-card {
+                    border-color: #E1E7EF !important;
+                    background: #F8FAFC !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF, 0 8px 18px rgba(15,23,42,0.035) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-form-tip-title,
+                html body:has(.profile-v11-theme-light) .profile-v11-password-tip-title {
+                    color: #26364D !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-form-tip-text,
+                html body:has(.profile-v11-theme-light) .profile-v11-password-tip-text {
+                    color: #667085 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-form-tip-card:hover .profile-v11-form-tip-title,
+                html body:has(.profile-v11-theme-light) .profile-v11-password-tip-card:hover .profile-v11-password-tip-title {
+                    color: #B42318 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-form-tip-card:hover .profile-v11-form-tip-text,
+                html body:has(.profile-v11-theme-light) .profile-v11-password-tip-card:hover .profile-v11-password-tip-text {
+                    color: #475467 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] [data-testid="stTextInput"] label p {
+                    color: #344054 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] [data-testid="stTextInput"] input {
+                    color: #1F2937 !important;
+                    -webkit-text-fill-color: #1F2937 !important;
+                    border-color: #D5DDE8 !important;
+                    background: #FFFFFF !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] [data-testid="stTextInput"] input::placeholder {
+                    color: #98A2B3 !important;
+                    -webkit-text-fill-color: #98A2B3 !important;
+                    opacity: 1 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-form-submit-note {
+                    border-color: rgba(76,175,80,0.22) !important;
+                    background: #F0FAF3 !important;
+                    color: #475467 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-form-submit-note strong {
+                    color: #217A3C !important;
+                }
+
+                /* Hero keamanan password. */
+                html body:has(.profile-v11-theme-light) .profile-v11-password-hero {
+                    border-color: rgba(255,152,0,0.28) !important;
+                    background:
+                        radial-gradient(circle at 7% 10%, rgba(255,183,77,0.18), transparent 30%),
+                        radial-gradient(circle at 93% 24%, rgba(229,57,53,0.07), transparent 26%),
+                        linear-gradient(135deg, #FFF9EF, #FFFFFF 58%, #FFF7F7) !important;
+                    box-shadow: 0 16px 34px rgba(15,23,42,0.075), inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-hero::before {
+                    background:
+                        linear-gradient(115deg, rgba(255,255,255,0.70), transparent 38%),
+                        repeating-linear-gradient(135deg, rgba(31,41,55,0.016) 0 1px, transparent 1px 16px) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-eyebrow {
+                    color: #B54708 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-title {
+                    color: var(--profile-light-text-strong) !important;
+                    text-shadow: none !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-desc {
+                    color: var(--profile-light-muted) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-chip {
+                    border-color: #E5D5B7 !important;
+                    background: rgba(255,255,255,0.80) !important;
+                    color: #475467 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-chip:hover {
+                    border-color: rgba(255,152,0,0.40) !important;
+                    background: #FFF5E7 !important;
+                    color: #B54708 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-chip:hover span {
+                    color: #B54708 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-live-caption {
+                    border-color: rgba(76,175,80,0.22) !important;
+                    background: #EFFAF2 !important;
+                    color: #2E7D46 !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-strength-panel {
+                    border-color: #E1E7EF !important;
+                    background: #F9FBFD !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-strength-label {
+                    color: #26364D !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-strength-note {
+                    color: #667085 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-strength-badge {
+                    background: #FFFFFF !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-strength-panel .profile-v11-strength-shell {
+                    border-color: #D9E1EB !important;
+                    background: #E8EDF3 !important;
+                    box-shadow: inset 0 1px 3px rgba(15,23,42,0.08) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-submit-note {
+                    border-color: rgba(255,152,0,0.24) !important;
+                    background: #FFF8E8 !important;
+                    color: #475467 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-submit-note strong {
+                    color: #B54708 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-match-card {
+                    border-color: #DDE4EC !important;
+                    background: #F8FAFC !important;
+                    color: #475467 !important;
+                    box-shadow: none !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-match-card.is-match {
+                    border-color: rgba(76,175,80,0.30) !important;
+                    background: #EFFAF2 !important;
+                    color: #26713E !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-password-match-card.is-mismatch {
+                    border-color: rgba(244,67,54,0.28) !important;
+                    background: #FFF1F1 !important;
+                    color: #B42318 !important;
+                }
+
+                /* Zona Berbahaya tetap tegas, tetapi tidak menjadi blok gelap di Light Theme. */
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-card {
+                    border-color: rgba(244,67,54,0.26) !important;
+                    background:
+                        radial-gradient(circle at 8% 8%, rgba(255,183,77,0.17), transparent 28%),
+                        radial-gradient(circle at 94% 18%, rgba(244,67,54,0.10), transparent 27%),
+                        linear-gradient(135deg, #FFF8F2, #FFFFFF 55%, #FFF2F2) !important;
+                    box-shadow: 0 16px 34px rgba(15,23,42,0.075), inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-card::before {
+                    background:
+                        linear-gradient(115deg, rgba(255,255,255,0.70), transparent 38%),
+                        repeating-linear-gradient(135deg, rgba(31,41,55,0.016) 0 1px, transparent 1px 16px) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-eyebrow {
+                    color: #B42318 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-title {
+                    color: var(--profile-light-text-strong) !important;
+                    text-shadow: none !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-text {
+                    color: var(--profile-light-muted) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-chip {
+                    border-color: #E6D7C6 !important;
+                    background: rgba(255,255,255,0.82) !important;
+                    color: #475467 !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-chip:hover {
+                    border-color: rgba(244,67,54,0.34) !important;
+                    background: #FFF1F1 !important;
+                    color: #B42318 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-chip:hover span {
+                    color: #B42318 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-panel {
+                    border-color: #E1E7EF !important;
+                    background:
+                        radial-gradient(circle at 0% 0%, rgba(244,67,54,0.055), transparent 32%),
+                        linear-gradient(145deg, #FFFFFF, #FAFBFD) !important;
+                    box-shadow: var(--profile-light-shadow), inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-step-card {
+                    border-color: #E3E8EF !important;
+                    background:
+                        radial-gradient(circle at 100% 0%, rgba(244,67,54,0.065), transparent 36%),
+                        #F9FBFD !important;
+                    color: #344054 !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-step-card:hover {
+                    border-color: rgba(244,67,54,0.28) !important;
+                    background: #FFF7F7 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-step-title {
+                    color: #26364D !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-danger-step-text {
+                    color: #667085 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-admin-lock-card {
+                    border-color: rgba(76,175,80,0.24) !important;
+                    background:
+                        radial-gradient(circle at 0% 50%, rgba(76,175,80,0.11), transparent 31%),
+                        linear-gradient(135deg, #F0FAF3, #FFFFFF) !important;
+                    color: #344054 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-delete-confirm-card {
+                    border-color: rgba(255,152,0,0.24) !important;
+                    background:
+                        radial-gradient(circle at 0% 50%, rgba(255,183,77,0.12), transparent 31%),
+                        linear-gradient(135deg, #FFF8EB, #FFFFFF) !important;
+                    color: #344054 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-admin-lock-title,
+                html body:has(.profile-v11-theme-light) .profile-v11-delete-confirm-title {
+                    color: #26364D !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-admin-lock-text,
+                html body:has(.profile-v11-theme-light) .profile-v11-delete-confirm-text {
+                    color: #667085 !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-admin-lock-pill {
+                    color: #26713E !important;
+                    background: #EAF8EE !important;
+                    border-color: rgba(76,175,80,0.24) !important;
+                    box-shadow: inset 0 1px 0 #FFFFFF !important;
+                }
+
+                /* Teks umum Streamlit di dalam halaman profil tetap kontras pada mode terang. */
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] p,
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] label,
+                html body:has(.profile-v11-theme-light) [data-testid="stCheckbox"] label,
+                html body:has(.profile-v11-theme-light) [data-testid="stCheckbox"] p {
+                    color: #344054 !important;
+                }
             </style>
             """,
             unsafe_allow_html=True,
@@ -3899,6 +4418,24 @@ def _render_profile_no_changes_alert() -> None:
                 line-height: 1.55;
                 margin-top: 0.16rem;
             }
+            html body:has(.profile-v11-theme-light) .profile-v12-no-change-alert {
+                border-color: rgba(255, 167, 38, 0.28);
+                background:
+                    radial-gradient(circle at 4% 18%, rgba(255, 167, 38, 0.10), transparent 36%),
+                    linear-gradient(135deg, #FFF9ED, #FFFFFF);
+                color: #344054;
+                box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+            }
+            html body:has(.profile-v11-theme-light) .profile-v12-no-change-icon {
+                background: #FFF2D7;
+                color: #B54708;
+            }
+            html body:has(.profile-v11-theme-light) .profile-v12-no-change-title {
+                color: #7A2E0E;
+            }
+            html body:has(.profile-v11-theme-light) .profile-v12-no-change-text {
+                color: #667085;
+            }
         </style>
         <div class="profile-v12-no-change-alert" role="status" aria-live="polite">
             <div class="profile-v12-no-change-icon">ℹ</div>
@@ -4391,7 +4928,15 @@ def render_profile() -> None:
             st.error("Data pengguna tidak ditemukan di database. Silakan login ulang.")
             return
 
-        st.markdown('<div class="profile-v11-wrapper">', unsafe_allow_html=True)
+        profile_theme_class = (
+            "profile-v11-theme-dark"
+            if bool(st.session_state.get("dark_mode", False))
+            else "profile-v11-theme-light"
+        )
+        st.markdown(
+            f'<div class="profile-v11-wrapper {profile_theme_class}">',
+            unsafe_allow_html=True,
+        )
 
         left_column, right_column = st.columns([0.92, 1.58], gap="large")
         with left_column:
