@@ -3259,6 +3259,38 @@ def _inject_profile_css() -> None:
                     color: var(--profile-light-muted) !important;
                 }
 
+                /* Light theme: kedua badge status foto wajib kontras dan tidak saling menimpa. */
+                html body:has(.profile-v11-theme-light) .profile-v11-current-photo-label {
+                    color: #166534 !important;
+                    -webkit-text-fill-color: #166534 !important;
+                    background: #ECFDF3 !important;
+                    border-color: #A7E3B8 !important;
+                    text-shadow: none !important;
+                    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.08) !important;
+                    user-select: none !important;
+                    -webkit-user-select: none !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-current-photo-label.is-default {
+                    color: #92400E !important;
+                    -webkit-text-fill-color: #92400E !important;
+                    background: #FFF7ED !important;
+                    border-color: #F6C98A !important;
+                    box-shadow: 0 4px 12px rgba(146, 64, 14, 0.07) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-status-dot {
+                    background: #22C55E !important;
+                    color: #22C55E !important;
+                    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.14) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-current-photo-label.is-default .profile-v11-status-dot {
+                    background: #F59E0B !important;
+                    color: #F59E0B !important;
+                    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14) !important;
+                }
+
                 /* Light theme: badge preview foto harus kontras dan mudah dibaca. */
                 html body:has(.profile-v11-theme-light) .profile-v11-selected-photo-status {
                     color: #166534 !important;
