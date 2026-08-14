@@ -594,6 +594,9 @@ def _inject_profile_css() -> None:
                     overflow: hidden;
                     /* Samakan tinggi kartu Statistik Penggunaan dengan kartu profil di kolom kiri. */
                     min-height: 508px;
+                    /* Isi kartu ikut mengisi tinggi kartu agar tidak menyisakan ruang kosong di bagian bawah. */
+                    display: flex;
+                    flex-direction: column;
                     padding: clamp(1.35rem, 2vw, 1.65rem);
                     background:
                         radial-gradient(circle at 92% 8%, rgba(229, 57, 53, 0.12), transparent 27%),
@@ -673,12 +676,19 @@ def _inject_profile_css() -> None:
                 .profile-v11-metric-grid {
                     gap: 1rem;
                     margin-top: 1rem;
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    align-items: stretch;
+                    grid-auto-rows: 1fr;
                 }
 
                 .profile-v11-metric-card {
                     position: relative;
                     overflow: hidden;
                     min-height: 170px;
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
                     padding: 1.12rem 1.15rem;
                     border: 1px solid rgba(255, 82, 82, 0.38);
                     border-radius: 16px;
@@ -775,7 +785,7 @@ def _inject_profile_css() -> None:
                     color: #9EABBE;
                     font-size: 0.84rem;
                     line-height: 1.52;
-                    margin: 0;
+                    margin: auto 0 0 0;
                 }
 
                 /* Input dan tombol dibuat selaras dengan tema halaman lain. */
