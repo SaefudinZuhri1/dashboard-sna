@@ -5158,9 +5158,12 @@ div[data-testid="stRadio"] > label p {
     background: #FFFFFF;
 }
 
-.rec-detail-content-text,
-.rec-detail-recommendation {
-    color: #445166;
+/* FIX LIGHT THEME: selector dibuat lebih spesifik daripada .rec-detail-panel p.
+   Tanpa ini, warna #C3C3C3 dari aturan dark/base tetap menang pada elemen <p>. */
+.rec-detail-panel .rec-detail-content-text,
+.rec-detail-panel .rec-detail-recommendation {
+    color: #445166 !important;
+    -webkit-text-fill-color: #445166 !important;
 }
 
 .rec-detail-note {
