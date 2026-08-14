@@ -5773,36 +5773,76 @@ div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stM
     overflow: hidden !important;
 }
 
-/* Fokus topik: teks pilihan panjang tetap satu baris dan dapat digeser horizontal.
-   Scrollbar dibuat tipis namun terlihat agar pengguna tahu isi masih berlanjut. */
-div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child {
-    min-width: 0 !important;
-    overflow-x: auto !important;
+/* Fokus topik: scrollbar ditempel pada CONTROL selectbox, bukan hanya pada
+   value wrapper internal BaseWeb. Ini penting karena Streamlit dapat mengganti
+   struktur wrapper value dan membuat scrollbar lama tidak pernah terlihat. */
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+    height: 58px !important;
+    max-height: 58px !important;
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    overflow-x: scroll !important;
     overflow-y: hidden !important;
-    white-space: nowrap !important;
     scrollbar-width: thin !important;
-    scrollbar-color: rgba(229,57,53,.72) #EDF1F5 !important;
+    scrollbar-color: rgba(229,57,53,.78) #EDF1F5 !important;
     overscroll-behavior-x: contain !important;
+    scrollbar-gutter: stable !important;
 }
 
-div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child * {
+/* Value container harus benar-benar lebih lebar dari field ketika teks panjang.
+   Tanpa min-width:max-content, browser hanya melakukan ellipsis dan tidak
+   mempunyai overflow aktual yang dapat digeser. */
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child {
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    width: max-content !important;
+    max-width: none !important;
+    padding-right: 10px !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child *,
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child div {
+    min-width: max-content !important;
+    width: max-content !important;
+    max-width: none !important;
     white-space: nowrap !important;
     text-overflow: clip !important;
     overflow: visible !important;
 }
 
-div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child::-webkit-scrollbar {
-    height: 5px !important;
+/* Tombol chevron tetap menempel di sisi kanan ketika teks digeser. */
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:last-child {
+    position: sticky !important;
+    right: 0 !important;
+    z-index: 4 !important;
+    flex: 0 0 42px !important;
+    min-width: 42px !important;
+    align-self: stretch !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: linear-gradient(90deg, rgba(255,255,255,.86), #FFFFFF 42%) !important;
 }
 
-div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child::-webkit-scrollbar-track {
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div::-webkit-scrollbar {
+    height: 6px !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div::-webkit-scrollbar-track {
     background: #EDF1F5 !important;
     border-radius: 999px !important;
 }
 
-div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child::-webkit-scrollbar-thumb {
-    background: rgba(229,57,53,.72) !important;
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div::-webkit-scrollbar-thumb {
+    background: rgba(229,57,53,.78) !important;
     border-radius: 999px !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div::-webkit-scrollbar-thumb:hover {
+    background: #E53935 !important;
 }
 
 /* Filter platform: chip tetap satu baris, tetapi scrollbar horizontal kini
