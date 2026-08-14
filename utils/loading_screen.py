@@ -133,9 +133,9 @@ LOADING_CONFIG: dict[str, dict[str, object]] = {
 def _is_dark_mode() -> bool:
     """Ambil status tema aktif tanpa mengganggu proses loading."""
     try:
-        return bool(st.session_state.get("dark_mode", True))
+        return bool(st.session_state.get("dark_mode", False))
     except Exception:
-        return True
+        return False
 
 
 @dataclass
@@ -367,6 +367,7 @@ def _buat_html_loading(judul: str, pesan: Iterable[str]) -> str:
 
             .telkom-loading-title {{
                 color: #FFFFFF;
+                -webkit-text-fill-color: #FFFFFF;
                 font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
                 font-size: clamp(1.22rem, 2.2vw, 1.55rem);
                 font-weight: 800;
@@ -479,6 +480,18 @@ def _buat_html_loading(judul: str, pesan: Iterable[str]) -> str:
                 box-shadow: 0 0 14px rgba(71,85,105,.30);
             }}
 
+            .telkom-loading-overlay.telkom-loading-dark .telkom-loading-title {{
+                background: none !important;
+                background-clip: border-box !important;
+                -webkit-background-clip: border-box !important;
+                color: #FFFFFF !important;
+                -webkit-text-fill-color: #FFFFFF !important;
+                filter: none !important;
+                mix-blend-mode: normal !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+            }}
+
             .telkom-loading-overlay.telkom-loading-light .telkom-loading-title {{
                 background: none !important;
                 background-clip: border-box !important;
@@ -575,7 +588,7 @@ def _buat_html_loading(judul: str, pesan: Iterable[str]) -> str:
                         <i class="telkom-loading-bar"></i>
                     </span>
                 </div>
-                <h2 class="telkom-loading-title" style="color:#FFFFFF !important;-webkit-text-fill-color:#FFFFFF !important;opacity:1 !important;">{escape(judul)}</h2>
+                <h2 class="telkom-loading-title">{escape(judul)}</h2>
                 <div class="telkom-loading-message">{pesan_html}</div>
                 <div class="telkom-loading-progress" aria-hidden="true"></div>
                 <div class="telkom-loading-brand">Telkom Group Analytics</div>
