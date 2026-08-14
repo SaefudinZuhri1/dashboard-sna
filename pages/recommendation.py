@@ -10620,6 +10620,35 @@ def _render_matrix_table(filtered_matrix: pd.DataFrame) -> None:
             )
             return
 
+        # Warna tabel mengikuti tema aktif. Sebelumnya seluruh teks body dipaksa putih,
+        # sehingga pada Light Theme teks hampir tidak terlihat di atas sel berwarna terang.
+        dark_mode = bool(st.session_state.get("dark_mode", False))
+
+        if dark_mode:
+            body_text_color = "#F3F6FA"
+            identity_text_color = "#FFFFFF"
+            body_background = "rgba(255,255,255,.015)"
+            identity_background = "rgba(255,255,255,.015)"
+            cell_border_color = "rgba(255,255,255,.07)"
+            header_background = "linear-gradient(135deg, #1D2230, #151821)"
+            header_text_color = "#DDE6F3"
+            header_border_color = "rgba(29,161,242,.22)"
+            high_score_color = "#FFFFFF"
+            mid_score_color = "#FFFFFF"
+            low_score_color = "#FFFFFF"
+        else:
+            body_text_color = "#344054"
+            identity_text_color = "#172033"
+            body_background = "#FFFFFF"
+            identity_background = "rgba(29,161,242,.035)"
+            cell_border_color = "#E1E7EE"
+            header_background = "linear-gradient(135deg, #F8FAFC, #EEF3F8)"
+            header_text_color = "#344054"
+            header_border_color = "#D8E2EC"
+            high_score_color = "#176B4D"
+            mid_score_color = "#8A5A00"
+            low_score_color = "#A3322E"
+
         def _score_style(value: Any) -> str:
             try:
                 score = float(value)
@@ -10628,45 +10657,52 @@ def _render_matrix_table(filtered_matrix: pd.DataFrame) -> None:
             if score >= 9:
                 return (
                     "background: linear-gradient(90deg, rgba(53,217,139,.24), rgba(53,217,139,.06)); "
-                    "color: #FFFFFF; font-weight: 900; border-left: 3px solid #35D98B;"
+                    f"color: {high_score_color}; font-weight: 900; border-left: 3px solid #35D98B;"
                 )
             if score >= 7:
                 return (
                     "background: linear-gradient(90deg, rgba(255,152,0,.22), rgba(255,152,0,.05)); "
-                    "color: #FFFFFF; font-weight: 850; border-left: 3px solid #FF9800;"
+                    f"color: {mid_score_color}; font-weight: 850; border-left: 3px solid #FF9800;"
                 )
             return (
                 "background: linear-gradient(90deg, rgba(229,57,53,.20), rgba(229,57,53,.05)); "
-                "color: #FFFFFF; font-weight: 800; border-left: 3px solid #E53935;"
+                f"color: {low_score_color}; font-weight: 800; border-left: 3px solid #E53935;"
             )
 
         styled_table = (
             display_table.style
             .format({"Rata-rata": "{:.1f}"})
-            .map(_score_style, subset=["Rata-rata", *topic_labels])
+            .set_properties(
+                **{
+                    "color": body_text_color,
+                    "background-color": body_background,
+                    "font-size": "13px",
+                }
+            )
             .set_properties(
                 subset=["Influencer", "Platform"],
                 **{
-                    "color": "#FFFFFF",
+                    "color": identity_text_color,
                     "font-weight": "850",
-                    "background-color": "rgba(255,255,255,.015)",
+                    "background-color": identity_background,
                 },
             )
+            .map(_score_style, subset=["Rata-rata", *topic_labels])
             .set_table_styles(
                 [
                     {
                         "selector": "th",
                         "props": [
-                            ("background", "linear-gradient(135deg, #1D2230, #151821)"),
-                            ("color", "#DDE6F3"),
+                            ("background", header_background),
+                            ("color", header_text_color),
                             ("font-weight", "900"),
-                            ("border-color", "rgba(29,161,242,.22)"),
+                            ("border-color", header_border_color),
                         ],
                     },
                     {
                         "selector": "td",
                         "props": [
-                            ("border-color", "rgba(255,255,255,.07)"),
+                            ("border-color", cell_border_color),
                             ("font-size", "13px"),
                         ],
                     },
