@@ -8717,7 +8717,10 @@ def _render_influencer_entry(
     reason = _influencer_reason(row, tags, layanan)
 
     _render_influencer_card(row, tags, content_payload)
-    selection_key = f"{layanan}|{username}"
+    # Username yang sama dapat hadir pada lebih dari satu platform (contoh:
+    # @kompascom di Twitter/X dan Instagram). Identitas detail dan key widget
+    # wajib menyertakan platform agar Streamlit tidak membuat key tombol ganda.
+    selection_key = f"{layanan}|{platform}|{username}"
     is_selected = (
         str(st.session_state.get("rec_selected_influencer", ""))
         == selection_key
@@ -8726,7 +8729,10 @@ def _render_influencer_entry(
 
     if st.button(
         button_label,
-        key=f"rec_detail_{_safe_key(layanan)}_{_safe_key(username)}",
+        key=(
+            f"rec_detail_{_safe_key(layanan)}_{_safe_key(platform)}_"
+            f"{_safe_key(username)}_{slot}"
+        ),
         type="secondary",
         use_container_width=True,
     ):
