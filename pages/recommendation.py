@@ -3041,6 +3041,58 @@ div[data-testid="stElementContainer"]:has(div[data-testid="stCode"]) {
     text-align: right;
 }
 
+/* FIX DETAIL REKOMENDASI: tinggi blok bukti mengikuti tinggi alami blok strategi.
+   Daftar bukti memakai seluruh ruang yang tersedia terlebih dahulu dan scrollbar
+   baru muncul jika seluruh bukti benar-benar lebih tinggi daripada blok strategi. */
+@media (min-width: 981px) {
+    .rec-detail-grid {
+        align-items: stretch;
+    }
+
+    .rec-detail-block-strategy {
+        height: auto;
+        align-self: stretch;
+    }
+
+    .rec-detail-block-evidence {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .rec-detail-block-evidence .rec-detail-block-head {
+        flex: 0 0 auto;
+    }
+
+    .rec-detail-block-evidence .rec-detail-content-list {
+        flex: 1 1 0;
+        min-height: 0;
+        max-height: none;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+}
+
+@media (max-width: 980px) {
+    .rec-detail-block-evidence,
+    .rec-detail-block-strategy {
+        height: auto;
+    }
+
+    .rec-detail-block-evidence {
+        overflow: visible;
+    }
+
+    .rec-detail-block-evidence .rec-detail-content-list {
+        flex: none;
+        min-height: 0;
+        max-height: none;
+        overflow-y: visible;
+    }
+}
+
 @media (max-width: 1100px) {
     .rec-detail-stat-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
