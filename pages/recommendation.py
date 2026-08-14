@@ -5764,17 +5764,52 @@ div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stM
     box-shadow: 0 5px 14px rgba(15,23,42,.055) !important;
 }
 
+/* Pilihan platform selalu satu baris. Jika viewport sempit, area tag boleh digeser
+   horizontal tanpa membuat tinggi multiselect bertambah. */
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+    height: 54px !important;
+    max-height: 54px !important;
+    flex-wrap: nowrap !important;
+    overflow: hidden !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div > div:first-child {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    overscroll-behavior-x: contain !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div > div:first-child::-webkit-scrollbar {
+    display: none !important;
+}
+
 div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
-    min-height: 32px !important;
+    flex: 0 0 auto !important;
+    min-height: 34px !important;
+    height: 34px !important;
+    max-width: none !important;
+    margin: 0 !important;
     border-radius: 9px !important;
     border: 1px solid rgba(229,57,53,.14) !important;
     background: #EF3E3A !important;
     box-shadow: none !important;
+    white-space: nowrap !important;
 }
 
 div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] span[data-baseweb="tag"] * {
     color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    font-size: 14px !important;
     font-weight: 750 !important;
+    white-space: nowrap !important;
 }
 
 div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSlider"] {
@@ -5804,8 +5839,19 @@ div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-filter-b
 div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-btn-reset {
     border: 1.5px solid #EF4444 !important;
     color: #B42318 !important;
+    -webkit-text-fill-color: #B42318 !important;
     background: #FFFFFF !important;
     box-shadow: 0 6px 16px rgba(15,23,42,.055) !important;
+    opacity: 1 !important;
+}
+
+/* Streamlit dapat memberi warna pada elemen <p>/<span> di dalam button.
+   Paksa seluruh isi Reset tetap terbaca, termasuk ketika tombol sedang inert. */
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-btn-reset *,
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-btn-reset.rec-matrix-btn-inert * {
+    color: #B42318 !important;
+    -webkit-text-fill-color: #B42318 !important;
+    opacity: 1 !important;
 }
 
 div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-btn-reset:not(.rec-matrix-btn-inert):hover {
@@ -11400,8 +11446,10 @@ def _render_matrix_filter_fragment(
                 unsafe_allow_html=True,
             )
 
+            # Platform dibuat lebih lebar agar tiga pilihan utama tetap sejajar
+            # horizontal dan tidak menambah tinggi form.
             control_1, control_2, control_3, control_reset, control_apply = st.columns(
-                [1.15, 1.25, 0.92, 0.72, 0.96],
+                [1.00, 1.85, 0.80, 0.78, 0.95],
                 gap="medium",
             )
             with control_1:
