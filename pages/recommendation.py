@@ -11338,11 +11338,19 @@ def _show_service_filter_loading() -> None:
 
 
 def _render_strategic_summary(points: list[str]) -> None:
-    """Tampilkan ringkasan strategis dalam panel visual interaktif dan berwarna.
+    """Tampilkan ringkasan strategis yang responsif terhadap Light/Dark Theme.
 
-    Bagian ini sengaja dirender melalui iframe HTML internal supaya seluruh elemen HTML,
-    animasi, dan dekorasi card tampil sebagai UI, bukan sebagai teks kode.
+    Komponen tetap menggunakan iframe HTML internal agar layout tiga kartu konsisten.
+    Efek visual kontinu yang berat sengaja dihindari supaya scroll pertama tetap mulus.
     """
+    try:
+        dark_mode = bool(st.session_state.get("dark_mode", False))
+    except Exception:
+        dark_mode = False
+
+    theme_class = "theme-dark" if dark_mode else "theme-light"
+    color_scheme = "dark" if dark_mode else "light"
+
     item_meta = [
         {"ikon": "✦", "label": "Prioritas Konten", "class": "content"},
         {"ikon": "◈", "label": "Kolaborasi Akun", "class": "creator"},
@@ -11363,125 +11371,59 @@ def _render_strategic_summary(points: list[str]) -> None:
         """
         for index, point in enumerate(points[:3], start=1)
     )
+
     html = f"""
     <!doctype html>
-    <html>
+    <html lang="id">
     <head>
         <meta charset="utf-8" />
         <style>
             :root {{
-                color-scheme: dark;
-                --red: #FF3B3B;
-                --orange: #FFB020;
+                color-scheme: {color_scheme};
+                --red: #E53935;
+                --orange: #F59E0B;
                 --cyan: #1DA1F2;
-                --purple: #B45CFF;
-                --green: #22C55E;
-                --panel: rgba(13, 13, 13, .88);
-                --line: rgba(255, 255, 255, .10);
+                --purple: #8B5CF6;
+                --green: #22A55B;
             }}
             * {{ box-sizing: border-box; }}
             html, body {{
                 margin: 0;
                 padding: 0;
+                width: 100%;
                 background: transparent;
+                overflow: hidden;
                 font-family: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
             }}
-            html {{
-                overflow: hidden;
-            }}
             body {{
-                min-height: 100%;
-                max-height: 560px;
-                overflow-x: hidden;
-                overflow-y: auto;
-                padding: 0 6px 0 0;
-                scrollbar-width: thin;
-                scrollbar-color: rgba(255,59,59,.75) rgba(255,255,255,.06);
-            }}
-            body::-webkit-scrollbar {{
-                width: 10px;
-            }}
-            body::-webkit-scrollbar-track {{
-                background: rgba(255,255,255,.055);
-                border-radius: 999px;
-            }}
-            body::-webkit-scrollbar-thumb {{
-                background: linear-gradient(180deg, #FF3B3B, #1DA1F2, #22C55E);
-                border: 2px solid rgba(8,10,16,.88);
-                border-radius: 999px;
-                box-shadow: 0 0 14px rgba(255,59,59,.28);
-            }}
-            body::-webkit-scrollbar-thumb:hover {{
-                background: linear-gradient(180deg, #FF5B5B, #36B6FF, #34D873);
+                padding: 0;
             }}
             .rec-strategy-showcase {{
                 position: relative;
                 isolation: isolate;
                 width: 100%;
-                min-height: 392px;
-                padding: 24px;
+                padding: 22px;
                 overflow: hidden;
-                border: 1px solid rgba(255,255,255,.10);
-                border-left: 5px solid var(--red);
                 border-radius: 24px;
-                background:
-                    radial-gradient(circle at 10% 12%, rgba(255,59,59,.28), transparent 26%),
-                    radial-gradient(circle at 84% 10%, rgba(29,161,242,.22), transparent 30%),
-                    radial-gradient(circle at 70% 92%, rgba(180,92,255,.14), transparent 34%),
-                    linear-gradient(135deg, rgba(35,14,18,.96), rgba(10,18,25,.96) 46%, rgba(11,11,12,.98));
-                box-shadow:
-                    0 24px 70px rgba(0,0,0,.42),
-                    inset 0 1px 0 rgba(255,255,255,.08),
-                    inset 0 -1px 0 rgba(255,255,255,.04);
-                animation: strategyPanelIn .62s cubic-bezier(.2,.85,.2,1) both;
+                contain: layout paint style;
             }}
-            .rec-strategy-showcase::before {{
-                content: "";
-                position: absolute;
-                inset: -40% -18%;
-                z-index: -2;
-                background:
-                    conic-gradient(from 180deg at 50% 50%, rgba(255,59,59,.18), rgba(255,176,32,.11), rgba(29,161,242,.18), rgba(180,92,255,.15), rgba(255,59,59,.18));
-                filter: blur(42px);
-                opacity: .72;
-                animation: strategyAura 9s linear infinite;
-            }}
+            .rec-strategy-showcase::before,
             .rec-strategy-showcase::after {{
                 content: "";
                 position: absolute;
-                inset: 0;
-                z-index: -1;
-                background:
-                    linear-gradient(115deg, transparent 0%, rgba(255,255,255,.09) 46%, transparent 58%),
-                    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px),
-                    linear-gradient(0deg, rgba(255,255,255,.025) 1px, transparent 1px);
-                background-size: 100% 100%, 46px 46px, 46px 46px;
-                transform: translateX(-120%);
-                opacity: .55;
-                animation: strategySweep 6.5s ease-in-out infinite;
-            }}
-            .rec-orb {{
-                position: absolute;
-                border-radius: 999px;
-                filter: blur(2px);
-                opacity: .68;
                 pointer-events: none;
+                z-index: -1;
             }}
-            .rec-orb-1 {{
-                width: 145px;
-                height: 145px;
-                right: 42px;
-                top: 34px;
-                background: radial-gradient(circle, rgba(29,161,242,.30), transparent 67%);
-                animation: strategyFloat 7.5s ease-in-out infinite;
+            .rec-strategy-showcase::before {{
+                inset: 0;
             }}
-            .rec-orb-2 {{
-                width: 118px;
-                height: 118px;
-                left: 76px;
-                bottom: 28px;
-                background: radial-gradient(circle, rgba(255,176,32,.24), transparent 68%);
-                animation: strategyFloat 8s ease-in-out infinite reverse;
+            .rec-strategy-showcase::after {{
+                inset: 0;
+                background-image:
+                    linear-gradient(90deg, currentColor 1px, transparent 1px),
+                    linear-gradient(0deg, currentColor 1px, transparent 1px);
+                background-size: 52px 52px;
+                opacity: .025;
             }}
             .rec-strategy-top {{
                 position: relative;
@@ -11489,12 +11431,9 @@ def _render_strategic_summary(points: list[str]) -> None:
                 align-items: center;
                 justify-content: space-between;
                 gap: 16px;
-                margin-bottom: 18px;
+                margin-bottom: 16px;
                 padding: 14px 16px;
-                border: 1px solid rgba(255,255,255,.10);
                 border-radius: 18px;
-                background: rgba(255,255,255,.045);
-                backdrop-filter: blur(10px);
             }}
             .rec-strategy-heading {{
                 display: flex;
@@ -11505,19 +11444,18 @@ def _render_strategic_summary(points: list[str]) -> None:
             .rec-strategy-heading-icon {{
                 display: grid;
                 place-items: center;
+                flex: 0 0 auto;
                 width: 44px;
                 height: 44px;
                 border-radius: 15px;
-                background: linear-gradient(135deg, #FF3B3B, #FFB020);
-                box-shadow: 0 0 28px rgba(255,59,59,.32);
-                color: #fff;
+                color: #FFFFFF;
+                background: linear-gradient(135deg, #E53935, #FF8A36 58%, #F7B32B);
                 font-size: 20px;
-                animation: strategyPulse 2.6s ease-in-out infinite;
+                box-shadow: 0 8px 20px rgba(229,57,53,.20);
             }}
             .rec-strategy-heading span {{
                 display: block;
-                color: rgba(255,255,255,.55);
-                font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
+                font-size: 12px;
                 font-weight: 900;
                 letter-spacing: .13em;
                 text-transform: uppercase;
@@ -11525,7 +11463,6 @@ def _render_strategic_summary(points: list[str]) -> None:
             .rec-strategy-heading strong {{
                 display: block;
                 margin-top: 2px;
-                color: #fff;
                 font-size: 18px;
                 font-weight: 950;
                 line-height: 1.2;
@@ -11543,48 +11480,34 @@ def _render_strategic_summary(points: list[str]) -> None:
                 gap: 6px;
                 padding: 8px 11px;
                 border-radius: 999px;
-                color: #fff;
-                font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
+                font-size: 12px;
                 font-weight: 900;
-                border: 1px solid rgba(255,255,255,.11);
-                box-shadow: inset 0 1px 0 rgba(255,255,255,.09);
                 white-space: nowrap;
             }}
-            .rec-badge.red {{ background: rgba(255,59,59,.18); border-color: rgba(255,59,59,.38); }}
-            .rec-badge.blue {{ background: rgba(29,161,242,.16); border-color: rgba(29,161,242,.36); }}
-            .rec-badge.green {{ background: rgba(34,197,94,.14); border-color: rgba(34,197,94,.34); }}
             .rec-strategy-list {{
+                position: relative;
                 display: grid;
                 grid-template-columns: repeat(3, minmax(0, 1fr));
                 gap: 14px;
-                position: relative;
             }}
             .rec-strategy-item {{
+                --tone: #E53935;
                 position: relative;
                 min-height: 190px;
                 padding: 18px 17px 17px;
                 overflow: hidden;
-                border: 1px solid rgba(255,255,255,.10);
                 border-radius: 20px;
-                background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
-                box-shadow: 0 18px 40px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08);
-                animation: strategyCardIn .58s cubic-bezier(.2,.85,.2,1) both;
-                transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
+                transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
             }}
             .rec-strategy-item:hover {{
-                transform: translateY(-7px);
-                border-color: var(--tone);
-                box-shadow: 0 26px 54px rgba(0,0,0,.38), 0 0 28px color-mix(in srgb, var(--tone) 24%, transparent);
+                transform: translateY(-3px);
             }}
             .rec-strategy-item::before {{
                 content: "";
                 position: absolute;
                 inset: 0;
-                background:
-                    radial-gradient(circle at 78% 20%, color-mix(in srgb, var(--tone) 28%, transparent), transparent 35%),
-                    linear-gradient(135deg, color-mix(in srgb, var(--tone) 13%, transparent), transparent 58%);
-                opacity: .95;
                 z-index: 0;
+                pointer-events: none;
             }}
             .rec-strategy-item::after {{
                 content: "";
@@ -11597,47 +11520,39 @@ def _render_strategic_summary(points: list[str]) -> None:
                 background: linear-gradient(90deg, transparent, var(--tone), transparent);
                 opacity: .92;
             }}
-            .tone-content {{ --tone: #FF3B3B; }}
+            .tone-content {{ --tone: #E53935; }}
             .tone-creator {{ --tone: #1DA1F2; }}
-            .tone-response {{ --tone: #22C55E; }}
-            .rec-strategy-item-1 {{ animation-delay: .08s; }}
-            .rec-strategy-item-2 {{ animation-delay: .18s; }}
-            .rec-strategy-item-3 {{ animation-delay: .28s; }}
+            .tone-response {{ --tone: #22A55B; }}
             .rec-strategy-number-wrap {{
                 position: relative;
                 z-index: 1;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                margin-bottom: 18px;
+                margin-bottom: 17px;
             }}
-            .rec-strategy-icon {{
-                display: grid;
-                place-items: center;
-                width: 42px;
-                height: 42px;
-                border-radius: 14px;
-                color: #fff;
-                background: color-mix(in srgb, var(--tone) 22%, rgba(255,255,255,.07));
-                border: 1px solid color-mix(in srgb, var(--tone) 42%, rgba(255,255,255,.10));
-                box-shadow: 0 0 24px color-mix(in srgb, var(--tone) 24%, transparent);
-                font-size: 18px;
-                font-weight: 950;
-            }}
+            .rec-strategy-icon,
             .rec-strategy-number {{
                 display: grid;
                 place-items: center;
+                color: #FFFFFF;
+                background: var(--tone);
+                border: 1px solid color-mix(in srgb, var(--tone) 72%, #FFFFFF);
+                box-shadow: 0 7px 18px color-mix(in srgb, var(--tone) 18%, transparent);
+                font-weight: 950;
+            }}
+            .rec-strategy-icon {{
+                width: 42px;
+                height: 42px;
+                border-radius: 14px;
+                font-size: 18px;
+            }}
+            .rec-strategy-number {{
                 min-width: 36px;
                 height: 36px;
                 padding: 0 10px;
                 border-radius: 999px;
-                color: #fff;
-                background: color-mix(in srgb, var(--tone) 68%, #111111);
-                border: 1px solid rgba(255,255,255,.14);
-                box-shadow: 0 0 18px color-mix(in srgb, var(--tone) 28%, transparent);
-                font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
                 font-size: 13px;
-                font-weight: 950;
             }}
             .rec-strategy-body {{
                 position: relative;
@@ -11650,25 +11565,19 @@ def _render_strategic_summary(points: list[str]) -> None:
                 margin-bottom: 10px;
                 padding: 6px 10px;
                 border-radius: 999px;
-                color: #fff;
-                background: color-mix(in srgb, var(--tone) 15%, rgba(255,255,255,.05));
-                border: 1px solid color-mix(in srgb, var(--tone) 30%, rgba(255,255,255,.08));
-                font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
+                font-size: 12px;
                 font-weight: 950;
-                letter-spacing: .09em;
+                letter-spacing: .08em;
                 text-transform: uppercase;
             }}
             .rec-strategy-text {{
-                color: rgba(255,255,255,.82);
                 font-size: 14px;
                 font-weight: 720;
                 line-height: 1.58;
                 text-wrap: pretty;
             }}
             .rec-strategy-text strong {{
-                color: #fff;
                 font-weight: 950;
-                text-shadow: 0 0 18px color-mix(in srgb, var(--tone) 24%, transparent);
             }}
             .rec-strategy-footer {{
                 position: relative;
@@ -11678,50 +11587,145 @@ def _render_strategic_summary(points: list[str]) -> None:
                 gap: 14px;
                 margin-top: 14px;
                 padding: 12px 14px;
-                border: 1px solid rgba(255,255,255,.09);
                 border-radius: 16px;
-                background: rgba(255,255,255,.04);
-                color: rgba(255,255,255,.70);
                 font-size: 12px;
                 font-weight: 750;
             }}
-            .rec-strategy-footer strong {{ color: #fff; }}
             .rec-footer-line {{
                 flex: 1 1 auto;
                 height: 2px;
                 border-radius: 999px;
-                background: linear-gradient(90deg, #FF3B3B, #FFB020, #1DA1F2, #22C55E);
-                animation: strategyLine 3.2s ease-in-out infinite;
+                background: linear-gradient(90deg, #E53935, #F59E0B, #1DA1F2, #22A55B);
             }}
-            @keyframes strategyPanelIn {{
-                from {{ opacity: 0; transform: translateY(18px) scale(.985); filter: blur(5px); }}
-                to {{ opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }}
+
+            /* -------------------------------------------------------------
+               LIGHT THEME — surface terang, berwarna, dan kontras tinggi.
+               ------------------------------------------------------------- */
+            .rec-strategy-showcase.theme-light {{
+                color: #172033;
+                border: 1px solid #D9E5EF;
+                border-left: 5px solid #E53935;
+                background:
+                    linear-gradient(135deg, #FFF9F8 0%, #F7FBFF 45%, #F7FFF9 100%);
+                box-shadow:
+                    0 16px 36px rgba(15,23,42,.10),
+                    inset 0 1px 0 rgba(255,255,255,.96);
             }}
-            @keyframes strategyCardIn {{
-                from {{ opacity: 0; transform: translateY(20px); }}
-                to {{ opacity: 1; transform: translateY(0); }}
+            .rec-strategy-showcase.theme-light::before {{
+                background:
+                    radial-gradient(circle at 9% 8%, rgba(229,57,53,.14), transparent 27%),
+                    radial-gradient(circle at 88% 8%, rgba(29,161,242,.13), transparent 29%),
+                    radial-gradient(circle at 72% 94%, rgba(34,165,91,.10), transparent 30%),
+                    radial-gradient(circle at 42% 72%, rgba(139,92,246,.07), transparent 34%);
             }}
-            @keyframes strategySweep {{
-                0%, 58% {{ transform: translateX(-120%); }}
-                82%, 100% {{ transform: translateX(120%); }}
+            .theme-light .rec-strategy-top {{
+                border: 1px solid #E2E8F0;
+                background: rgba(255,255,255,.84);
+                box-shadow: 0 8px 22px rgba(15,23,42,.055);
             }}
-            @keyframes strategyAura {{
-                to {{ transform: rotate(360deg); }}
+            .theme-light .rec-strategy-heading span {{ color: #8B5960; }}
+            .theme-light .rec-strategy-heading strong {{ color: #172033; }}
+            .theme-light .rec-badge {{
+                color: #344054;
+                background: #FFFFFF;
+                border: 1px solid #E2E8F0;
+                box-shadow: 0 4px 12px rgba(15,23,42,.05);
             }}
-            @keyframes strategyFloat {{
-                0%, 100% {{ transform: translate3d(0,0,0) scale(1); }}
-                50% {{ transform: translate3d(-16px, 14px, 0) scale(1.07); }}
+            .theme-light .rec-badge.red {{ color: #B42318; background: #FFF1F0; border-color: #F5B8B4; }}
+            .theme-light .rec-badge.blue {{ color: #1769AA; background: #EFF8FF; border-color: #B8DCF5; }}
+            .theme-light .rec-badge.green {{ color: #167044; background: #ECFDF3; border-color: #B9E6CA; }}
+            .theme-light .rec-strategy-item {{
+                border: 1px solid color-mix(in srgb, var(--tone) 24%, #DCE5EE);
+                background:
+                    linear-gradient(145deg,
+                        color-mix(in srgb, var(--tone) 8%, #FFFFFF) 0%,
+                        #FFFFFF 72%);
+                box-shadow:
+                    0 11px 24px rgba(15,23,42,.075),
+                    inset 0 1px 0 #FFFFFF;
             }}
-            @keyframes strategyPulse {{
-                0%, 100% {{ transform: scale(1); box-shadow: 0 0 24px rgba(255,59,59,.28); }}
-                50% {{ transform: scale(1.06); box-shadow: 0 0 34px rgba(255,176,32,.36); }}
+            .theme-light .rec-strategy-item:hover {{
+                border-color: color-mix(in srgb, var(--tone) 48%, #CDD8E4);
+                box-shadow:
+                    0 16px 30px rgba(15,23,42,.11),
+                    0 0 20px color-mix(in srgb, var(--tone) 10%, transparent),
+                    inset 0 1px 0 #FFFFFF;
             }}
-            @keyframes strategyLine {{
-                0%, 100% {{ opacity: .55; filter: saturate(1); }}
-                50% {{ opacity: 1; filter: saturate(1.35); }}
+            .theme-light .rec-strategy-item::before {{
+                background:
+                    radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--tone) 12%, transparent), transparent 38%);
             }}
+            .theme-light .rec-strategy-mini-label {{
+                color: color-mix(in srgb, var(--tone) 72%, #172033);
+                background: color-mix(in srgb, var(--tone) 9%, #FFFFFF);
+                border: 1px solid color-mix(in srgb, var(--tone) 28%, #E2E8F0);
+            }}
+            .theme-light .rec-strategy-text {{ color: #344054; }}
+            .theme-light .rec-strategy-text strong {{ color: #172033; }}
+            .theme-light .rec-strategy-footer {{
+                color: #536174;
+                border: 1px solid #E2E8F0;
+                background: rgba(255,255,255,.82);
+            }}
+            .theme-light .rec-strategy-footer strong {{ color: #172033; }}
+
+            /* -------------------------------------------------------------
+               DARK THEME — mempertahankan karakter Minimalist with Deep.
+               ------------------------------------------------------------- */
+            .rec-strategy-showcase.theme-dark {{
+                color: #FFFFFF;
+                border: 1px solid rgba(255,255,255,.10);
+                border-left: 5px solid #E53935;
+                background:
+                    radial-gradient(circle at 10% 12%, rgba(229,57,53,.24), transparent 27%),
+                    radial-gradient(circle at 86% 8%, rgba(29,161,242,.18), transparent 30%),
+                    linear-gradient(135deg, rgba(35,14,18,.98), rgba(10,18,25,.98) 48%, rgba(11,11,12,.99));
+                box-shadow:
+                    0 18px 44px rgba(0,0,0,.35),
+                    inset 0 1px 0 rgba(255,255,255,.07);
+            }}
+            .theme-dark .rec-strategy-top {{
+                border: 1px solid rgba(255,255,255,.10);
+                background: rgba(255,255,255,.045);
+            }}
+            .theme-dark .rec-strategy-heading span {{ color: rgba(255,255,255,.56); }}
+            .theme-dark .rec-strategy-heading strong {{ color: #FFFFFF; }}
+            .theme-dark .rec-badge {{
+                color: #FFFFFF;
+                border: 1px solid rgba(255,255,255,.11);
+            }}
+            .theme-dark .rec-badge.red {{ background: rgba(229,57,53,.18); border-color: rgba(229,57,53,.38); }}
+            .theme-dark .rec-badge.blue {{ background: rgba(29,161,242,.16); border-color: rgba(29,161,242,.36); }}
+            .theme-dark .rec-badge.green {{ background: rgba(34,165,91,.16); border-color: rgba(34,165,91,.36); }}
+            .theme-dark .rec-strategy-item {{
+                border: 1px solid rgba(255,255,255,.10);
+                background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
+                box-shadow: 0 15px 32px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.07);
+            }}
+            .theme-dark .rec-strategy-item:hover {{
+                border-color: color-mix(in srgb, var(--tone) 58%, rgba(255,255,255,.15));
+                box-shadow: 0 20px 38px rgba(0,0,0,.33), 0 0 22px color-mix(in srgb, var(--tone) 18%, transparent);
+            }}
+            .theme-dark .rec-strategy-item::before {{
+                background:
+                    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--tone) 22%, transparent), transparent 38%);
+            }}
+            .theme-dark .rec-strategy-mini-label {{
+                color: #FFFFFF;
+                background: color-mix(in srgb, var(--tone) 16%, rgba(255,255,255,.05));
+                border: 1px solid color-mix(in srgb, var(--tone) 32%, rgba(255,255,255,.09));
+            }}
+            .theme-dark .rec-strategy-text {{ color: rgba(255,255,255,.84); }}
+            .theme-dark .rec-strategy-text strong {{ color: #FFFFFF; }}
+            .theme-dark .rec-strategy-footer {{
+                color: rgba(255,255,255,.72);
+                border: 1px solid rgba(255,255,255,.09);
+                background: rgba(255,255,255,.04);
+            }}
+            .theme-dark .rec-strategy-footer strong {{ color: #FFFFFF; }}
+
             @media (max-width: 980px) {{
-                .rec-strategy-showcase {{ min-height: 0; padding: 18px; }}
+                .rec-strategy-showcase {{ padding: 18px; }}
                 .rec-strategy-top {{ align-items: flex-start; flex-direction: column; }}
                 .rec-strategy-badges {{ justify-content: flex-start; }}
                 .rec-strategy-list {{ grid-template-columns: 1fr; }}
@@ -11732,26 +11736,17 @@ def _render_strategic_summary(points: list[str]) -> None:
                 .rec-strategy-heading-icon {{ width: 38px; height: 38px; border-radius: 13px; }}
                 .rec-strategy-heading strong {{ font-size: 15px; }}
                 .rec-strategy-badges {{ gap: 6px; }}
-                .rec-badge {{ padding: 7px 9px; font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */; }}
+                .rec-badge {{ padding: 7px 9px; }}
                 .rec-strategy-text {{ font-size: 13px; line-height: 1.52; }}
             }}
             @media (prefers-reduced-motion: reduce) {{
-                .rec-strategy-showcase,
-                .rec-strategy-showcase::before,
-                .rec-strategy-showcase::after,
-                .rec-strategy-item,
-                .rec-strategy-heading-icon,
-                .rec-orb,
-                .rec-footer-line {{ animation: none !important; }}
-                .rec-strategy-item:hover {{ transform: none; }}
+                .rec-strategy-item {{ transition: none !important; }}
+                .rec-strategy-item:hover {{ transform: none !important; }}
             }}
         </style>
     </head>
     <body>
-        <section class="rec-strategy-showcase" aria-label="Ringkasan strategi rekomendasi">
-            <div class="rec-orb rec-orb-1"></div>
-            <div class="rec-orb rec-orb-2"></div>
-
+        <section class="rec-strategy-showcase {theme_class}" aria-label="Ringkasan strategi rekomendasi">
             <header class="rec-strategy-top">
                 <div class="rec-strategy-heading">
                     <div class="rec-strategy-heading-icon">⚡</div>
@@ -11779,7 +11774,10 @@ def _render_strategic_summary(points: list[str]) -> None:
     </body>
     </html>
     """
-    render_html_iframe(html, height=560, scrolling=True)
+
+    # Tinggi otomatis + tanpa nested scrollbar iframe membuat scroll halaman utama
+    # lebih ringan dan menghilangkan ruang kosong gelap pada Light Theme.
+    render_html_iframe(html, height="content", scrolling=False)
 
 
 # -----------------------------------------------------------------------------
