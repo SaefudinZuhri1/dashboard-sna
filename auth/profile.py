@@ -3270,6 +3270,24 @@ def _inject_profile_css() -> None:
                     box-shadow: inset 0 1px 0 #FFFFFF, 0 10px 22px rgba(15,23,42,0.045) !important;
                 }
 
+                /* V5.12: status foto tersimpan harus memiliki kontras yang kuat pada Light Theme. */
+                html body:has(.profile-v11-theme-light) .profile-v11-current-photo-label:not(.is-default) {
+                    color: #166534 !important;
+                    -webkit-text-fill-color: #166534 !important;
+                    border-color: #B7E4C2 !important;
+                    background: linear-gradient(135deg, #EAF8EE, #F5FCF7) !important;
+                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.96), 0 6px 14px rgba(22,101,52,0.08) !important;
+                    text-shadow: none !important;
+                    user-select: none;
+                    -webkit-user-select: none;
+                }
+
+                html body:has(.profile-v11-theme-light) .profile-v11-current-photo-label:not(.is-default) .profile-v11-status-dot {
+                    color: #2E7D32 !important;
+                    background: #2E7D32 !important;
+                    box-shadow: 0 0 0 4px rgba(46,125,50,0.10);
+                }
+
                 html body:has(.profile-v11-theme-light) [data-testid="stExpander"] [data-testid="stFileUploader"] section {
                     border-color: rgba(229,57,53,0.34) !important;
                     background:
