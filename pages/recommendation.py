@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 import re
 import time
+from functools import lru_cache
 from html import escape
 from pathlib import Path
 from textwrap import dedent, fill
@@ -37,18 +38,20 @@ from utils.dummy_data import (
     get_demo_sna,
     get_dummy_topic_data,
 )
-from utils.topic_classifier import summarize_topics
-from utils.topic_data_service import load_enriched_topic_data
+from utils.topic_classifier import (
+    apply_indihome_topics,
+    apply_telkomsel_topics,
+    summarize_topics,
+)
 from utils.data_loader import (
-    get_sentiment_file_signature,
     get_sentiment_source_name,
     get_sna_source_names,
     load_influencer_content_data,
     load_indibiz_top_kata,
     load_indibiz_topics,
     load_model_status,
+    load_recommendation_source_data,
     load_sna_data,
-    load_topic_data,
     sentiment_file_exists,
     sna_file_exists,
 )
@@ -6400,6 +6403,7 @@ def _select_balanced_account_type_candidates(
         return ranked_candidates.head(max(int(per_type_limit), 1)).copy()
 
 
+@lru_cache(maxsize=32)
 def _topic_regex(keywords: tuple[str, ...]) -> str:
     """Bangun pola regex aman dari daftar kata kunci topik."""
     ordered = sorted((str(item) for item in keywords), key=len, reverse=True)
@@ -6623,7 +6627,16 @@ def _build_topic_summary(
         else:
             source_is_real = sentiment_file_exists(layanan)
             source_name = get_sentiment_source_name(layanan)
-            df = load_topic_data(layanan).copy()
+            # Rekomendasi memakai proyeksi sumber bersama agar file sentimen
+            # besar tidak diparsing ulang oleh loader topik dan loader influencer.
+            # Halaman Analisis Topik tetap memakai loader minimumnya sendiri.
+            shared_source = load_recommendation_source_data(layanan)
+            topic_columns = [
+                column
+                for column in ("platform", "content", "predicted_sentiment")
+                if column in shared_source.columns
+            ]
+            df = shared_source.loc[:, topic_columns].copy()
 
         if df.empty or "content" not in df.columns:
             raise ValueError("Kolom komentar tidak tersedia pada sumber data.")
@@ -6776,7 +6789,6 @@ def _filter_sna_by_service(df: pd.DataFrame, layanan: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-@st.cache_data(show_spinner=False, max_entries=12)
 def _calculate_influencers_from_sna(
     df: pd.DataFrame,
     layanan: str,
@@ -6818,8 +6830,14 @@ def _calculate_influencers_from_sna(
             if platform_df.empty:
                 continue
 
+            # nx.DiGraph memang menyimpan satu edge unik per source-target.
+            # Dedup dilakukan sebelum konstruksi graph agar ribuan komentar yang
+            # menuju akun hub yang sama tidak diproses berulang oleh NetworkX.
+            # ``network_edges`` tetap dihitung dari platform_df asli sehingga
+            # frekuensi interaksi pada ranking tidak berubah.
+            graph_edges = platform_df.loc[:, ["source", "target"]].drop_duplicates()
             graph = nx.from_pandas_edgelist(
-                platform_df,
+                graph_edges,
                 source="source",
                 target="target",
                 create_using=nx.DiGraph(),
@@ -6879,7 +6897,7 @@ def _build_content_author_stats(layanan: str) -> pd.DataFrame:
 
         # Jika edge list menyimpan teks source, gunakan sebagai bukti tambahan.
         if sna_file_exists(layanan):
-            sna_frame = _filter_sna_by_service(load_sna_data(layanan).copy(), layanan)
+            sna_frame = _filter_sna_by_service(load_sna_data(layanan, recommendation_mode=True).copy(), layanan)
             content_column = next(
                 (
                     column for column in (
@@ -7112,7 +7130,7 @@ def _build_indibiz_influencer_data() -> tuple[pd.DataFrame, dict[str, Any]]:
         # 1) Kandidat jaringan. Pada data penelitian IndiBiz, edge SNA paling
         # kuat tersedia pada Twitter/X sehingga bagian ini tidak boleh menjadi
         # satu-satunya sumber kandidat rekomendasi.
-        sna_df = load_sna_data("IndiBiz").copy()
+        sna_df = load_sna_data("IndiBiz", recommendation_mode=True).copy()
         service_df = _filter_sna_by_service(sna_df, "IndiBiz")
         network_candidates = _calculate_influencers_from_sna(
             service_df,
@@ -7353,7 +7371,7 @@ def _build_influencer_data(
     ]
     try:
         content_stats = _build_content_author_stats(layanan)
-        sna_df = load_sna_data(layanan).copy()
+        sna_df = load_sna_data(layanan, recommendation_mode=True).copy()
         service_df = _filter_sna_by_service(sna_df, layanan)
         network_candidates = _calculate_influencers_from_sna(service_df, layanan)
 
@@ -7862,7 +7880,7 @@ def _build_influencer_content_catalog(
         sna_source = (
             get_demo_sna(layanan).copy()
             if demo_mode
-            else load_sna_data(layanan).copy()
+            else load_sna_data(layanan, recommendation_mode=True).copy()
         )
         sna_df = _filter_sna_by_service(sna_source, layanan)
         if not sna_df.empty and "source" in sna_df.columns:
@@ -12986,8 +13004,26 @@ def _build_recommendation_topic_records(
                 _indibiz_topic_signature()
             )
         else:
-            file_signature = get_sentiment_file_signature(safe_service)
-            enriched = load_enriched_topic_data(safe_service, file_signature)
+            # Gunakan proyeksi sumber yang sama dengan ranking influencer.
+            # Dengan demikian cold-open hanya melakukan satu parsing file
+            # sentimen besar untuk seluruh halaman Rekomendasi.
+            shared_source = load_recommendation_source_data(safe_service)
+            topic_columns = [
+                column
+                for column in (
+                    "platform", "content", "predicted_sentiment", "layanan"
+                )
+                if column in shared_source.columns
+            ]
+            enriched = shared_source.loc[:, topic_columns].copy()
+            if "content" not in enriched.columns:
+                enriched["content"] = ""
+            if "predicted_sentiment" not in enriched.columns:
+                enriched["predicted_sentiment"] = "neutral"
+            if safe_service == "IndiHome":
+                enriched = apply_indihome_topics(enriched, text_col="content")
+            elif safe_service == "Telkomsel":
+                enriched = apply_telkomsel_topics(enriched, text_col="content")
             summary = summarize_topics(enriched, top_n=5)
             raw_records = (
                 summary.head(5).to_dict("records")

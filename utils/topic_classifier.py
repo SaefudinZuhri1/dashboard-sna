@@ -1048,18 +1048,18 @@ def _iter_candidate_topics(sentiment: Any) -> Iterable[tuple[str, tuple[str, ...
         return tuple()
 
 
-def _score_topic(normalized_text: str, keywords: tuple[str, ...]) -> tuple[int, int]:
-    """Hitung skor topik berdasarkan keyword tunggal dan frasa yang cocok."""
+def _score_topic_prepared(
+    token_counts: Counter,
+    padded_text: str,
+    keywords: tuple[str, ...],
+) -> tuple[int, int]:
+    """Hitung skor dari token yang sudah disiapkan satu kali per komentar."""
     try:
-        if not normalized_text or not keywords:
+        if not keywords:
             return 0, 0
 
-        tokens = normalized_text.split()
-        token_counts = Counter(tokens)
-        padded_text = f" {normalized_text} "
         total_score = 0
         matched_keywords = 0
-
         for keyword in keywords:
             if " " in keyword:
                 occurrence = padded_text.count(f" {keyword} ")
@@ -1072,8 +1072,19 @@ def _score_topic(normalized_text: str, keywords: tuple[str, ...]) -> tuple[int, 
                 if occurrence:
                     total_score += occurrence
                     matched_keywords += 1
-
         return total_score, matched_keywords
+    except Exception:
+        return 0, 0
+
+
+def _score_topic(normalized_text: str, keywords: tuple[str, ...]) -> tuple[int, int]:
+    """Hitung skor topik berdasarkan keyword tunggal dan frasa yang cocok."""
+    try:
+        if not normalized_text or not keywords:
+            return 0, 0
+        token_counts = Counter(normalized_text.split())
+        padded_text = f" {normalized_text} "
+        return _score_topic_prepared(token_counts, padded_text, keywords)
     except Exception:
         return 0, 0
 
@@ -1089,9 +1100,11 @@ def _classify_cached(text: str, sentiment: str) -> str:
         best_topic = DEFAULT_TOPIC
         best_score = 0
         best_matches = 0
+        token_counts = Counter(normalized_text.split())
+        padded_text = f" {normalized_text} "
 
         for topic_name, keywords in _iter_candidate_topics(sentiment):
-            score, matches = _score_topic(normalized_text, keywords)
+            score, matches = _score_topic_prepared(token_counts, padded_text, keywords)
             if score > best_score or (score == best_score and matches > best_matches):
                 best_topic = topic_name
                 best_score = score
@@ -1178,9 +1191,11 @@ def _classify_indihome_cached(text: str) -> str:
         best_topic = DEFAULT_TOPIC
         best_score = 0
         best_matches = 0
+        token_counts = Counter(normalized_text.split())
+        padded_text = f" {normalized_text} "
 
         for topic_name, keywords in _normalized_indihome_topics():
-            score, matches = _score_topic(normalized_text, keywords)
+            score, matches = _score_topic_prepared(token_counts, padded_text, keywords)
             if score > best_score or (score == best_score and matches > best_matches):
                 best_topic = topic_name
                 best_score = score
@@ -1225,9 +1240,11 @@ def _classify_telkomsel_cached(text: str) -> str:
         best_topic = DEFAULT_TOPIC
         best_score = 0
         best_matches = 0
+        token_counts = Counter(normalized_text.split())
+        padded_text = f" {normalized_text} "
 
         for topic_name, keywords in _normalized_telkomsel_topics():
-            score, matches = _score_topic(normalized_text, keywords)
+            score, matches = _score_topic_prepared(token_counts, padded_text, keywords)
             if score > best_score or (score == best_score and matches > best_matches):
                 best_topic = topic_name
                 best_score = score

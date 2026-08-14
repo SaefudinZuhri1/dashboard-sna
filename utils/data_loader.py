@@ -1442,6 +1442,45 @@ def _enrich_telkomsel_sna_followers(df_sna: pd.DataFrame) -> pd.DataFrame:
         return df_sna.copy()
 
 
+def _enrich_sna_followers_from_recommendation_source(
+    df_sna: pd.DataFrame,
+    layanan: str,
+) -> pd.DataFrame:
+    """Perkaya followers SNA dari proyeksi sentimen yang sudah dibaca Rekomendasi.
+
+    Jalur ini hanya dipakai saat halaman Rekomendasi meminta ``recommendation_mode``.
+    Tujuannya menghindari pembacaan file sentimen besar sekali lagi hanya untuk
+    dua kolom username/followers. Halaman lain tetap memakai alur lama.
+    """
+    try:
+        shared = load_recommendation_source_data(layanan)
+        if (
+            shared is None
+            or shared.empty
+            or "username" not in shared.columns
+            or "followers" not in shared.columns
+        ):
+            return df_sna.copy()
+
+        followers_source = shared.loc[:, ["username", "followers"]].copy()
+        followers_source = followers_source[
+            followers_source["username"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .ne("")
+        ].copy()
+        if followers_source.empty:
+            return df_sna.copy()
+        return _update_sna_followers_from_prediction(
+            df_sna,
+            followers_source,
+            layanan,
+        )
+    except Exception:
+        return df_sna.copy()
+
+
 def _enrich_combined_sna_followers(
     combined: pd.DataFrame,
     layanan: str | None,
@@ -1734,6 +1773,7 @@ def _load_sna_cached(
     layanan: str | None,
     file_signature: str,
     followers_signature: str,
+    recommendation_mode: bool = False,
 ) -> pd.DataFrame:
     """Muat sumber SNA aktual dengan cache per layanan.
 
@@ -1764,7 +1804,13 @@ def _load_sna_cached(
         return _fallback_sna_df(layanan)
 
     combined = pd.concat(frames, ignore_index=True, sort=False)
-    combined = _enrich_combined_sna_followers(combined, layanan)
+    if recommendation_mode and layanan in {"IndiBiz", "Telkomsel"}:
+        combined = _enrich_sna_followers_from_recommendation_source(
+            combined,
+            str(layanan),
+        )
+    else:
+        combined = _enrich_combined_sna_followers(combined, layanan)
 
     # Jangan menghapus edge yang tampak sama pada tahap loader. Untuk data
     # komentar Instagram/TikTok, satu akun dapat mengirim beberapa komentar
@@ -1877,13 +1923,16 @@ def load_home_sna_projection() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False, ttl=60, max_entries=12)
-def load_sna_data(layanan: str | None = None) -> pd.DataFrame:
+def load_sna_data(
+    layanan: str | None = None,
+    recommendation_mode: bool = False,
+) -> pd.DataFrame:
     """
     Muat data SNA dari file yang relevan dengan layanan terpilih.
 
-    Pemanggilan lama load_sna_data() tetap didukung. Untuk halaman yang hanya
-    butuh satu layanan, pakai load_sna_data("IndiBiz") agar tidak membaca semua
-    file SNA sekaligus.
+    Pemanggilan lama load_sna_data() tetap didukung. Untuk halaman Rekomendasi,
+    ``recommendation_mode=True`` membuat enrichment followers memakai proyeksi
+    sentimen yang sudah dicache sehingga file besar tidak dibaca ulang.
     """
     try:
         if not sna_file_exists(layanan):
@@ -1901,7 +1950,12 @@ def load_sna_data(layanan: str | None = None) -> pd.DataFrame:
             )
         else:
             followers_signature = "tidak-berlaku"
-        return _load_sna_cached(layanan, signature, followers_signature)
+        return _load_sna_cached(
+            layanan,
+            signature,
+            followers_signature,
+            recommendation_mode=bool(recommendation_mode),
+        )
     except Exception as e:
         st.error(f"Gagal memuat data SNA: {e}")
         st.warning("Menggunakan data dummy SNA sebagai fallback.")
@@ -2528,6 +2582,7 @@ def _read_influencer_content_csv_path(path: str) -> pd.DataFrame | None:
                 keep_default_na=False,
                 na_filter=False,
                 low_memory=True,
+                memory_map=True,
             )
             rename = {source: canonical for canonical, source in mapping.items()}
             return frame.rename(columns=rename)
@@ -2631,6 +2686,105 @@ def _read_influencer_content_source(path: str) -> pd.DataFrame | None:
     return None
 
 
+def _normalize_recommendation_source_df(
+    frame: pd.DataFrame,
+    layanan: str,
+) -> pd.DataFrame:
+    """Normalisasi satu proyeksi sumber untuk topik dan rekomendasi influencer.
+
+    Berbeda dari loader influencer publik, baris tanpa username tidak dibuang
+    di sini karena baris tersebut masih sah untuk agregasi topik. Filter username
+    baru diterapkan ketika data dipakai sebagai bukti influencer.
+    """
+    canonical_columns = list(INFLUENCER_CONTENT_COLUMNS)
+    if frame is None or frame.empty:
+        return pd.DataFrame(columns=canonical_columns + ["layanan"])
+
+    result = frame.copy()
+    if "content" not in result.columns:
+        return pd.DataFrame(columns=canonical_columns + ["layanan"])
+    for column in canonical_columns:
+        if column not in result.columns:
+            result[column] = ""
+
+    for column in result.select_dtypes(include="object").columns:
+        result[column] = (
+            result[column]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.lstrip("'")
+        )
+
+    result["username"] = result["username"].str.lstrip("@").str.strip()
+    result["platform"] = (
+        result["platform"]
+        .str.lower()
+        .str.strip()
+        .replace(
+            {
+                "x": "twitter",
+                "twitter/x": "twitter",
+                "tik tok": "tiktok",
+                "ig": "instagram",
+            }
+        )
+    )
+    result["predicted_sentiment"] = (
+        result["predicted_sentiment"]
+        .str.lower()
+        .str.strip()
+        .map(SENTIMENT_MAP)
+        .fillna("neutral")
+    )
+    for column in ("followers", "engagement", "like", "comment", "share", "view"):
+        result[column] = pd.to_numeric(result[column], errors="coerce").fillna(0)
+
+    result = result[
+        result["content"].ne("")
+        & result["platform"].isin(["twitter", "instagram", "tiktok"])
+    ].copy()
+    result["layanan"] = layanan
+    return result[canonical_columns + ["layanan"]].reset_index(drop=True)
+
+
+@st.cache_data(show_spinner=False, max_entries=6)
+def _load_recommendation_source_cached(
+    layanan: str,
+    file_signature: str,
+) -> pd.DataFrame:
+    """Baca file sentimen besar satu kali untuk topik + rekomendasi.
+
+    ``file_signature`` menjadi cache key sehingga perubahan file tetap terdeteksi.
+    Cache ini sengaja menjadi boundary I/O bersama agar cold-open Rekomendasi
+    tidak mengulang parsing file yang sama melalui dua loader berbeda.
+    """
+    del file_signature
+    source = _resolve_sentiment_source(layanan)
+    if source is None:
+        return _normalize_recommendation_source_df(pd.DataFrame(), layanan)
+    frame = _read_influencer_content_source(str(source))
+    if frame is None or frame.empty:
+        return _normalize_recommendation_source_df(pd.DataFrame(), layanan)
+    return _normalize_recommendation_source_df(frame, layanan)
+
+
+def load_recommendation_source_data(layanan: str) -> pd.DataFrame:
+    """Muat proyeksi bersama khusus kebutuhan halaman Rekomendasi.
+
+    Fungsi publik ini tidak mengubah kontrak loader lama. Seluruh error tetap
+    dipetakan ke DataFrame kosong agar halaman dapat memakai fallback existing.
+    """
+    try:
+        if not sentiment_file_exists(layanan):
+            return _normalize_recommendation_source_df(pd.DataFrame(), layanan)
+        signature = get_sentiment_file_signature(layanan)
+        return _load_recommendation_source_cached(layanan, signature)
+    except Exception as exc:
+        st.error(f"Gagal memuat sumber rekomendasi {layanan}: {exc}")
+        return _normalize_recommendation_source_df(pd.DataFrame(), layanan)
+
+
 def _normalize_influencer_content_df(
     frame: pd.DataFrame,
     layanan: str,
@@ -2695,15 +2849,14 @@ def _load_influencer_content_cached(
     layanan: str,
     file_signature: str,
 ) -> pd.DataFrame:
-    """Muat kolom bukti konten asli dan cache berdasarkan versi file."""
-    del file_signature
-    source = _resolve_sentiment_source(layanan)
-    if source is None:
+    """Ambil bukti influencer dari proyeksi sumber bersama yang sudah dicache."""
+    shared = _load_recommendation_source_cached(layanan, file_signature)
+    if shared is None or shared.empty:
         return _normalize_influencer_content_df(pd.DataFrame(), layanan)
-    frame = _read_influencer_content_source(str(source))
-    if frame is None or frame.empty:
-        return _normalize_influencer_content_df(pd.DataFrame(), layanan)
-    return _normalize_influencer_content_df(frame, layanan)
+
+    result = shared[shared["username"].fillna("").astype(str).str.strip().ne("")].copy()
+    canonical_columns = list(INFLUENCER_CONTENT_COLUMNS) + ["layanan"]
+    return result.loc[:, canonical_columns].reset_index(drop=True)
 
 
 def load_influencer_content_data(layanan: str) -> pd.DataFrame:
