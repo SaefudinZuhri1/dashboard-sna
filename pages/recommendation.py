@@ -445,7 +445,11 @@ PHASE12_AI_CSS = """
 .rec-ai-shell {
     position: relative;
     isolation: isolate;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
     overflow: hidden;
+    min-height: 220px;
     margin: 18px 0 24px;
     padding: 26px;
     border: 1px solid rgba(255,255,255,.12);
@@ -458,10 +462,9 @@ PHASE12_AI_CSS = """
     box-shadow:
         0 28px 70px rgba(0,0,0,.38),
         inset 0 1px 0 rgba(255,255,255,.08);
-    transition: transform .28s ease, border-color .28s ease, box-shadow .28s ease;
+    transition: border-color .22s ease, box-shadow .22s ease;
 }
 .rec-ai-shell:hover {
-    transform: translateY(-3px);
     border-color: rgba(255,255,255,.20);
     box-shadow:
         0 34px 82px rgba(0,0,0,.46),
@@ -472,7 +475,8 @@ PHASE12_AI_CSS = """
     content: '';
     position: absolute;
     inset: 0;
-    z-index: -2;
+    z-index: 0;
+    pointer-events: none;
     background-image:
         linear-gradient(rgba(255,255,255,.026) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255,255,255,.026) 1px, transparent 1px);
@@ -483,37 +487,34 @@ PHASE12_AI_CSS = """
 .rec-ai-shell::after {
     content: '';
     position: absolute;
+    z-index: 1;
     left: 24px;
     right: 24px;
     bottom: 0;
     height: 3px;
     border-radius: 999px 999px 0 0;
     background: linear-gradient(90deg, #E53935, #FFB020, #1DA1F2, #8B5CF6, #4CAF50, #E53935);
-    background-size: 220% 100%;
+    background-size: 100% 100%;
     opacity: .95;
-    animation: recAiBorderFlow 7s linear infinite;
 }
 .rec-ai-orb {
     position: absolute;
-    z-index: -1;
-    width: 210px;
-    height: 210px;
+    z-index: 0;
+    width: 260px;
+    height: 260px;
     border-radius: 50%;
-    filter: blur(18px);
-    opacity: .22;
+    opacity: .30;
     pointer-events: none;
 }
 .rec-ai-orb.one {
-    top: -120px;
-    left: 8%;
-    background: #E53935;
-    animation: recAiFloatOne 9s ease-in-out infinite;
+    top: -145px;
+    left: 5%;
+    background: radial-gradient(circle, rgba(229,57,53,.48) 0%, rgba(229,57,53,.18) 42%, rgba(229,57,53,0) 72%);
 }
 .rec-ai-orb.two {
-    right: 5%;
-    bottom: -150px;
-    background: #1DA1F2;
-    animation: recAiFloatTwo 11s ease-in-out infinite;
+    right: 2%;
+    bottom: -170px;
+    background: radial-gradient(circle, rgba(29,161,242,.42) 0%, rgba(29,161,242,.16) 42%, rgba(29,161,242,0) 72%);
 }
 .rec-ai-heading {
     position: relative;
@@ -543,7 +544,6 @@ PHASE12_AI_CSS = """
         linear-gradient(145deg, rgba(229,57,53,.95), rgba(139,92,246,.82) 52%, rgba(29,161,242,.90));
     box-shadow: 0 15px 34px rgba(229,57,53,.22), inset 0 1px 0 rgba(255,255,255,.30);
     font-size: 25px;
-    animation: recAiLogoPulse 3.4s ease-in-out infinite;
 }
 .rec-ai-logo::after {
     content: '';
@@ -607,7 +607,6 @@ PHASE12_AI_CSS = """
     border-radius: 999px;
     color: rgba(255,255,255,.72);
     background: rgba(255,255,255,.045);
-    backdrop-filter: blur(8px);
     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
     font-weight: 800;
     transition: transform .2s ease, color .2s ease, border-color .2s ease, background .2s ease;
@@ -634,7 +633,6 @@ PHASE12_AI_CSS = """
     flex: 0 0 auto;
     padding: 9px 12px;
     border-radius: 999px;
-    backdrop-filter: blur(10px);
     font-size: 0.75rem /* FIX: minimum 12px agar terbaca di tablet */;
     font-weight: 900;
     letter-spacing: .025em;
@@ -649,8 +647,7 @@ PHASE12_AI_CSS = """
     height: 8px;
     border-radius: 50%;
     background: currentColor;
-    box-shadow: 0 0 14px currentColor;
-    animation: recAiStatusPulse 1.8s ease-in-out infinite;
+    box-shadow: 0 0 10px currentColor;
 }
 .rec-gemini-badge.online {
     color: #77F29A;
@@ -1345,7 +1342,7 @@ div[data-testid="stCode"] {
     .rec-sentiment-strategy-description { min-height: 0; }
 }
 @media (max-width: 620px) {
-    .rec-ai-shell { padding: 20px 17px; border-radius: 20px; }
+    .rec-ai-shell { min-height: 0; padding: 20px 17px; border-radius: 20px; }
     .rec-ai-brand { gap: 12px; }
     .rec-ai-logo { width: 46px; height: 46px; flex-basis: 46px; border-radius: 15px; }
     .rec-ai-heading h2 { font-size: 22px; }
@@ -11994,11 +11991,51 @@ def _render_ai_generator(
     available = bool(status.get("available") or GEMINI_AVAILABLE)
     badge_class = "online" if available else "offline"
     badge_label = "Gemini AI Aktif" if available else "Mode Offline"
+    ai_theme_class = (
+        "rec-ai-theme-dark"
+        if bool(st.session_state.get("dark_mode", False))
+        else "rec-ai-theme-light"
+    )
 
     st.markdown(
         dedent(
             f"""
-            <section class="rec-ai-shell">
+            <style>
+                /* Guard lokal: dikirim bersama markup agar AI Studio tetap terlihat
+                   saat Streamlit melakukan rerun/reconciliation DOM. */
+                #rec-ai-content-studio {{
+                    display: block !important;
+                    visibility: visible !important;
+                    opacity: 1 !important;
+                }}
+                #rec-ai-content-studio .rec-ai-heading,
+                #rec-ai-content-studio .rec-ai-brand,
+                #rec-ai-content-studio .rec-ai-copy {{
+                    visibility: visible !important;
+                    opacity: 1 !important;
+                }}
+                #rec-ai-content-studio.rec-ai-theme-light {{
+                    border-color: #D9E0E8;
+                    background:
+                        radial-gradient(circle at 8% 12%, rgba(229,57,53,.13), transparent 30%),
+                        radial-gradient(circle at 92% 12%, rgba(29,161,242,.11), transparent 32%),
+                        radial-gradient(circle at 72% 100%, rgba(76,175,80,.08), transparent 30%),
+                        linear-gradient(145deg, #FFFFFF, #F7F9FC);
+                }}
+                #rec-ai-content-studio.rec-ai-theme-light h2 {{ color: #172033 !important; }}
+                #rec-ai-content-studio.rec-ai-theme-light p {{ color: #5F6B7A !important; }}
+                #rec-ai-content-studio.rec-ai-theme-dark {{
+                    border-color: rgba(255,255,255,.12);
+                    background:
+                        radial-gradient(circle at 8% 12%, rgba(229,57,53,.26), transparent 30%),
+                        radial-gradient(circle at 92% 12%, rgba(29,161,242,.20), transparent 32%),
+                        radial-gradient(circle at 72% 100%, rgba(76,175,80,.12), transparent 30%),
+                        linear-gradient(145deg, rgba(25,25,30,.99), rgba(10,12,18,.99));
+                }}
+                #rec-ai-content-studio.rec-ai-theme-dark h2 {{ color: #FFFFFF !important; }}
+                #rec-ai-content-studio.rec-ai-theme-dark p {{ color: rgba(255,255,255,.69) !important; }}
+            </style>
+            <section id="rec-ai-content-studio" class="rec-ai-shell {ai_theme_class}" aria-label="Generator Ide Konten Gemini">
                 <div class="rec-ai-orb one"></div>
                 <div class="rec-ai-orb two"></div>
                 <div class="rec-ai-heading">
