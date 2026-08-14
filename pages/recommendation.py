@@ -5773,6 +5773,40 @@ div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stM
     overflow: hidden !important;
 }
 
+/* Fokus topik: teks pilihan panjang tetap satu baris dan dapat digeser horizontal.
+   Scrollbar dibuat tipis namun terlihat agar pengguna tahu isi masih berlanjut. */
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child {
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    white-space: nowrap !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(229,57,53,.72) #EDF1F5 !important;
+    overscroll-behavior-x: contain !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child * {
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    overflow: visible !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child::-webkit-scrollbar {
+    height: 5px !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child::-webkit-scrollbar-track {
+    background: #EDF1F5 !important;
+    border-radius: 999px !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child::-webkit-scrollbar-thumb {
+    background: rgba(229,57,53,.72) !important;
+    border-radius: 999px !important;
+}
+
+/* Filter platform: chip tetap satu baris, tetapi scrollbar horizontal kini
+   terlihat sehingga chip paling kanan tidak lagi tampak terpotong. */
 div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div > div:first-child {
     display: flex !important;
     flex: 1 1 auto !important;
@@ -5781,14 +5815,26 @@ div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stM
     gap: 6px !important;
     min-width: 0 !important;
     max-width: 100% !important;
+    padding-bottom: 3px !important;
     overflow-x: auto !important;
     overflow-y: hidden !important;
-    scrollbar-width: none !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(229,57,53,.72) #EDF1F5 !important;
     overscroll-behavior-x: contain !important;
 }
 
 div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div > div:first-child::-webkit-scrollbar {
-    display: none !important;
+    height: 5px !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div > div:first-child::-webkit-scrollbar-track {
+    background: #EDF1F5 !important;
+    border-radius: 999px !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div > div:first-child::-webkit-scrollbar-thumb {
+    background: rgba(229,57,53,.72) !important;
+    border-radius: 999px !important;
 }
 
 div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
