@@ -592,7 +592,8 @@ def _inject_profile_css() -> None:
 
                 .profile-v11-stats-card {
                     overflow: hidden;
-                    min-height: 404px;
+                    /* Samakan tinggi kartu Statistik Penggunaan dengan kartu profil di kolom kiri. */
+                    min-height: 508px;
                     padding: clamp(1.35rem, 2vw, 1.65rem);
                     background:
                         radial-gradient(circle at 92% 8%, rgba(229, 57, 53, 0.12), transparent 27%),
