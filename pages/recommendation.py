@@ -9726,6 +9726,96 @@ def _render_matrix_rank_cards(
             ).strip()
         )
 
+    # Iframe ranking memiliki dokumen CSS sendiri sehingga tidak otomatis mewarisi
+    # Light/Dark Theme dari halaman Streamlit. Warna Light Theme harus disuntikkan
+    # secara eksplisit agar kartu ranking tidak selalu memakai surface gelap.
+    dark_mode = bool(st.session_state.get("dark_mode", False))
+    rank_theme_css = ""
+    if not dark_mode:
+        rank_theme_css = dedent(
+            """
+            :root { color-scheme: light; }
+
+            .rec-rank-card {
+                --rank-accent: #F6B73C;
+                border-color: color-mix(in srgb, var(--platform-color, #1DA1F2) 38%, #D9E2EC);
+                background:
+                    radial-gradient(circle at 92% -12%, color-mix(in srgb, var(--platform-color, #1DA1F2) 18%, transparent), transparent 42%),
+                    radial-gradient(circle at 5% 115%, color-mix(in srgb, var(--rank-accent, #F6B73C) 10%, transparent), transparent 38%),
+                    linear-gradient(145deg, #FFFFFF 0%, color-mix(in srgb, var(--platform-color, #1DA1F2) 5%, #F8FAFC) 100%);
+                box-shadow:
+                    0 14px 30px rgba(15,23,42,.10),
+                    0 0 24px color-mix(in srgb, var(--platform-color, #1DA1F2) 10%, transparent),
+                    inset 0 1px 0 rgba(255,255,255,.96);
+            }
+
+            .rec-rank-card:nth-child(1) { --rank-accent: #F4B942; }
+            .rec-rank-card:nth-child(2) { --rank-accent: #93A1B3; }
+            .rec-rank-card:nth-child(3) { --rank-accent: #C98252; }
+
+            .rec-rank-card:hover {
+                border-color: color-mix(in srgb, var(--platform-color, #1DA1F2) 62%, #C9D4E0);
+                box-shadow:
+                    0 21px 40px rgba(15,23,42,.15),
+                    0 0 34px color-mix(in srgb, var(--platform-color, #1DA1F2) 20%, transparent),
+                    inset 0 1px 0 #FFFFFF;
+                filter: saturate(1.08);
+            }
+
+            .rec-rank-card::before {
+                background: linear-gradient(180deg, var(--platform-color, #1DA1F2), var(--rank-accent, #F4B942));
+                box-shadow: 0 0 18px color-mix(in srgb, var(--platform-color, #1DA1F2) 24%, transparent);
+            }
+
+            .rec-rank-card::after {
+                background: linear-gradient(105deg, transparent 36%, rgba(255,255,255,.78) 48%, transparent 60%);
+                opacity: .42;
+            }
+
+            .rec-rank-glow {
+                background: color-mix(in srgb, var(--platform-color, #1DA1F2) 13%, transparent);
+                opacity: .72;
+            }
+
+            .rec-rank-number {
+                color: #172033;
+                background:
+                    linear-gradient(145deg, color-mix(in srgb, var(--rank-accent, #F4B942) 18%, #FFFFFF), color-mix(in srgb, var(--platform-color, #1DA1F2) 10%, #FFFFFF));
+                border-color: color-mix(in srgb, var(--rank-accent, #F4B942) 58%, #D6DEE8);
+                box-shadow:
+                    0 7px 18px color-mix(in srgb, var(--rank-accent, #F4B942) 18%, transparent),
+                    inset 0 1px 0 #FFFFFF;
+            }
+
+            .rec-rank-user {
+                color: #172033;
+                text-shadow: none;
+            }
+
+            .rec-rank-platform {
+                color: #334155;
+                border-color: color-mix(in srgb, var(--platform-color, #1DA1F2) 40%, #D7E0EA);
+                background: color-mix(in srgb, var(--platform-color, #1DA1F2) 10%, #FFFFFF);
+                box-shadow: inset 0 1px 0 rgba(255,255,255,.94);
+            }
+
+            .rec-rank-platform b {
+                color: #FFFFFF;
+                background: color-mix(in srgb, var(--platform-color, #1DA1F2) 82%, #334155);
+                box-shadow: 0 3px 10px color-mix(in srgb, var(--platform-color, #1DA1F2) 20%, transparent);
+            }
+
+            .rec-rank-score {
+                color: color-mix(in srgb, var(--platform-color, #1DA1F2) 74%, #172033);
+                text-shadow: 0 5px 18px color-mix(in srgb, var(--platform-color, #1DA1F2) 16%, transparent);
+            }
+
+            .rec-rank-score em {
+                color: #6B778A;
+            }
+            """
+        ).strip()
+
     # Memakai iframe HTML internal agar HTML kartu benar-benar dirender sebagai UI,
     # bukan terbaca sebagai teks/kode oleh Markdown Streamlit.
     rank_html = dedent(
@@ -9897,6 +9987,9 @@ def _render_matrix_rank_cards(
                     font-weight: 800;
                     letter-spacing: 0;
                 }}
+
+                {rank_theme_css}
+
                 @keyframes recRankEnter {{
                     0% {{
                         opacity: 0;
