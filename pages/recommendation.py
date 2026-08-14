@@ -10971,6 +10971,9 @@ def _current_matrix_filter_values(
         st.session_state.get(keys["platform_widget"], list(default_platforms)),
         platform_labels,
     )
+    # Multiselect kosong berarti semua platform sesuai teks bantuan UI.
+    if not platforms:
+        platforms = default_platforms
     try:
         score = int(st.session_state.get(keys["score_widget"], default_score))
     except (TypeError, ValueError):
@@ -10994,6 +10997,10 @@ def _applied_matrix_filter_values(
         st.session_state.get(keys["platform_applied"], list(default_platforms)),
         platform_labels,
     )
+    # Snapshot kosong juga diperlakukan sebagai semua platform agar tidak
+    # tercatat sebagai filter aktif semu.
+    if not platforms:
+        platforms = default_platforms
     try:
         score = int(st.session_state.get(keys["score_applied"], default_score))
     except (TypeError, ValueError):
@@ -11068,66 +11075,244 @@ def _reset_matrix_filter_state(
         st.error(f"Filter matriks belum dapat direset. Detail: {exc}")
 
 
+def _render_matrix_filter_interaction_guard(layanan: str) -> None:
+    """Jaga tombol Apply/Reset tetap inert saat filter matriks belum aktif.
+
+    Kontrol utama berada di dalam ``st.form`` sehingga perubahan selectbox,
+    multiselect, dan slider hanya tersimpan di browser sampai salah satu tombol
+    form ditekan. Guard ini bekerja di sisi browser untuk mempertahankan tampilan
+    tombol normal (bukan disabled) sambil memblokir pointer/keyboard ketika semua
+    filter masih pada nilai awal dan belum ada filter aktif yang diterapkan.
+    """
+    try:
+        service_key = _safe_key(layanan)
+        render_html_iframe(
+            fr"""
+            <script>
+            (() => {{
+                const parentWindow = window.parent;
+                const doc = parentWindow.document;
+                const cleanupKey = "__recMatrixMainFilterGuard_{service_key}";
+
+                if (typeof parentWindow[cleanupKey] === "function") {{
+                    parentWindow[cleanupKey]();
+                }}
+
+                const rapikan = (nilai) => String(nilai || "")
+                    .replace(/\s+/g, " " )
+                    .trim();
+
+                const marker = () => doc.querySelector(
+                    '.rec-matrix-main-form-marker[data-service="{service_key}"]'
+                );
+
+                const cariKontrol = (form, namaLabel, testId) => {{
+                    if (!form) return null;
+                    const label = Array.from(form.querySelectorAll("label"))
+                        .find((item) => rapikan(item.textContent).toLowerCase() === namaLabel.toLowerCase());
+                    if (!label) return null;
+                    return label.closest(`[data-testid="${{testId}}"]`);
+                }};
+
+                const nilaiSelect = (kontrol) => {{
+                    if (!kontrol) return "";
+                    const bidang = kontrol.querySelector('[data-baseweb="select"]');
+                    const input = kontrol.querySelector("input");
+                    return rapikan(bidang?.innerText || bidang?.textContent || input?.value || "");
+                }};
+
+                const nilaiSlider = (kontrol) => {{
+                    if (!kontrol) return NaN;
+                    const slider = kontrol.querySelector('[role="slider"]');
+                    const raw = slider?.getAttribute("aria-valuenow") ||
+                        slider?.getAttribute("aria-valuetext") ||
+                        slider?.textContent || "";
+                    const found = String(raw).match(/-?\d+(?:[.,]\d+)?/);
+                    return found ? Number(found[0].replace(",", ".")) : NaN;
+                }};
+
+                const ubahStatusTombol = (tombol, dibuatInert) => {{
+                    if (!tombol) return;
+                    tombol.dataset.recMatrixFilterInert = dibuatInert ? "true" : "false";
+                    tombol.style.pointerEvents = dibuatInert ? "none" : "";
+                    tombol.style.cursor = dibuatInert ? "default" : "";
+                    tombol.tabIndex = dibuatInert ? -1 : 0;
+                }};
+
+                const sinkronkan = () => {{
+                    const penanda = marker();
+                    const form = penanda?.closest('[data-testid="stForm"]') || penanda?.closest("form");
+                    if (!penanda || !form) return;
+
+                    const tombol = Array.from(form.querySelectorAll("button"));
+                    const tombolTerapkan = tombol.find((item) => rapikan(item.innerText) === "Terapkan Filter");
+                    const tombolReset = tombol.find((item) => rapikan(item.innerText) === "Reset Filter");
+                    if (!tombolTerapkan || !tombolReset) return;
+
+                    const defaultTopic = rapikan(penanda.dataset.defaultTopic);
+                    const defaultPlatforms = rapikan(penanda.dataset.defaultPlatforms)
+                        .split("|")
+                        .map(rapikan)
+                        .filter(Boolean);
+                    const defaultScore = Number(penanda.dataset.defaultScore || "1");
+                    const appliedActive = penanda.dataset.appliedActive === "true";
+
+                    const topicControl = cariKontrol(form, "Fokus topik", "stSelectbox");
+                    const platformControl = cariKontrol(form, "Filter platform", "stMultiSelect");
+                    const scoreControl = cariKontrol(form, "Skor minimum", "stSlider");
+
+                    const topicValue = nilaiSelect(topicControl);
+                    const platformText = nilaiSelect(platformControl);
+                    const scoreValue = nilaiSlider(scoreControl);
+
+                    const topicAktif = topicValue !== defaultTopic;
+                    const jumlahPlatformDefaultTerpilih = defaultPlatforms
+                        .filter((label) => platformText.includes(label)).length;
+                    const seluruhPlatformAwal = defaultPlatforms.length > 0 && (
+                        jumlahPlatformDefaultTerpilih === defaultPlatforms.length ||
+                        jumlahPlatformDefaultTerpilih === 0
+                    );
+                    const platformAktif = !seluruhPlatformAwal;
+                    const scoreAktif = Number.isFinite(scoreValue) && scoreValue !== defaultScore;
+                    const filterAktif = appliedActive || topicAktif || platformAktif || scoreAktif;
+
+                    ubahStatusTombol(tombolTerapkan, !filterAktif);
+                    ubahStatusTombol(tombolReset, !filterAktif);
+                }};
+
+                let timer = null;
+                const jadwalkan = () => {{
+                    window.clearTimeout(timer);
+                    timer = window.setTimeout(sinkronkan, 30);
+                }};
+
+                const observer = new MutationObserver(jadwalkan);
+                observer.observe(doc.body, {{
+                    subtree: true,
+                    childList: true,
+                    characterData: true,
+                    attributes: true,
+                    attributeFilter: ["value", "aria-valuenow", "aria-valuetext"]
+                }});
+
+                doc.addEventListener("input", jadwalkan, true);
+                doc.addEventListener("change", jadwalkan, true);
+                doc.addEventListener("click", jadwalkan, true);
+
+                parentWindow[cleanupKey] = () => {{
+                    observer.disconnect();
+                    doc.removeEventListener("input", jadwalkan, true);
+                    doc.removeEventListener("change", jadwalkan, true);
+                    doc.removeEventListener("click", jadwalkan, true);
+                    window.clearTimeout(timer);
+                }};
+
+                sinkronkan();
+                window.setTimeout(sinkronkan, 200);
+            }})();
+            </script>
+            """,
+            height=0,
+        )
+    except Exception:
+        # Guard hanya peningkatan UX. Backend callback tetap memvalidasi state.
+        return None
+
+
 @_FRAGMENT_DECORATOR
 def _render_matrix_filter_fragment(
     layanan: str,
     topic_labels: list[str],
     platform_labels: list[str],
 ) -> None:
-    """Render kontrol matriks tanpa memuat ulang analisis sebelum Apply valid."""
+    """Render filter matriks secara manual tanpa rerun saat kontrol baru diubah."""
     try:
         _ensure_matrix_filter_state(layanan, topic_labels, platform_labels)
         keys = _matrix_filter_state_keys(layanan)
-
-        control_1, control_2, control_3, control_reset, control_apply = st.columns(
-            [1.15, 1.25, 0.92, 0.72, 0.96],
-            gap="medium",
+        defaults = _matrix_filter_defaults(topic_labels, platform_labels)
+        applied_values = _applied_matrix_filter_values(
+            layanan,
+            topic_labels,
+            platform_labels,
         )
-        with control_1:
-            st.selectbox(
-                "Fokus topik",
-                options=topic_labels,
-                key=keys["topic_widget"],
-                help="Kolom ini dipakai untuk mengurutkan influencer dari skor tertinggi.",
+        applied_filter_active = applied_values != defaults
+        default_topic, default_platforms, default_score = defaults
+        default_platform_text = "|".join(default_platforms)
+        service_key = _safe_key(layanan)
+
+        # Form menahan seluruh perubahan widget di sisi browser. Memilih topik,
+        # platform, atau skor tidak lagi mererun fragment/halaman. Nilai baru
+        # baru dikirim ke Python ketika Apply atau Reset benar-benar ditekan.
+        with st.form(
+            key=f"rec_matrix_filter_form_{service_key}",
+            clear_on_submit=False,
+        ):
+            st.markdown(
+                (
+                    '<span class="rec-matrix-main-form-marker" '
+                    f'data-service="{escape(service_key)}" '
+                    f'data-default-topic="{escape(default_topic)}" '
+                    f'data-default-platforms="{escape(default_platform_text)}" '
+                    f'data-default-score="{int(default_score)}" '
+                    f'data-applied-active="{str(applied_filter_active).lower()}" '
+                    'aria-hidden="true"></span>'
+                ),
+                unsafe_allow_html=True,
             )
-        with control_2:
-            st.multiselect(
-                "Filter platform",
-                options=platform_labels,
-                key=keys["platform_widget"],
-                help="Kosongkan semua pilihan untuk menampilkan semua platform.",
+
+            control_1, control_2, control_3, control_reset, control_apply = st.columns(
+                [1.15, 1.25, 0.92, 0.72, 0.96],
+                gap="medium",
             )
-        with control_3:
-            st.slider(
-                "Skor minimum",
-                min_value=1,
-                max_value=10,
-                step=1,
-                key=keys["score_widget"],
-                help="Naikkan nilai ini untuk menyaring hanya influencer dengan kecocokan tinggi.",
-            )
-        with control_reset:
-            st.markdown("<div style='height: 31px;'></div>", unsafe_allow_html=True)
-            st.button(
-                "Reset Filter",
-                key=f"rec_matrix_reset_filter_{_safe_key(layanan)}",
-                use_container_width=True,
-                on_click=_reset_matrix_filter_state,
-                args=(layanan, topic_labels, platform_labels),
-            )
-        with control_apply:
-            st.markdown("<div style='height: 31px;'></div>", unsafe_allow_html=True)
-            st.button(
-                "Terapkan Filter",
-                key=f"rec_matrix_apply_filter_{_safe_key(layanan)}",
-                use_container_width=True,
-                type="primary",
-                on_click=_apply_matrix_filter_state,
-                args=(layanan, topic_labels, platform_labels),
-            )
+            with control_1:
+                st.selectbox(
+                    "Fokus topik",
+                    options=topic_labels,
+                    key=keys["topic_widget"],
+                    help="Kolom ini dipakai untuk mengurutkan influencer dari skor tertinggi.",
+                )
+            with control_2:
+                st.multiselect(
+                    "Filter platform",
+                    options=platform_labels,
+                    key=keys["platform_widget"],
+                    help="Kosongkan semua pilihan untuk menampilkan semua platform.",
+                )
+            with control_3:
+                st.slider(
+                    "Skor minimum",
+                    min_value=1,
+                    max_value=10,
+                    step=1,
+                    key=keys["score_widget"],
+                    help="Naikkan nilai ini untuk menyaring hanya influencer dengan kecocokan tinggi.",
+                )
+            with control_reset:
+                st.markdown("<div style='height: 31px;'></div>", unsafe_allow_html=True)
+                st.form_submit_button(
+                    "Reset Filter",
+                    use_container_width=True,
+                    on_click=_reset_matrix_filter_state,
+                    args=(layanan, topic_labels, platform_labels),
+                )
+            with control_apply:
+                st.markdown("<div style='height: 31px;'></div>", unsafe_allow_html=True)
+                st.form_submit_button(
+                    "Terapkan Filter",
+                    use_container_width=True,
+                    type="primary",
+                    on_click=_apply_matrix_filter_state,
+                    args=(layanan, topic_labels, platform_labels),
+                )
+
+        # Tombol tetap terlihat seperti tombol biasa, tetapi benar-benar inert
+        # saat semua kontrol masih default dan belum ada filter aktif. Guard JS
+        # juga memperbarui status tombol langsung saat draft berubah di form,
+        # tanpa meminta rerun ke server.
+        _render_matrix_filter_interaction_guard(layanan)
 
         # Callback hanya mengisi event saat Apply/Reset benar-benar mengubah state.
-        # Klik Apply tanpa perubahan berhenti pada fragment ini tanpa aksi analisis.
+        # Apply tanpa perubahan pada filter aktif tetap berhenti di fragment ini.
         if bool(st.session_state.pop(keys["event"], False)):
             st.rerun(scope="app")
     except Exception as exc:
