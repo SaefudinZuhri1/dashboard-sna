@@ -3458,6 +3458,64 @@ def _inject_profile_css() -> None:
                     opacity: 1 !important;
                 }
 
+                /* V5.12: Rapikan field Edit Profil pada Light Theme.
+                   Border ditempatkan di wrapper BaseWeb agar simetris dan tidak terpotong oleh input internal. */
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] [data-testid="stTextInput"] div[data-baseweb="input"] {
+                    min-height: 56px !important;
+                    border: 1.5px solid #D4DCE8 !important;
+                    border-radius: 14px !important;
+                    background: #FFFFFF !important;
+                    box-shadow:
+                        0 1px 2px rgba(15, 23, 42, 0.035),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+                    overflow: hidden !important;
+                    transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] [data-testid="stTextInput"] div[data-baseweb="input"]:hover {
+                    border-color: #B8C3D3 !important;
+                    box-shadow:
+                        0 2px 8px rgba(15, 23, 42, 0.05),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] [data-testid="stTextInput"]:focus-within div[data-baseweb="input"] {
+                    border-color: #F04438 !important;
+                    box-shadow:
+                        0 0 0 3px rgba(229, 57, 53, 0.10),
+                        0 6px 16px rgba(15, 23, 42, 0.06),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] [data-testid="stTextInput"] div[data-baseweb="input"] input {
+                    min-height: 53px !important;
+                    padding: 0 16px !important;
+                    border: 0 !important;
+                    border-radius: 13px !important;
+                    background: transparent !important;
+                    box-shadow: none !important;
+                    transform: none !important;
+                }
+
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] [data-testid="stTextInput"] div[data-baseweb="input"] input:hover,
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] [data-testid="stTextInput"] div[data-baseweb="input"] input:focus {
+                    border: 0 !important;
+                    background: transparent !important;
+                    box-shadow: none !important;
+                    transform: none !important;
+                }
+
+                /* V5.12: Teks tombol Simpan Perubahan wajib kontras pada tombol primary Light Theme. */
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] div[data-testid="stFormSubmitButton"] button[kind="primary"],
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] div[data-testid="stFormSubmitButton"] button[kind="primary"] p,
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] div[data-testid="stFormSubmitButton"] button[kind="primary"] span,
+                html body:has(.profile-v11-theme-light) [data-testid="stForm"] div[data-testid="stFormSubmitButton"] button[kind="primary"] div {
+                    color: #FFFFFF !important;
+                    -webkit-text-fill-color: #FFFFFF !important;
+                    opacity: 1 !important;
+                    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.14) !important;
+                }
+
                 html body:has(.profile-v11-theme-light) .profile-v11-form-submit-note {
                     border-color: rgba(76,175,80,0.22) !important;
                     background: #F0FAF3 !important;
