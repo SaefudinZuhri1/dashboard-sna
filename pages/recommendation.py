@@ -5712,6 +5712,140 @@ div[data-testid="stButton"] button[kind="secondary"]:hover {
     box-shadow: 0 11px 24px rgba(229,57,53,.10) !important;
 }
 
+
+/* -------------------------------------------------------------------------- */
+/* FILTER MATRIKS UTAMA — LIGHT THEME                                         */
+/* Tujuan: satu ritme tinggi, tombol presisi, dan visual lebih tenang.         */
+/* -------------------------------------------------------------------------- */
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) {
+    margin: 4px 0 16px !important;
+    padding: 16px 18px 18px !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 18px !important;
+    background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFD 100%) !important;
+    box-shadow: 0 12px 30px rgba(15,23,42,.065) !important;
+    animation: none !important;
+}
+
+.rec-matrix-main-form-marker {
+    display: none !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stHorizontalBlock"] {
+    align-items: flex-end !important;
+    gap: 16px !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) label {
+    margin-bottom: 7px !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) label p {
+    color: #344054 !important;
+    font-size: 14px !important;
+    font-weight: 760 !important;
+    line-height: 1.25 !important;
+    letter-spacing: -.01em !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+    min-height: 54px !important;
+    border: 1px solid #D9E1EA !important;
+    border-radius: 14px !important;
+    background: #FFFFFF !important;
+    box-shadow: 0 4px 12px rgba(15,23,42,.035) !important;
+    transition: border-color .16s ease, box-shadow .16s ease !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover,
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div:hover {
+    border-color: #BCC8D6 !important;
+    box-shadow: 0 5px 14px rgba(15,23,42,.055) !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+    min-height: 32px !important;
+    border-radius: 9px !important;
+    border: 1px solid rgba(229,57,53,.14) !important;
+    background: #EF3E3A !important;
+    box-shadow: none !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stMultiSelect"] span[data-baseweb="tag"] * {
+    color: #FFFFFF !important;
+    font-weight: 750 !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSlider"] {
+    padding-bottom: 5px !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stSlider"] [role="slider"] {
+    border-color: #E53935 !important;
+    background: #E53935 !important;
+    box-shadow: 0 0 0 4px rgba(229,57,53,.10) !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-filter-btn {
+    min-height: 54px !important;
+    height: 54px !important;
+    padding: 0 18px !important;
+    border-radius: 14px !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    letter-spacing: -.01em !important;
+    line-height: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: border-color .16s ease, background .16s ease, box-shadow .16s ease !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-btn-reset {
+    border: 1.5px solid #EF4444 !important;
+    color: #B42318 !important;
+    background: #FFFFFF !important;
+    box-shadow: 0 6px 16px rgba(15,23,42,.055) !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-btn-reset:not(.rec-matrix-btn-inert):hover {
+    border-color: #DC2626 !important;
+    color: #991B1B !important;
+    background: #FFF7F6 !important;
+    box-shadow: 0 8px 19px rgba(229,57,53,.10) !important;
+    transform: translateY(-1px) !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-btn-apply {
+    border: 1px solid #E23C3A !important;
+    color: #FFFFFF !important;
+    background: linear-gradient(135deg, #EF4444 0%, #E53935 58%, #D9468F 100%) !important;
+    box-shadow: 0 9px 22px rgba(229,57,53,.18) !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-btn-apply:not(.rec-matrix-btn-inert):hover {
+    background: linear-gradient(135deg, #F04A47 0%, #E53935 60%, #CE3E86 100%) !important;
+    box-shadow: 0 11px 25px rgba(229,57,53,.24) !important;
+    transform: translateY(-1px) !important;
+}
+
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-btn-inert,
+div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) .rec-matrix-btn-inert:hover {
+    cursor: default !important;
+    transform: none !important;
+    filter: none !important;
+}
+
+@media (max-width: 1050px) {
+    div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) {
+        padding: 14px !important;
+    }
+
+    div[data-testid="stForm"]:has(.rec-matrix-main-form-marker) div[data-testid="stHorizontalBlock"] {
+        gap: 12px !important;
+    }
+}
+
 div[data-testid="stExpander"] {
     border-color: #DCE3EB !important;
     background: linear-gradient(145deg, #FFFFFF, #F8FAFC) !important;
@@ -11134,6 +11268,7 @@ def _render_matrix_filter_interaction_guard(layanan: str) -> None:
                 const ubahStatusTombol = (tombol, dibuatInert) => {{
                     if (!tombol) return;
                     tombol.dataset.recMatrixFilterInert = dibuatInert ? "true" : "false";
+                    tombol.classList.toggle("rec-matrix-btn-inert", dibuatInert);
                     tombol.style.pointerEvents = dibuatInert ? "none" : "";
                     tombol.style.cursor = dibuatInert ? "default" : "";
                     tombol.tabIndex = dibuatInert ? -1 : 0;
@@ -11144,10 +11279,15 @@ def _render_matrix_filter_interaction_guard(layanan: str) -> None:
                     const form = penanda?.closest('[data-testid="stForm"]') || penanda?.closest("form");
                     if (!penanda || !form) return;
 
+                    form.classList.add("rec-matrix-filter-form");
+
                     const tombol = Array.from(form.querySelectorAll("button"));
                     const tombolTerapkan = tombol.find((item) => rapikan(item.innerText) === "Terapkan Filter");
                     const tombolReset = tombol.find((item) => rapikan(item.innerText) === "Reset Filter");
                     if (!tombolTerapkan || !tombolReset) return;
+
+                    tombolTerapkan.classList.add("rec-matrix-filter-btn", "rec-matrix-btn-apply");
+                    tombolReset.classList.add("rec-matrix-filter-btn", "rec-matrix-btn-reset");
 
                     const defaultTopic = rapikan(penanda.dataset.defaultTopic);
                     const defaultPlatforms = rapikan(penanda.dataset.defaultPlatforms)
