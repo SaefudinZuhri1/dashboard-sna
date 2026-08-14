@@ -5898,13 +5898,13 @@ def _select_balanced_platform_candidates(
     influencers: pd.DataFrame,
     per_platform_limit: int = PLATFORM_CARD_TARGET,
 ) -> pd.DataFrame:
-    """Pilih kandidat seimbang: 3 Twitter/X, 3 Instagram, dan 3 TikTok.
+    """Pilih kandidat lintas platform dengan target utama 3 + 3 + 3.
 
-    Fungsi ini dipakai setelah filter tipe akun (Influencer/Akun Media), sehingga
-    setiap kategori tetap mempertahankan identitas akun yang sudah diklasifikasikan.
-    Kandidat pada tiap platform diurutkan berdasarkan skor rekomendasi, centrality,
-    dan followers. Hasil diinterleave agar setiap baris grid berisi satu akun dari
-    Twitter/X, Instagram, dan TikTok.
+    Prioritas pertama tetap mengambil kandidat terbaik dari Twitter/X, Instagram,
+    dan TikTok secara seimbang. Jika salah satu platform memang tidak mempunyai
+    cukup akun untuk tipe yang sedang dipilih, slot kosong diisi kandidat terbaik
+    berikutnya dari platform lain. Dengan cara ini grid tetap terisi tanpa membuat
+    akun dummy atau mengubah tipe akun hanya demi memenuhi kuota visual.
     """
     try:
         if influencers is None or influencers.empty:
@@ -5946,6 +5946,7 @@ def _select_balanced_platform_candidates(
             )
 
         limit = max(int(per_platform_limit), 1)
+        target_total = limit * len(PLATFORM_ORDER)
         platform_frames: dict[str, pd.DataFrame] = {}
         for platform_key in PLATFORM_ORDER:
             platform_frames[platform_key] = (
@@ -5954,7 +5955,7 @@ def _select_balanced_platform_candidates(
                 .reset_index(drop=True)
             )
 
-        # Susunan interleave membuat setiap baris grid 3 kolom konsisten:
+        # Susunan utama tetap interleave agar setiap baris grid berusaha berisi
         # Twitter/X | Instagram | TikTok.
         ordered_rows: list[pd.DataFrame] = []
         for rank_index in range(limit):
@@ -5967,12 +5968,39 @@ def _select_balanced_platform_candidates(
             return work.iloc[0:0].copy()
 
         result = pd.concat(ordered_rows, ignore_index=True, sort=False)
-        result = result.drop_duplicates(
-            subset=["username_key", "platform"]
+        dedupe_columns = (
+            ["username_key", "platform"]
             if "username_key" in result.columns
-            else ["username", "platform"],
-            keep="first",
-        ).reset_index(drop=True)
+            else ["username", "platform"]
+        )
+        result = result.drop_duplicates(subset=dedupe_columns, keep="first")
+
+        # Fallback terkontrol untuk layanan/platform yang datanya belum seimbang.
+        # Kandidat tambahan tetap berasal dari data aktual dan tipe akun yang sama.
+        # Tidak ada placeholder ataupun perubahan label Media/Influencer.
+        if len(result) < target_total:
+            selected_keys = {
+                tuple(str(row.get(column, "")) for column in dedupe_columns)
+                for _, row in result.iterrows()
+            }
+            remaining_rows: list[pd.DataFrame] = []
+            for _, row in work.iterrows():
+                key = tuple(str(row.get(column, "")) for column in dedupe_columns)
+                if key in selected_keys:
+                    continue
+                remaining_rows.append(row.to_frame().T)
+                selected_keys.add(key)
+                if len(result) + len(remaining_rows) >= target_total:
+                    break
+
+            if remaining_rows:
+                result = pd.concat(
+                    [result, *remaining_rows],
+                    ignore_index=True,
+                    sort=False,
+                )
+
+        result = result.head(target_total).reset_index(drop=True)
         result["recommendation_rank"] = range(1, len(result) + 1)
         return result
     except Exception as error:
@@ -6748,7 +6776,13 @@ def _score_content_validated_candidates(
 
 @st.cache_data(show_spinner=False, max_entries=12)
 def _build_indibiz_influencer_data() -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Pilih maksimal sembilan influencer IndiBiz pada setiap platform."""
+    """Bangun kandidat IndiBiz dari SNA dan konten aktual lintas platform.
+
+    SNA IndiBiz terutama menyediakan kandidat Twitter/X. Instagram dan TikTok
+    dilengkapi dari penulis konten aktual pada dataset sentimen IndiBiz. Seluruh
+    kandidat tetap non-brand, lalu diranking per platform tanpa membuat akun
+    dummy atau placeholder.
+    """
     columns = [
         "username", "username_key", "platform", "followers",
         "degree_centrality", "network_edges", "content_count",
@@ -6757,80 +6791,154 @@ def _build_indibiz_influencer_data() -> tuple[pd.DataFrame, dict[str, Any]]:
         "selection_basis", "layanan",
     ]
     try:
+        # 1) Kandidat jaringan. Pada data penelitian IndiBiz, edge SNA paling
+        # kuat tersedia pada Twitter/X sehingga bagian ini tidak boleh menjadi
+        # satu-satunya sumber kandidat rekomendasi.
         sna_df = load_sna_data("IndiBiz").copy()
         service_df = _filter_sna_by_service(sna_df, "IndiBiz")
-        candidates = _calculate_influencers_from_sna(service_df, "IndiBiz")
-        if candidates.empty:
-            raise ValueError("Edge SNA IndiBiz tidak menghasilkan kandidat non-brand.")
-
-        candidates["followers"] = pd.to_numeric(
-            candidates["followers"], errors="coerce"
-        ).fillna(0).clip(lower=0)
-        candidates["degree_centrality"] = pd.to_numeric(
-            candidates["degree_centrality"], errors="coerce"
-        ).fillna(0).clip(lower=0)
-        candidates["network_edges"] = pd.to_numeric(
-            candidates["network_edges"], errors="coerce"
-        ).fillna(0).clip(lower=0)
-
-        follower_log = candidates["followers"].map(math.log1p)
-        follower_max = float(follower_log.max()) if not follower_log.empty else 0.0
-        degree_max = float(candidates["degree_centrality"].max()) if not candidates.empty else 0.0
-        follower_norm = follower_log / follower_max if follower_max > 0 else 0.0
-        degree_norm = (
-            candidates["degree_centrality"] / degree_max
-            if degree_max > 0
-            else 0.0
+        network_candidates = _calculate_influencers_from_sna(
+            service_df,
+            "IndiBiz",
         )
-        candidates["recommendation_score"] = (
-            degree_norm * 0.55 + follower_norm * 0.45
-        )
-        candidates["selection_basis"] = "Followers + degree centrality"
-
-        content_stats = _build_content_author_stats("IndiBiz")
-        if not content_stats.empty:
-            candidates = candidates.merge(
-                content_stats,
-                on=["username_key", "platform"],
-                how="left",
-                suffixes=("", "_content"),
+        if network_candidates.empty:
+            network_candidates = pd.DataFrame(
+                columns=[
+                    "username", "username_key", "platform", "followers",
+                    "degree_centrality", "network_edges", "layanan",
+                ]
             )
-            if "followers_content" in candidates.columns:
-                candidates["followers"] = candidates[["followers", "followers_content"]].max(axis=1)
-                candidates = candidates.drop(columns=["followers_content"], errors="ignore")
-            if "username_content" in candidates.columns:
-                candidates["username"] = candidates["username_content"].fillna(candidates["username"])
-                candidates = candidates.drop(columns=["username_content"], errors="ignore")
+
+        # 2) Penulis konten aktual. Sumber ini menyediakan kandidat Instagram
+        # dan TikTok yang sebelumnya tidak pernah masuk ke pool khusus IndiBiz.
+        content_stats = _build_content_author_stats("IndiBiz")
+
+        # 3) Gabungkan kandidat yang mempunyai bukti jaringan + konten.
+        validated_pool = network_candidates.merge(
+            content_stats,
+            on=["username_key", "platform"],
+            how="inner",
+            suffixes=("_network", "_content"),
+        )
+        if not validated_pool.empty:
+            validated_pool["username"] = validated_pool[
+                "username_content"
+            ].fillna(validated_pool["username_network"])
+            validated_pool["followers"] = validated_pool[
+                ["followers_network", "followers_content"]
+            ].max(axis=1)
+            validated_pool = validated_pool.drop(
+                columns=[
+                    "username_network", "username_content",
+                    "followers_network", "followers_content",
+                ],
+                errors="ignore",
+            )
+
+        candidate_frames: list[pd.DataFrame] = []
+        if not validated_pool.empty:
+            candidate_frames.append(validated_pool)
+
+        known_keys: set[tuple[str, str]] = set()
+        if not validated_pool.empty:
+            known_keys.update(
+                zip(
+                    validated_pool["username_key"].astype(str),
+                    validated_pool["platform"].astype(str),
+                )
+            )
+
+        # Kandidat jaringan yang belum mempunyai pasangan konten tetap boleh
+        # tampil karena mempunyai bukti metrik SNA/followers yang nyata.
+        network_extra = network_candidates.copy()
+        if not network_extra.empty:
+            network_mask = [
+                (str(row.username_key), str(row.platform)) not in known_keys
+                for row in network_extra.itertuples()
+            ]
+            network_extra = network_extra.loc[network_mask].copy()
+            for column in (
+                "content_count", "relevant_content_count", "content_engagement",
+            ):
+                network_extra[column] = 0
+            network_extra["dominant_topic"] = ""
+            network_extra["content_topics"] = ""
+            if not network_extra.empty:
+                candidate_frames.append(network_extra)
+                known_keys.update(
+                    zip(
+                        network_extra["username_key"].astype(str),
+                        network_extra["platform"].astype(str),
+                    )
+                )
+
+        # INILAH PERBAIKAN UTAMA: penulis konten Instagram/TikTok yang valid
+        # tidak lagi dibuang hanya karena tidak mempunyai edge pada file SNA.
+        content_extra = content_stats.copy()
+        if not content_extra.empty:
+            content_mask = [
+                (str(row.username_key), str(row.platform)) not in known_keys
+                for row in content_extra.itertuples()
+            ]
+            content_extra = content_extra.loc[content_mask].copy()
+            content_extra["degree_centrality"] = 0.0
+            content_extra["network_edges"] = 0
+            content_extra["layanan"] = "IndiBiz"
+            if not content_extra.empty:
+                candidate_frames.append(content_extra)
+
+        if not candidate_frames:
+            raise ValueError(
+                "Tidak ada kandidat IndiBiz dari data SNA maupun konten aktual."
+            )
+
+        pool = pd.concat(candidate_frames, ignore_index=True, sort=False)
+        pool = pool.drop_duplicates(
+            subset=["username_key", "platform"],
+            keep="first",
+        )
 
         for column in (
-            "content_count", "relevant_content_count", "content_engagement",
+            "followers", "degree_centrality", "network_edges", "content_count",
+            "relevant_content_count", "content_engagement",
         ):
-            if column not in candidates.columns:
-                candidates[column] = 0
-            candidates[column] = pd.to_numeric(
-                candidates[column], errors="coerce"
-            ).fillna(0)
+            if column not in pool.columns:
+                pool[column] = 0
+            pool[column] = pd.to_numeric(
+                pool[column],
+                errors="coerce",
+            ).fillna(0).clip(lower=0)
+
         for column in ("dominant_topic", "content_topics"):
-            if column not in candidates.columns:
-                candidates[column] = ""
-            candidates[column] = candidates[column].fillna("").astype(str)
+            if column not in pool.columns:
+                pool[column] = ""
+            pool[column] = pool[column].fillna("").astype(str)
 
-        ranked = candidates.sort_values(
-            ["recommendation_score", "degree_centrality", "followers", "username"],
-            ascending=[False, False, False, True],
-        ).drop_duplicates(subset=["username_key", "platform"], keep="first")
+        pool["layanan"] = "IndiBiz"
 
+        # 4) Ranking dilakukan per platform supaya platform dengan volume data
+        # besar tidak menghabiskan seluruh slot rekomendasi.
         selected_frames: list[pd.DataFrame] = []
         for platform in PLATFORM_ORDER:
-            group = ranked[ranked["platform"].eq(platform)].copy()
+            group = pool[pool["platform"].eq(platform)].copy()
             if group.empty:
                 continue
+
+            group = _score_content_validated_candidates(group, platform)
+            group = group.sort_values(
+                [
+                    "recommendation_score", "degree_centrality", "followers",
+                    "relevant_content_count", "content_count", "username",
+                ],
+                ascending=[False, False, False, False, False, True],
+            )
             group = _select_balanced_account_type_candidates(group)
             if not group.empty:
                 selected_frames.append(group)
 
         if not selected_frames:
-            raise ValueError("Tidak ada kandidat influencer IndiBiz pada platform yang tersedia.")
+            raise ValueError(
+                "Tidak ada kandidat rekomendasi IndiBiz pada platform yang tersedia."
+            )
 
         result = pd.concat(selected_frames, ignore_index=True, sort=False)
         result = result.sort_values(
@@ -6839,35 +6947,50 @@ def _build_indibiz_influencer_data() -> tuple[pd.DataFrame, dict[str, Any]]:
         ).reset_index(drop=True)
         result["recommendation_rank"] = range(1, len(result) + 1)
         result["layanan"] = "IndiBiz"
+
         for column in columns:
             if column not in result.columns:
-                result[column] = "" if column in {
-                    "username", "username_key", "platform", "dominant_topic",
-                    "content_topics", "selection_basis", "layanan",
-                } else 0
+                result[column] = (
+                    ""
+                    if column in {
+                        "username", "username_key", "platform",
+                        "dominant_topic", "content_topics",
+                        "selection_basis", "layanan",
+                    }
+                    else 0
+                )
         result = result[columns]
 
-        is_real = sna_file_exists("IndiBiz")
-        source_name = (
-            get_sna_source_names("IndiBiz")
-            if is_real
-            else "Dummy SNA IndiBiz dari utils/dummy_data.py"
-        )
+        has_real_sna = sna_file_exists("IndiBiz")
+        has_real_content = sentiment_file_exists("IndiBiz")
+        source_parts: list[str] = []
+        if has_real_content:
+            source_parts.append(get_sentiment_source_name("IndiBiz"))
+        if has_real_sna:
+            source_parts.append(get_sna_source_names("IndiBiz"))
+        source_name = " + ".join(part for part in source_parts if part)
+        if not source_name:
+            source_name = "Data IndiBiz yang tersedia"
+
         return result, {
-            "is_real": is_real,
+            "is_real": bool(has_real_sna or has_real_content),
             "source_name": source_name,
             "actual_rows": int(len(result)),
             "content_authors": int(len(content_stats)),
-            "ranking_method": "55% degree centrality + 45% followers",
+            "ranking_method": (
+                "Degree centrality + followers + bukti konten relevan"
+            ),
         }
     except Exception as error:
         st.error(f"Gagal menghitung influencer IndiBiz: {error}")
         return pd.DataFrame(columns=columns), {
             "is_real": False,
-            "source_name": "Fallback SNA IndiBiz belum dapat dihitung",
+            "source_name": "Fallback kandidat IndiBiz belum dapat dihitung",
             "actual_rows": 0,
             "content_authors": 0,
-            "ranking_method": "55% degree centrality + 45% followers",
+            "ranking_method": (
+                "Degree centrality + followers + bukti konten relevan"
+            ),
         }
 
 
