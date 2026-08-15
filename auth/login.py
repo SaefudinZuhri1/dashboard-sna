@@ -815,16 +815,52 @@ def _inject_login_css() -> None:
                 box-shadow: 0 0 22px rgba(229, 57, 53, 0.08) !important;
             }
 
+            /*
+             * Streamlit 1.59.x merender st.text_input dengan wrapper
+             * data-testid="stTextInputRootElement" (bukan BaseWeb lagi).
+             * Target wrapper aktual ini agar border Light Theme benar-benar
+             * terlihat pada field Username dan Password.
+             */
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] [data-testid="stTextInputRootElement"] {
+                width: 100% !important;
+                min-height: 50px !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+                background: #FFFFFF !important;
+                background-color: #FFFFFF !important;
+                border: 1.5px solid #B7C0CC !important;
+                border-radius: 11px !important;
+                outline: none !important;
+                box-shadow:
+                    inset 0 0 0 0.5px rgba(71, 85, 105, 0.10),
+                    0 1px 3px rgba(15, 23, 42, 0.07) !important;
+                color-scheme: light !important;
+                transition: border-color 0.16s ease, box-shadow 0.16s ease !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] [data-testid="stTextInputRootElement"]:hover {
+                border-color: #8F9BAA !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] [data-testid="stTextInputRootElement"]:focus-within {
+                border-color: var(--auth-red) !important;
+                box-shadow:
+                    inset 0 0 0 0.5px rgba(229, 57, 53, 0.16),
+                    0 0 0 3px rgba(229, 57, 53, 0.13) !important;
+            }
+
+            /* Fallback untuk struktur Streamlit lama; tidak mengubah Dark Theme. */
             body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] div[data-baseweb="input"] {
-                background: var(--auth-input) !important;
-                background-color: var(--auth-input) !important;
-                border: 1.5px solid var(--auth-border) !important;
-                box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+                background: #FFFFFF !important;
+                background-color: #FFFFFF !important;
+                border: 1.5px solid #B7C0CC !important;
+                border-radius: 11px !important;
+                box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07) !important;
                 color-scheme: light !important;
             }
 
             body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] div[data-baseweb="input"]:hover {
-                border-color: #AEB7C3 !important;
+                border-color: #8F9BAA !important;
             }
 
             body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
