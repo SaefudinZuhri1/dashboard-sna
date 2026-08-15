@@ -2515,6 +2515,108 @@ def render_auth_page() -> None:
                 ),
                 unsafe_allow_html=True,
             )
+
+            # Penyesuaian Light Theme hanya untuk teaser pada halaman Login.
+            # CSS dark di atas sengaja tidak diubah agar mode gelap tetap identik.
+            is_light_login = (
+                st.session_state.get("page") != "register"
+                and not bool(st.session_state.get("dark_mode", False))
+            )
+            if is_light_login:
+                st.markdown(
+                    r"""
+                    <style>
+                    .public-ai-teaser-v11 {
+                        background:
+                            linear-gradient(145deg, rgba(255,255,255,.98), rgba(249,250,252,.98)) padding-box,
+                            linear-gradient(115deg,
+                                rgba(229,57,53,.62),
+                                rgba(139,92,246,.24),
+                                rgba(56,189,248,.24),
+                                rgba(229,57,53,.62)) border-box !important;
+                        box-shadow:
+                            0 18px 42px rgba(15,23,42,.10),
+                            0 0 0 1px rgba(255,255,255,.72) inset,
+                            0 0 28px rgba(229,57,53,.05) !important;
+                    }
+
+                    .public-ai-teaser-v11:hover {
+                        box-shadow:
+                            0 24px 52px rgba(15,23,42,.14),
+                            0 0 0 1px rgba(229,57,53,.05) inset,
+                            0 0 34px rgba(229,57,53,.10),
+                            0 0 52px rgba(139,92,246,.05) !important;
+                    }
+
+                    .public-ai-teaser-v11::before {
+                        background: radial-gradient(circle,
+                            rgba(229,57,53,.15) 0%,
+                            rgba(139,92,246,.08) 38%,
+                            transparent 72%) !important;
+                    }
+
+                    .public-ai-teaser-v11::after {
+                        background: linear-gradient(105deg,
+                            transparent 40%,
+                            rgba(255,255,255,.42) 48%,
+                            rgba(255,255,255,.72) 50%,
+                            rgba(255,255,255,.42) 52%,
+                            transparent 60%) !important;
+                    }
+
+                    .public-ai-teaser-v11__badge {
+                        border-color: #E5E7EB !important;
+                        background: rgba(248,250,252,.90) !important;
+                        color: #64748B !important;
+                    }
+
+                    .public-ai-teaser-v11__badge:hover {
+                        color: #B42318 !important;
+                        background: #FFF1F1 !important;
+                        border-color: #F4C7C7 !important;
+                    }
+
+                    .public-ai-teaser-v11__spark {
+                        border-color: #F1D5D4 !important;
+                        background: linear-gradient(145deg, #FFF1F1, #F7F1FF) !important;
+                        color: #B42318 !important;
+                        box-shadow:
+                            0 8px 22px rgba(15,23,42,.08),
+                            0 0 18px rgba(229,57,53,.06) !important;
+                    }
+
+                    .public-ai-teaser-v11__title {
+                        color: #1F2937 !important;
+                    }
+
+                    .public-ai-teaser-v11__title-accent {
+                        background: linear-gradient(90deg, #1F2937 8%, #B42318 47%, #6D4CC7 78%, #1F2937 100%) !important;
+                        background-size: 220% auto !important;
+                        -webkit-background-clip: text !important;
+                        background-clip: text !important;
+                        color: transparent !important;
+                    }
+
+                    .public-ai-teaser-v11__description {
+                        color: #5F6368 !important;
+                    }
+
+                    .public-ai-teaser-v11__description strong {
+                        color: #1F2937 !important;
+                    }
+
+                    .public-ai-teaser-v11__meta {
+                        color: #64748B !important;
+                    }
+
+                    .public-ai-teaser-v11__meta-item:hover {
+                        color: #334155 !important;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
             st.button(
                 "✨ Coba AI Content Studio Tanpa Login",
                 key="open_public_ai_content_studio",
@@ -3291,6 +3393,16 @@ def route_page(selected: str) -> None:
 def render_footer() -> None:
     """Tampilkan footer global interaktif pada seluruh halaman dashboard."""
     try:
+        # Footer Light Theme dibatasi hanya pada halaman Login publik.
+        # Footer dashboard dan footer pada dark mode tetap memakai baseline lama.
+        is_light_login_footer = (
+            not bool(st.session_state.get("logged_in", False))
+            and st.session_state.get("page") == "login"
+            and str(st.session_state.get("_public_route") or "auth") == "auth"
+            and not bool(st.session_state.get("dark_mode", False))
+        )
+        footer_theme_class = " footer-light-login" if is_light_login_footer else ""
+
         render_html_iframe(
             dedent(
                 f"""
@@ -3527,6 +3639,70 @@ def render_footer() -> None:
 
                         .footer-top-button:hover .footer-arrow {{ transform: translateY(-2px); }}
 
+                        /* Light Theme khusus footer halaman Login. */
+                        .footer-shell.footer-light-login {{
+                            border-color: #E5E7EB;
+                            background:
+                                radial-gradient(circle at var(--mouse-x, 82%) var(--mouse-y, 18%), rgba(229,57,53,.10), transparent 31%),
+                                radial-gradient(circle at 12% 110%, rgba(33,150,243,.08), transparent 34%),
+                                linear-gradient(135deg, rgba(255,255,255,.99), rgba(247,248,250,.99));
+                            box-shadow: 0 16px 34px rgba(15,23,42,.10);
+                        }}
+
+                        .footer-shell.footer-light-login:hover {{
+                            border-color: rgba(229,57,53,.34);
+                            box-shadow: 0 18px 40px rgba(15,23,42,.13), 0 0 24px rgba(229,57,53,.07);
+                        }}
+
+                        .footer-shell.footer-light-login::after {{
+                            background: rgba(229,57,53,.08);
+                        }}
+
+                        .footer-shell.footer-light-login .footer-mark {{
+                            border-color: rgba(229,57,53,.28);
+                            background: linear-gradient(145deg, rgba(229,57,53,.11), rgba(229,57,53,.035));
+                            box-shadow: inset 0 0 18px rgba(229,57,53,.045);
+                        }}
+
+                        .footer-shell.footer-light-login .footer-title,
+                        .footer-shell.footer-light-login .footer-meta strong {{
+                            color: #1F2937;
+                        }}
+
+                        .footer-shell.footer-light-login .footer-meta {{
+                            color: #64748B;
+                        }}
+
+                        .footer-shell.footer-light-login .footer-chip {{
+                            border-color: #E5E7EB;
+                            background: #F4F5F7;
+                            color: #475569;
+                        }}
+
+                        .footer-shell.footer-light-login .footer-chip:hover,
+                        .footer-shell.footer-light-login .footer-chip.is-active {{
+                            border-color: #F4C7C7;
+                            background: #FFF1F1;
+                            color: #B42318;
+                        }}
+
+                        .footer-shell.footer-light-login .footer-status {{
+                            border-color: #BBF7D0;
+                            background: #ECFDF3;
+                            color: #166534;
+                        }}
+
+                        .footer-shell.footer-light-login .footer-top-button {{
+                            border-color: #F4C7C7;
+                            background: linear-gradient(135deg, #FFF1F1, #FDE7E7);
+                            color: #B42318;
+                        }}
+
+                        .footer-shell.footer-light-login .footer-top-button:hover {{
+                            border-color: rgba(229,57,53,.48);
+                            box-shadow: 0 9px 20px rgba(229,57,53,.10);
+                        }}
+
                         @keyframes footer-gradient-flow {{
                             to {{ background-position: 240% 0; }}
                         }}
@@ -3571,7 +3747,7 @@ def render_footer() -> None:
                     </style>
                 </head>
                 <body>
-                    <footer class="footer-shell" id="dashboardFooter">
+                    <footer class="footer-shell{footer_theme_class}" id="dashboardFooter">
                         <div class="footer-content">
                             <div class="footer-brand">
                                 <div class="footer-mark" aria-hidden="true">📡</div>
