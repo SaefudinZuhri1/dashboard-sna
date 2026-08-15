@@ -760,8 +760,8 @@ def _inject_login_css() -> None:
                 --auth-page-soft: #F1F3F6;
                 --auth-card: #FFFFFF;
                 --auth-card-bottom: #FCFCFD;
-                --auth-input: #F4F5F7;
-                --auth-border: #D9DEE7;
+                --auth-input: #F7F8FA;
+                --auth-border: #C4CBD5;
                 --auth-text: #1F1F1F;
                 --auth-muted: #5F6368;
                 --auth-placeholder: #8A9099;
@@ -818,8 +818,18 @@ def _inject_login_css() -> None:
             body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] div[data-baseweb="input"] {
                 background: var(--auth-input) !important;
                 background-color: var(--auth-input) !important;
-                border-color: var(--auth-border) !important;
+                border: 1.5px solid var(--auth-border) !important;
+                box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
                 color-scheme: light !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] div[data-baseweb="input"]:hover {
+                border-color: #AEB7C3 !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
+                border-color: var(--auth-red) !important;
+                box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.13) !important;
             }
 
             body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] input,
