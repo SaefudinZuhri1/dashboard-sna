@@ -2623,6 +2623,12 @@ def render_auth_page() -> None:
                 use_container_width=True,
                 on_click=_open_public_ai_content_studio,
             )
+
+        if st.session_state.get("page") == "register":
+            # Overlay transisi dari Login dipertahankan sampai form Register,
+            # teaser publik, dan tombol CTA selesai dikirim ke browser. Fungsi
+            # removal menunggu repaint browser sebelum melepas overlay.
+            remove_login_transition_overlay()
     except Exception:
         st.error("Halaman autentikasi belum dapat ditampilkan.")
 

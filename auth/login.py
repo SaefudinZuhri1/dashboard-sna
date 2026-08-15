@@ -956,10 +956,24 @@ def _login_transition_html() -> str:
     )
 
 
+def _register_transition_html() -> str:
+    """Bangun overlay saat pengguna berpindah dari Login ke Register."""
+    return _buat_html_loading(
+        "Membuka Pendaftaran",
+        (
+            "Menyiapkan formulir pendaftaran",
+            "Memuat pengaturan keamanan akun",
+            "Menyiapkan validasi data akun",
+            "Membuka halaman Buat Akun Baru",
+        ),
+    )
+
+
 def _install_login_click_overlay() -> None:
     """Pasang overlay sebelum submit agar form tidak berkedip saat rerun."""
     try:
         overlay_json = json.dumps(_login_transition_html())
+        register_overlay_json = json.dumps(_register_transition_html())
         render_html_iframe(
             f"""
             <!doctype html>
@@ -971,6 +985,7 @@ def _install_login_click_overlay() -> None:
                     const overlayId = {json.dumps(LOGIN_OVERLAY_ID)};
                     const styleId = {json.dumps(LOGIN_OVERLAY_STYLE_ID)};
                     const overlayMarkup = {overlay_json};
+                    const registerOverlayMarkup = {register_overlay_json};
 
                     const hasCompleteCredentials = (form) => {{
                         if (!form) return false;
@@ -984,7 +999,7 @@ def _install_login_click_overlay() -> None:
                         );
                     }};
 
-                    const mountOverlay = () => {{
+                    const mountOverlay = (markup = overlayMarkup) => {{
                         // Bersihkan overlay sisa dari percobaan sebelumnya. Pada versi lama,
                         // holder dapat tetap berada di DOM setelah animasi safety selesai.
                         const oldOverlay = parentDocument.getElementById(overlayId);
@@ -994,7 +1009,7 @@ def _install_login_click_overlay() -> None:
 
                         const holder = parentDocument.createElement('div');
                         holder.id = overlayId;
-                        holder.innerHTML = overlayMarkup;
+                        holder.innerHTML = markup;
                         parentDocument.body.appendChild(holder);
 
                         const overlay = holder.querySelector('.telkom-loading-overlay');
@@ -1029,27 +1044,29 @@ def _install_login_click_overlay() -> None:
                             const loginButton = buttons.find((button) =>
                                 (button.innerText || '').toLowerCase().includes('masuk')
                             );
-                            if (!loginButton || loginButton.dataset.loginOverlayV2 === '1') continue;
+                            if (!loginButton) continue;
 
-                            loginButton.dataset.loginOverlayV2 = '1';
-                            let submitStarted = false;
-                            const scheduleOverlay = () => {{
-                                if (submitStarted || !hasCompleteCredentials(form)) return;
-                                submitStarted = true;
+                            if (loginButton.dataset.loginOverlayV3 !== '1') {{
+                                loginButton.dataset.loginOverlayV3 = '1';
+                                let submitStarted = false;
+                                const scheduleOverlay = () => {{
+                                    if (submitStarted || !hasCompleteCredentials(form)) return;
+                                    submitStarted = true;
 
-                                // Jangan memasang overlay pada pointerdown. Overlay full-screen
-                                // dapat mengambil pointer sebelum event click mencapai tombol,
-                                // sehingga klik pertama hanya menampilkan loading tetapi form
-                                // tidak pernah tersubmit. Timer 0 memberi browser kesempatan
-                                // menyelesaikan click/submit terlebih dahulu, lalu overlay muncul.
-                                window.setTimeout(mountOverlay, 0);
-                            }};
+                                    // Timer 0 memberi browser kesempatan menyelesaikan click/submit
+                                    // sebelum overlay full-screen dipasang ke dokumen induk.
+                                    window.setTimeout(() => mountOverlay(overlayMarkup), 0);
+                                }};
 
-                            // Klik tombol dan Enter tetap memakai jalur yang sama. Tidak ada
-                            // preventDefault/stopPropagation sehingga submit Streamlit diteruskan.
-                            loginButton.addEventListener('click', scheduleOverlay, true);
-                            form.addEventListener('submit', scheduleOverlay, true);
-                            form.addEventListener('keydown', (event) => {{
+                                // Klik tombol dan Enter tetap memakai jalur yang sama. Tidak ada
+                                // preventDefault/stopPropagation sehingga submit Streamlit diteruskan.
+                                loginButton.addEventListener('click', scheduleOverlay, true);
+                                form.addEventListener('submit', (event) => {{
+                                    const submitterText = (event.submitter?.innerText || '').toLowerCase();
+                                    if (submitterText.includes('daftar di sini')) return;
+                                    scheduleOverlay();
+                                }}, true);
+                                form.addEventListener('keydown', (event) => {{
                                 const target = event.target;
                                 const isCredentialInput = target && (
                                     target.type === 'text' || target.type === 'password'
@@ -1062,11 +1079,24 @@ def _install_login_click_overlay() -> None:
                                     scheduleOverlay();
                                 }}
                             }}, true);
+                            }}
+
+                            const registerButton = buttons.find((button) =>
+                                (button.innerText || '').toLowerCase().includes('daftar di sini')
+                            );
+                            if (registerButton && registerButton.dataset.registerOverlayV1 !== '1') {{
+                                registerButton.dataset.registerOverlayV1 = '1';
+                                registerButton.addEventListener('click', () => {{
+                                    // Custom loading dipasang segera setelah click diteruskan ke
+                                    // Streamlit agar halaman Login tidak tertinggal saat rerun.
+                                    window.setTimeout(() => mountOverlay(registerOverlayMarkup), 0);
+                                }}, true);
+                            }}
                         }}
                     }};
 
                     bindLoginButton();
-                    const observerKey = '__telkomLoginOverlayObserverV2';
+                    const observerKey = '__telkomLoginOverlayObserverV3';
                     const oldObserver = window.parent[observerKey];
                     if (oldObserver && typeof oldObserver.disconnect === 'function') {{
                         oldObserver.disconnect();
