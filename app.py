@@ -2516,13 +2516,13 @@ def render_auth_page() -> None:
                 unsafe_allow_html=True,
             )
 
-            # Penyesuaian Light Theme hanya untuk teaser pada halaman Login.
-            # CSS dark di atas sengaja tidak diubah agar mode gelap tetap identik.
-            is_light_login = (
-                st.session_state.get("page") != "register"
+            # Penyesuaian Light Theme untuk teaser pada halaman autentikasi publik
+            # (Login dan Register). CSS dark di atas sengaja tidak diubah.
+            is_light_auth = (
+                st.session_state.get("page") in {"login", "register"}
                 and not bool(st.session_state.get("dark_mode", False))
             )
-            if is_light_login:
+            if is_light_auth:
                 st.markdown(
                     r"""
                     <style>
@@ -3399,15 +3399,15 @@ def route_page(selected: str) -> None:
 def render_footer() -> None:
     """Tampilkan footer global interaktif pada seluruh halaman dashboard."""
     try:
-        # Footer Light Theme dibatasi hanya pada halaman Login publik.
-        # Footer dashboard dan footer pada dark mode tetap memakai baseline lama.
-        is_light_login_footer = (
+        # Footer Light Theme berlaku pada halaman autentikasi publik
+        # (Login dan Register). Footer dashboard/dark mode tetap baseline lama.
+        is_light_auth_footer = (
             not bool(st.session_state.get("logged_in", False))
-            and st.session_state.get("page") == "login"
+            and st.session_state.get("page") in {"login", "register"}
             and str(st.session_state.get("_public_route") or "auth") == "auth"
             and not bool(st.session_state.get("dark_mode", False))
         )
-        footer_theme_class = " footer-light-login" if is_light_login_footer else ""
+        footer_theme_class = " footer-light-login" if is_light_auth_footer else ""
 
         render_html_iframe(
             dedent(
@@ -3645,7 +3645,7 @@ def render_footer() -> None:
 
                         .footer-top-button:hover .footer-arrow {{ transform: translateY(-2px); }}
 
-                        /* Light Theme khusus footer halaman Login. */
+                        /* Light Theme khusus footer halaman autentikasi publik. */
                         .footer-shell.footer-light-login {{
                             border-color: #E5E7EB;
                             background:

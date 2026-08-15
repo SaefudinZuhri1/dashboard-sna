@@ -660,6 +660,223 @@ def _inject_register_css() -> None:
     )
 
 
+    # Light Theme Register: override ini hanya aktif saat mode terang.
+    # CSS dark mode di atas dibiarkan utuh agar tampilan gelap yang sudah
+    # disetujui tidak berubah.
+    if not bool(st.session_state.get("dark_mode", False)):
+        st.markdown(
+            """
+            <style>
+            :root {
+                --auth-page: #F7F8FA;
+                --auth-page-soft: #F1F3F6;
+                --auth-card: #FFFFFF;
+                --auth-card-bottom: #FCFCFD;
+                --auth-input: #FFFFFF;
+                --auth-border: #C4CBD5;
+                --auth-text: #1F1F1F;
+                --auth-muted: #5F6368;
+                --auth-placeholder: #8A9099;
+            }
+
+            html,
+            body,
+            .stApp,
+            [data-testid="stAppViewContainer"],
+            [data-testid="stMain"] {
+                background: linear-gradient(180deg, var(--auth-page) 0%, var(--auth-page-soft) 100%) !important;
+                color: var(--auth-text) !important;
+                color-scheme: light !important;
+            }
+
+            html,
+            body,
+            [data-testid="stAppViewContainer"],
+            [data-testid="stMain"] {
+                scrollbar-color: var(--auth-red) #EEF0F3 !important;
+            }
+
+            html::-webkit-scrollbar-track,
+            body::-webkit-scrollbar-track,
+            [data-testid="stAppViewContainer"]::-webkit-scrollbar-track,
+            [data-testid="stMain"]::-webkit-scrollbar-track {
+                background: #EEF0F3 !important;
+            }
+
+            html::-webkit-scrollbar-thumb,
+            body::-webkit-scrollbar-thumb,
+            [data-testid="stAppViewContainer"]::-webkit-scrollbar-thumb,
+            [data-testid="stMain"]::-webkit-scrollbar-thumb {
+                border-color: #EEF0F3 !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] {
+                background: linear-gradient(180deg, #FFFFFF 0%, #FCFCFD 100%) !important;
+                background-color: #FFFFFF !important;
+                border-color: rgba(229, 57, 53, 0.48) !important;
+                box-shadow:
+                    0 22px 58px rgba(15, 23, 42, 0.10),
+                    0 0 0 1px rgba(229, 57, 53, 0.04),
+                    0 0 30px rgba(229, 57, 53, 0.06) !important;
+                color: var(--auth-text) !important;
+            }
+
+            .auth-icon-wrap {
+                background: rgba(229, 57, 53, 0.07) !important;
+                border-color: rgba(229, 57, 53, 0.50) !important;
+                box-shadow: 0 0 22px rgba(229, 57, 53, 0.08) !important;
+            }
+
+            /* Streamlit 1.59.x memakai stTextInputRootElement sebagai kotak input. */
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] [data-testid="stTextInputRootElement"] {
+                width: 100% !important;
+                min-height: 50px !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+                background: #FFFFFF !important;
+                background-color: #FFFFFF !important;
+                border: 1.5px solid #B7C0CC !important;
+                border-radius: 11px !important;
+                outline: none !important;
+                box-shadow:
+                    inset 0 0 0 0.5px rgba(71, 85, 105, 0.10),
+                    0 1px 3px rgba(15, 23, 42, 0.07) !important;
+                color-scheme: light !important;
+                transition: border-color 0.16s ease, box-shadow 0.16s ease !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] [data-testid="stTextInputRootElement"]:hover {
+                border-color: #8F9BAA !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] [data-testid="stTextInputRootElement"]:focus-within {
+                border-color: var(--auth-red) !important;
+                box-shadow:
+                    inset 0 0 0 0.5px rgba(229, 57, 53, 0.16),
+                    0 0 0 3px rgba(229, 57, 53, 0.13) !important;
+            }
+
+            /* Fallback untuk struktur Streamlit lama tanpa menyentuh dark mode. */
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] div[data-baseweb="input"] {
+                background: #FFFFFF !important;
+                background-color: #FFFFFF !important;
+                border: 1.5px solid #B7C0CC !important;
+                border-radius: 11px !important;
+                box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07) !important;
+                color-scheme: light !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] div[data-baseweb="input"]:hover {
+                border-color: #8F9BAA !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
+                border-color: var(--auth-red) !important;
+                box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.13) !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] input,
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] input:focus,
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] input:active {
+                color: #1F2937 !important;
+                -webkit-text-fill-color: #1F2937 !important;
+                color-scheme: light !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] input:-webkit-autofill,
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] input:-webkit-autofill:hover,
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] input:-webkit-autofill:focus,
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] input:-webkit-autofill:active {
+                -webkit-box-shadow: 0 0 0 1000px #FFFFFF inset !important;
+                box-shadow: 0 0 0 1000px #FFFFFF inset !important;
+                -webkit-text-fill-color: #1F2937 !important;
+                caret-color: var(--auth-red) !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] button {
+                color: #8A94A3 !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stTextInput"] button:hover {
+                color: #475569 !important;
+                background: rgba(15, 23, 42, 0.05) !important;
+            }
+
+            .password-strength {
+                background: #F8FAFC !important;
+                border-color: #DCE2E9 !important;
+            }
+
+            .password-strength__label {
+                color: #475569 !important;
+                -webkit-text-fill-color: #475569 !important;
+            }
+
+            .password-strength__status {
+                color: #7A828E !important;
+                -webkit-text-fill-color: #7A828E !important;
+            }
+
+            .password-strength__bar {
+                background: #D7DCE3 !important;
+            }
+
+            .password-strength__hint,
+            .password-note {
+                color: #6B7280 !important;
+                -webkit-text-fill-color: #6B7280 !important;
+            }
+
+            .password-strength[data-state="weak"] {
+                background: #FFF7F7 !important;
+                border-color: rgba(229, 57, 53, 0.30) !important;
+            }
+
+            .password-strength[data-state="weak"] .password-strength__status {
+                color: #D32F2F !important;
+                -webkit-text-fill-color: #D32F2F !important;
+            }
+
+            .password-strength[data-state="medium"] {
+                background: #FFFBF3 !important;
+                border-color: rgba(245, 124, 0, 0.30) !important;
+            }
+
+            .password-strength[data-state="medium"] .password-strength__status {
+                color: #D97706 !important;
+                -webkit-text-fill-color: #D97706 !important;
+            }
+
+            .password-strength[data-state="strong"] {
+                background: #F4FBF5 !important;
+                border-color: rgba(76, 175, 80, 0.30) !important;
+            }
+
+            .password-strength[data-state="strong"] .password-strength__status {
+                color: #2E7D32 !important;
+                -webkit-text-fill-color: #2E7D32 !important;
+            }
+
+            .auth-divider {
+                background: rgba(31, 41, 55, 0.10) !important;
+            }
+
+            .auth-helper-text {
+                color: #5F6368 !important;
+                -webkit-text-fill-color: #5F6368 !important;
+            }
+
+            body [data-testid="stAppViewContainer"] div[data-testid="stForm"] div[data-testid="stCaptionContainer"] p,
+            .stage2-footer {
+                color: #7A828E !important;
+                -webkit-text-fill-color: #7A828E !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 def _render_password_strength_tracker() -> None:
     """Render indikator kekuatan password yang berubah langsung saat diketik."""
     tracker_html = (
