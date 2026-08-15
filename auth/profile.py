@@ -4746,7 +4746,7 @@ def _reset_password_widget_state() -> None:
 
 
 def _render_password_form(user_id: int) -> None:
-    """Render section 3: form ubah password dengan indikator live di luar st.form."""
+    """Render section 3: form ubah password tanpa rerun saat pengguna mengetik."""
     try:
         _reset_password_widget_state()
         st.markdown(
@@ -4777,84 +4777,91 @@ def _render_password_form(user_id: int) -> None:
             """
             <div class="profile-v11-password-live-caption">
                 <span>⚡</span>
-                <span>Mode live aktif: indikator kekuatan berubah otomatis saat password baru diketik.</span>
+                <span>Validasi password dijalankan saat tombol Simpan Password Baru diklik.</span>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        # Jangan memakai st.form untuk bagian ini. Di dalam st.form, nilai text_input baru
-        # dikirim setelah tombol submit ditekan, sehingga indikator kekuatan tidak bisa berubah real-time.
-        with st.container(border=True):
-            st.markdown(
-                """
-                <div class="profile-v11-password-intro">
-                    <div class="profile-v11-password-tip-card">
-                        <div class="profile-v11-password-tip-icon">🔑</div>
-                        <div>
-                            <p class="profile-v11-password-tip-title">Password lama</p>
-                            <p class="profile-v11-password-tip-text">Dipakai untuk memastikan perubahan dilakukan oleh pemilik akun.</p>
+        # Gunakan st.form agar input Password Lama, Password Baru, dan Konfirmasi Password Baru
+        # tidak memicu rerun ketika pengguna mengetik atau berpindah field. Nilai baru hanya
+        # dikirim ke server ketika tombol "Simpan Password Baru" ditekan.
+        with st.form(
+            "profile_v11_password_form",
+            clear_on_submit=False,
+            enter_to_submit=False,
+            border=False,
+        ):
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <div class="profile-v11-password-intro">
+                        <div class="profile-v11-password-tip-card">
+                            <div class="profile-v11-password-tip-icon">🔑</div>
+                            <div>
+                                <p class="profile-v11-password-tip-title">Password lama</p>
+                                <p class="profile-v11-password-tip-text">Dipakai untuk memastikan perubahan dilakukan oleh pemilik akun.</p>
+                            </div>
+                        </div>
+                        <div class="profile-v11-password-tip-card">
+                            <div class="profile-v11-password-tip-icon">🧱</div>
+                            <div>
+                                <p class="profile-v11-password-tip-title">Minimal 6 karakter</p>
+                                <p class="profile-v11-password-tip-text">Indikator kekuatan diperbarui saat tombol simpan diklik.</p>
+                            </div>
+                        </div>
+                        <div class="profile-v11-password-tip-card">
+                            <div class="profile-v11-password-tip-icon">✅</div>
+                            <div>
+                                <p class="profile-v11-password-tip-title">Konfirmasi ulang</p>
+                                <p class="profile-v11-password-tip-text">Password baru harus sama pada kolom konfirmasi sebelum disimpan.</p>
+                            </div>
                         </div>
                     </div>
-                    <div class="profile-v11-password-tip-card">
-                        <div class="profile-v11-password-tip-icon">🧱</div>
-                        <div>
-                            <p class="profile-v11-password-tip-title">Minimal 6 karakter</p>
-                            <p class="profile-v11-password-tip-text">Indikator kekuatan akan berubah otomatis saat password diketik.</p>
-                        </div>
-                    </div>
-                    <div class="profile-v11-password-tip-card">
-                        <div class="profile-v11-password-tip-icon">✅</div>
-                        <div>
-                            <p class="profile-v11-password-tip-title">Konfirmasi ulang</p>
-                            <p class="profile-v11-password-tip-text">Password baru harus sama pada kolom konfirmasi sebelum disimpan.</p>
-                        </div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-            old_password = st.text_input(
-                "Password Lama",
-                type="password",
-                key="profile_v11_old_password",
-                placeholder="Masukkan password saat ini",
-            )
-            new_col, confirm_col = st.columns([1, 1], gap="large")
-            with new_col:
-                new_password = st.text_input(
-                    "Password Baru",
-                    type="password",
-                    key="profile_v11_new_password",
-                    placeholder="Minimal 6 karakter",
-                )
-            with confirm_col:
-                confirm_password = st.text_input(
-                    "Konfirmasi Password Baru",
-                    type="password",
-                    key="profile_v11_confirm_password",
-                    placeholder="Ketik ulang password baru",
+                    """,
+                    unsafe_allow_html=True,
                 )
 
-            _render_password_strength(new_password)
-            _render_password_match_status(new_password, confirm_password)
+                old_password = st.text_input(
+                    "Password Lama",
+                    type="password",
+                    key="profile_v11_old_password",
+                    placeholder="Masukkan password saat ini",
+                )
+                new_col, confirm_col = st.columns([1, 1], gap="large")
+                with new_col:
+                    new_password = st.text_input(
+                        "Password Baru",
+                        type="password",
+                        key="profile_v11_new_password",
+                        placeholder="Minimal 6 karakter",
+                    )
+                with confirm_col:
+                    confirm_password = st.text_input(
+                        "Konfirmasi Password Baru",
+                        type="password",
+                        key="profile_v11_confirm_password",
+                        placeholder="Ketik ulang password baru",
+                    )
 
-            st.markdown(
-                """
-                <div class="profile-v11-password-submit-note">
-                    <span>✨</span>
-                    <div><strong>Tips keamanan:</strong> hindari password yang sama dengan akun lain dan jangan bagikan password kepada siapa pun.</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            submitted = st.button(
-                "🛡️ Simpan Password Baru",
-                type="primary",
-                use_container_width=True,
-                key="profile_v11_password_save_button",
-            )
+                _render_password_strength(new_password)
+                _render_password_match_status(new_password, confirm_password)
+
+                st.markdown(
+                    """
+                    <div class="profile-v11-password-submit-note">
+                        <span>✨</span>
+                        <div><strong>Tips keamanan:</strong> hindari password yang sama dengan akun lain dan jangan bagikan password kepada siapa pun.</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                submitted = st.form_submit_button(
+                    "🛡️ Simpan Password Baru",
+                    type="primary",
+                    use_container_width=True,
+                    key="profile_v11_password_save_button",
+                )
 
         if not submitted:
             return
