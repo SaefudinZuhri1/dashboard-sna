@@ -4298,11 +4298,65 @@ def _render_light_theme_css() -> None:
             border-color: #C9D9ED !important;
             background: #F7FAFE !important;
         }
+        /* FIX v11 Light Theme: kartu Mode Fokus Kreatif dibuat terang,
+           modern, dan tetap terisolasi dari CSS Dark Mode baseline. */
+        .st-key-public_ai_focus_mode {
+            position: relative !important;
+            overflow: hidden !important;
+            margin: 2px 0 18px !important;
+            padding: 14px 16px !important;
+            border: 1px solid rgba(99,102,241,.18) !important;
+            border-radius: 16px !important;
+            background:
+                radial-gradient(circle at 92% 16%, rgba(139,92,246,.09), transparent 31%),
+                radial-gradient(circle at 7% 100%, rgba(229,57,53,.055), transparent 35%),
+                linear-gradient(135deg, #FFFFFF 0%, #F8FAFF 55%, #FFF9FC 100%) !important;
+            box-shadow: 0 12px 28px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.98) !important;
+            transition: transform .28s ease, border-color .28s ease, box-shadow .28s ease !important;
+        }
+        .st-key-public_ai_focus_mode::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 11px;
+            bottom: 11px;
+            width: 4px;
+            border-radius: 0 999px 999px 0;
+            background: linear-gradient(180deg, #E53935, #8B5CF6 58%, #38BDF8);
+            box-shadow: 0 0 16px rgba(139,92,246,.18);
+            pointer-events: none;
+        }
+        .st-key-public_ai_focus_mode:hover {
+            transform: translateY(-2px) !important;
+            border-color: rgba(99,102,241,.30) !important;
+            box-shadow: 0 16px 34px rgba(15,23,42,.11), 0 0 22px rgba(99,102,241,.055), inset 0 1px 0 rgba(255,255,255,.98) !important;
+        }
         .st-key-public_ai_focus_mode,
         .st-key-public_ai_focus_mode label,
-        .st-key-public_ai_focus_mode p {
-            color: #3F4D61 !important;
-            -webkit-text-fill-color: #3F4D61 !important;
+        .st-key-public_ai_focus_mode p,
+        .st-key-public_ai_focus_mode [data-testid="stWidgetLabel"] p {
+            color: #334155 !important;
+            -webkit-text-fill-color: #334155 !important;
+        }
+        .st-key-public_ai_focus_mode label,
+        .st-key-public_ai_focus_mode [data-testid="stWidgetLabel"] p {
+            font-weight: 750 !important;
+        }
+        .st-key-public_ai_focus_mode [data-testid="stTooltipHoverTarget"],
+        .st-key-public_ai_focus_mode svg {
+            color: #64748B !important;
+        }
+        .st-key-public_ai_focus_mode [data-testid="stToggle"] input[type="checkbox"] + div,
+        .st-key-public_ai_focus_mode [data-baseweb="checkbox"] input[type="checkbox"] + div {
+            background: #E2E8F0 !important;
+            border-color: #CBD5E1 !important;
+            box-shadow: inset 0 1px 2px rgba(15,23,42,.08) !important;
+        }
+        .st-key-public_ai_focus_mode [data-testid="stToggle"] input[type="checkbox"]:checked + div,
+        .st-key-public_ai_focus_mode [data-baseweb="checkbox"] input[type="checkbox"]:checked + div {
+            background: linear-gradient(135deg, #E53935, #8B5CF6) !important;
+            border-color: rgba(139,92,246,.48) !important;
+            box-shadow: 0 0 0 3px rgba(139,92,246,.10), 0 6px 14px rgba(139,92,246,.16) !important;
         }
         .public-ai-focus-v18 {
             border-color: #F1D4A2 !important;
