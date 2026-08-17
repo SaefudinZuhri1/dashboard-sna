@@ -4207,6 +4207,20 @@ def _render_light_theme_css() -> None:
             color: #26364A !important;
             -webkit-text-fill-color: #26364A !important;
         }
+
+        /* FIX Light Theme: beri ruang khusus ikon dekoratif pada dropdown Sasaran Komunikasi.
+           Selector dibatasi ke dua field ini agar dropdown pada section lain tidak berubah. */
+        .st-key-public_ai_target_choice [data-baseweb="select"] > div,
+        .st-key-public_ai_tujuan [data-baseweb="select"] > div {
+            padding-left: 68px !important;
+        }
+        .st-key-public_ai_target_choice [data-baseweb="select"] > div > div:first-child,
+        .st-key-public_ai_tujuan [data-baseweb="select"] > div > div:first-child,
+        .st-key-public_ai_target_choice [data-baseweb="select"] [role="combobox"],
+        .st-key-public_ai_tujuan [data-baseweb="select"] [role="combobox"] {
+            padding-left: 16px !important;
+            min-width: 0 !important;
+        }
         .st-key-public_ai_topik_custom input::placeholder,
         .st-key-public_ai_username input::placeholder,
         .st-key-public_ai_target_custom input::placeholder,
