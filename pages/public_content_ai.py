@@ -4744,262 +4744,270 @@ def render_public_content_ai() -> None:
         )
         st.markdown(studio_map_html, unsafe_allow_html=True)
 
-        with st.container(border=True):
-            context_content_header = (
-                '<div class="public-ai-context-v15-marker public-ai-context-content-v15-marker" aria-hidden="true"></div>'
-                '<div class="public-ai-context-header-v15">'
-                '<div class="public-ai-context-heading-v15">'
-                '<span class="public-ai-context-icon-v15" aria-hidden="true">▤</span>'
-                '<div class="public-ai-section-heading-v20">'
-                '<span class="public-ai-section-eyebrow-v20">STEP 01 · CONTENT BRIEF</span>'
-                '<h2 class="public-ai-context-title-v15"><strong>1.</strong> Konteks Konten'
-                '<span class="public-ai-context-line-v15" aria-hidden="true"></span></h2>'
-                '<p class="public-ai-section-subtitle-v20">Tentukan fondasi ide sebelum AI menyusun arah konten.</p>'
-                '</div>'
-                '</div>'
-                '<span class="public-ai-context-chip-v15">✦ Lengkapi konteks konten Anda</span>'
-                '</div>'
-            )
-            st.markdown(context_content_header, unsafe_allow_html=True)
-
-            col_service, col_platform = st.columns(2)
-            with col_service:
-                layanan = st.selectbox(
-                    "Layanan Telkom Group",
-                    options=("IndiHome", "IndiBiz", "Telkomsel"),
-                    key="public_ai_layanan",
+        # Seluruh input utama dibatch dalam satu form supaya mengetik atau memilih opsi
+        # tidak memicu rerun. Nilai baru dikirim saat tombol rekomendasi ditekan.
+        with st.form(
+            "public_ai_content_form",
+            clear_on_submit=False,
+            enter_to_submit=False,
+            border=False,
+        ):
+            with st.container(border=True):
+                context_content_header = (
+                    '<div class="public-ai-context-v15-marker public-ai-context-content-v15-marker" aria-hidden="true"></div>'
+                    '<div class="public-ai-context-header-v15">'
+                    '<div class="public-ai-context-heading-v15">'
+                    '<span class="public-ai-context-icon-v15" aria-hidden="true">▤</span>'
+                    '<div class="public-ai-section-heading-v20">'
+                    '<span class="public-ai-section-eyebrow-v20">STEP 01 · CONTENT BRIEF</span>'
+                    '<h2 class="public-ai-context-title-v15"><strong>1.</strong> Konteks Konten'
+                    '<span class="public-ai-context-line-v15" aria-hidden="true"></span></h2>'
+                    '<p class="public-ai-section-subtitle-v20">Tentukan fondasi ide sebelum AI menyusun arah konten.</p>'
+                    '</div>'
+                    '</div>'
+                    '<span class="public-ai-context-chip-v15">✦ Lengkapi konteks konten Anda</span>'
+                    '</div>'
                 )
-            with col_platform:
-                platform_label = st.selectbox(
-                    "Platform Influencer",
-                    options=tuple(PLATFORM_OPTIONS.keys()),
-                    key="public_ai_platform",
+                st.markdown(context_content_header, unsafe_allow_html=True)
+
+                col_service, col_platform = st.columns(2)
+                with col_service:
+                    layanan = st.selectbox(
+                        "Layanan Telkom Group",
+                        options=("IndiHome", "IndiBiz", "Telkomsel"),
+                        key="public_ai_layanan",
+                    )
+                with col_platform:
+                    platform_label = st.selectbox(
+                        "Platform Influencer",
+                        options=tuple(PLATFORM_OPTIONS.keys()),
+                        key="public_ai_platform",
+                    )
+
+                topic_options = _get_topic_options(layanan)
+                topik_pilihan = st.selectbox(
+                    "Topik Konten",
+                    options=topic_options,
+                    key="public_ai_topik_pilihan",
                 )
+                custom_topic = ""
+                if topik_pilihan == "Topik Lainnya":
+                    custom_topic = st.text_input(
+                        "Tulis Topik Konten",
+                        placeholder="Contoh: edukasi menjaga keamanan Wi-Fi untuk keluarga",
+                        max_chars=150,
+                        key="public_ai_topik_custom",
+                    )
 
-            topic_options = _get_topic_options(layanan)
-            topik_pilihan = st.selectbox(
-                "Topik Konten",
-                options=topic_options,
-                key="public_ai_topik_pilihan",
-            )
-            custom_topic = ""
-            if topik_pilihan == "Topik Lainnya":
-                custom_topic = st.text_input(
-                    "Tulis Topik Konten",
-                    placeholder="Contoh: edukasi menjaga keamanan Wi-Fi untuk keluarga",
-                    max_chars=150,
-                    key="public_ai_topik_custom",
+            with st.container(border=True):
+                context_influencer_header = (
+                    '<div class="public-ai-context-v15-marker public-ai-context-influencer-v15-marker" aria-hidden="true"></div>'
+                    '<div class="public-ai-context-header-v15">'
+                    '<div class="public-ai-context-heading-v15">'
+                    '<span class="public-ai-context-icon-v15" aria-hidden="true">◎</span>'
+                    '<div class="public-ai-section-heading-v20">'
+                    '<span class="public-ai-section-eyebrow-v20">STEP 02 · CREATOR PERSONA</span>'
+                    '<h2 class="public-ai-context-title-v15"><strong>2.</strong> Konteks Influencer'
+                    '<span class="public-ai-context-line-v15" aria-hidden="true"></span></h2>'
+                    '<p class="public-ai-section-subtitle-v20">Beri AI karakter komunikasi yang lebih spesifik dan autentik.</p>'
+                    '</div>'
+                    '</div>'
+                    '<span class="public-ai-context-chip-v15">✦ Kenali influencer lebih baik</span>'
+                    '</div>'
                 )
+                st.markdown(context_influencer_header, unsafe_allow_html=True)
 
-        with st.container(border=True):
-            context_influencer_header = (
-                '<div class="public-ai-context-v15-marker public-ai-context-influencer-v15-marker" aria-hidden="true"></div>'
-                '<div class="public-ai-context-header-v15">'
-                '<div class="public-ai-context-heading-v15">'
-                '<span class="public-ai-context-icon-v15" aria-hidden="true">◎</span>'
-                '<div class="public-ai-section-heading-v20">'
-                '<span class="public-ai-section-eyebrow-v20">STEP 02 · CREATOR PERSONA</span>'
-                '<h2 class="public-ai-context-title-v15"><strong>2.</strong> Konteks Influencer'
-                '<span class="public-ai-context-line-v15" aria-hidden="true"></span></h2>'
-                '<p class="public-ai-section-subtitle-v20">Beri AI karakter komunikasi yang lebih spesifik dan autentik.</p>'
-                '</div>'
-                '</div>'
-                '<span class="public-ai-context-chip-v15">✦ Kenali influencer lebih baik</span>'
-                '</div>'
-            )
-            st.markdown(context_influencer_header, unsafe_allow_html=True)
-
-            username_raw = st.text_input(
-                "Username Influencer",
-                placeholder="Contoh: @namaakun",
-                max_chars=100,
-                key="public_ai_username",
-            )
-            gaya_raw = st.text_area(
-                "Gaya Konten atau Karakter Influencer (opsional)",
-                placeholder=(
-                    "Contoh: komunikatif, humor ringan, audiens anak muda, "
-                    "sering membuat video edukasi singkat"
-                ),
-                max_chars=500,
-                height=110,
-                key="public_ai_gaya",
-            )
-            st.markdown(
-                '<div class="public-ai-influencer-note-v15">'
-                'Informasi ini membantu AI menyesuaikan gaya rekomendasi. '
-                'Dashboard tidak mengambil data profil influencer secara otomatis.'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-
-        with st.container(border=True):
-            target_header = (
-                '<div class="public-ai-target-v16-marker" aria-hidden="true"></div>'
-                '<div class="public-ai-target-header-v16">'
-                '<div class="public-ai-target-heading-v16">'
-                '<span class="public-ai-target-icon-v16" aria-hidden="true">◎</span>'
-                '<div class="public-ai-section-heading-v20">'
-                '<span class="public-ai-section-eyebrow-v20">STEP 03 · CAMPAIGN DIRECTION</span>'
-                '<h2 class="public-ai-target-title-v16"><strong>3.</strong> Sasaran Komunikasi'
-                '<span class="public-ai-target-line-v16" aria-hidden="true"></span></h2>'
-                '<p class="public-ai-section-subtitle-v20">Pilih siapa yang dituju dan perubahan apa yang ingin dicapai.</p>'
-                '</div>'
-                '</div>'
-                '<span class="public-ai-target-chip-v16">✦ Tentukan arah komunikasi</span>'
-                '</div>'
-            )
-            st.markdown(target_header, unsafe_allow_html=True)
-
-            col_audience, col_goal = st.columns(2)
-            with col_audience:
-                audience_choice = st.selectbox(
-                    "Target Audiens",
-                    options=TARGET_AUDIENCE_OPTIONS,
-                    key="public_ai_target_choice",
+                username_raw = st.text_input(
+                    "Username Influencer",
+                    placeholder="Contoh: @namaakun",
+                    max_chars=100,
+                    key="public_ai_username",
                 )
-            with col_goal:
-                tujuan = st.selectbox(
-                    "Tujuan Konten",
-                    options=CONTENT_GOAL_OPTIONS,
-                    index=0,
-                    key="public_ai_tujuan",
+                gaya_raw = st.text_area(
+                    "Gaya Konten atau Karakter Influencer (opsional)",
+                    placeholder=(
+                        "Contoh: komunikatif, humor ringan, audiens anak muda, "
+                        "sering membuat video edukasi singkat"
+                    ),
+                    max_chars=500,
+                    height=110,
+                    key="public_ai_gaya",
+                )
+                st.markdown(
+                    '<div class="public-ai-influencer-note-v15">'
+                    'Informasi ini membantu AI menyesuaikan gaya rekomendasi. '
+                    'Dashboard tidak mengambil data profil influencer secara otomatis.'
+                    '</div>',
+                    unsafe_allow_html=True,
                 )
 
-            custom_audience = ""
-            if audience_choice == "Tulis sendiri":
-                custom_audience = st.text_input(
-                    "Tulis Target Audiens",
-                    placeholder="Contoh: pemilik kedai kopi di kota Bandung",
-                    max_chars=150,
-                    key="public_ai_target_custom",
+            with st.container(border=True):
+                target_header = (
+                    '<div class="public-ai-target-v16-marker" aria-hidden="true"></div>'
+                    '<div class="public-ai-target-header-v16">'
+                    '<div class="public-ai-target-heading-v16">'
+                    '<span class="public-ai-target-icon-v16" aria-hidden="true">◎</span>'
+                    '<div class="public-ai-section-heading-v20">'
+                    '<span class="public-ai-section-eyebrow-v20">STEP 03 · CAMPAIGN DIRECTION</span>'
+                    '<h2 class="public-ai-target-title-v16"><strong>3.</strong> Sasaran Komunikasi'
+                    '<span class="public-ai-target-line-v16" aria-hidden="true"></span></h2>'
+                    '<p class="public-ai-section-subtitle-v20">Pilih siapa yang dituju dan perubahan apa yang ingin dicapai.</p>'
+                    '</div>'
+                    '</div>'
+                    '<span class="public-ai-target-chip-v16">✦ Tentukan arah komunikasi</span>'
+                    '</div>'
                 )
+                st.markdown(target_header, unsafe_allow_html=True)
 
-        topik = custom_topic if topik_pilihan == "Topik Lainnya" else topik_pilihan
-        target_audiens = custom_audience if audience_choice == "Tulis sendiri" else audience_choice
-        payload = {
-            "layanan": _clean_text(layanan, 30),
-            "platform": PLATFORM_OPTIONS.get(platform_label, "twitter"),
-            "platform_label": _clean_text(platform_label, 30),
-            "topik": _clean_text(topik, 150),
-            "username": _normalize_username(username_raw),
-            "gaya": _clean_multiline_text(gaya_raw, 500),
-            "target_audiens": _clean_text(target_audiens, 150),
-            "tujuan": _clean_text(tujuan, 100),
-        }
+                col_audience, col_goal = st.columns(2)
+                with col_audience:
+                    audience_choice = st.selectbox(
+                        "Target Audiens",
+                        options=TARGET_AUDIENCE_OPTIONS,
+                        key="public_ai_target_choice",
+                    )
+                with col_goal:
+                    tujuan = st.selectbox(
+                        "Tujuan Konten",
+                        options=CONTENT_GOAL_OPTIONS,
+                        index=0,
+                        key="public_ai_tujuan",
+                    )
 
-        limit_reached = request_count >= PUBLIC_AI_MAX_REQUESTS
+                custom_audience = ""
+                if audience_choice == "Tulis sendiri":
+                    custom_audience = st.text_input(
+                        "Tulis Target Audiens",
+                        placeholder="Contoh: pemilik kedai kopi di kota Bandung",
+                        max_chars=150,
+                        key="public_ai_target_custom",
+                    )
+
+            topik = custom_topic if topik_pilihan == "Topik Lainnya" else topik_pilihan
+            target_audiens = custom_audience if audience_choice == "Tulis sendiri" else audience_choice
+            payload = {
+                "layanan": _clean_text(layanan, 30),
+                "platform": PLATFORM_OPTIONS.get(platform_label, "twitter"),
+                "platform_label": _clean_text(platform_label, 30),
+                "topik": _clean_text(topik, 150),
+                "username": _normalize_username(username_raw),
+                "gaya": _clean_multiline_text(gaya_raw, 500),
+                "target_audiens": _clean_text(target_audiens, 150),
+                "tujuan": _clean_text(tujuan, 100),
+            }
+
+            limit_reached = request_count >= PUBLIC_AI_MAX_REQUESTS
 
 
-        # Creative Journey bereaksi pada kelengkapan input tanpa mengubah payload AI.
-        context_done = bool(payload.get("layanan") and payload.get("platform") and payload.get("topik"))
-        influencer_done = bool(payload.get("username"))
-        target_done = bool(payload.get("target_audiens") and payload.get("tujuan"))
-        ready_done = context_done and influencer_done and target_done and not limit_reached
-        completion_steps = [context_done, influencer_done, target_done, ready_done]
-        completion_percent = int(round((sum(completion_steps) / len(completion_steps)) * 100))
-        progress_angle = int(round((completion_percent / 100) * 360))
+            # Creative Journey bereaksi pada kelengkapan input tanpa mengubah payload AI.
+            context_done = bool(payload.get("layanan") and payload.get("platform") and payload.get("topik"))
+            influencer_done = bool(payload.get("username"))
+            target_done = bool(payload.get("target_audiens") and payload.get("tujuan"))
+            ready_done = context_done and influencer_done and target_done and not limit_reached
+            completion_steps = [context_done, influencer_done, target_done, ready_done]
+            completion_percent = int(round((sum(completion_steps) / len(completion_steps)) * 100))
+            progress_angle = int(round((completion_percent / 100) * 360))
 
-        step_statuses = (
-            ("Konteks Konten", "Layanan, platform, dan topik sudah siap" if context_done else "Lengkapi layanan, platform, dan topik", context_done),
-            ("Profil Influencer", f"{payload.get('username') or 'Username belum diisi'}" if influencer_done else "Masukkan username influencer", influencer_done),
-            ("Sasaran", f"{payload.get('target_audiens') or 'Target belum dipilih'} · {payload.get('tujuan') or 'Tujuan belum dipilih'}" if target_done else "Tentukan audiens dan tujuan", target_done),
-            ("Generate", "Siap menghasilkan rekomendasi" if ready_done else ("Kuota sesi habis" if limit_reached else "Menunggu input wajib"), ready_done),
-        )
-        first_incomplete = next((index for index, done in enumerate(completion_steps) if not done), 3)
-        step_html = "".join(
-            (
-                f'<article class="public-ai-step-v18 {"is-done" if done else ""} {"is-current" if index == first_incomplete and not ready_done else ""}">'
-                '<span class="public-ai-step-icon-v18" aria-hidden="true"></span>'
-                f'<div class="public-ai-step-title-v18">{escape(title)}</div>'
-                f'<div class="public-ai-step-status-v18">{escape(status)}</div>'
-                '</article>'
+            step_statuses = (
+                ("Konteks Konten", "Layanan, platform, dan topik sudah siap" if context_done else "Lengkapi layanan, platform, dan topik", context_done),
+                ("Profil Influencer", f"{payload.get('username') or 'Username belum diisi'}" if influencer_done else "Masukkan username influencer", influencer_done),
+                ("Sasaran", f"{payload.get('target_audiens') or 'Target belum dipilih'} · {payload.get('tujuan') or 'Tujuan belum dipilih'}" if target_done else "Tentukan audiens dan tujuan", target_done),
+                ("Generate", "Siap menghasilkan rekomendasi" if ready_done else ("Kuota sesi habis" if limit_reached else "Menunggu input wajib"), ready_done),
             )
-            for index, (title, status, done) in enumerate(step_statuses)
-        )
-        journey_html = (
-            '<section class="public-ai-journey-v18" aria-label="Progres pembuatan rekomendasi">'
-            '<div class="public-ai-journey-head-v18">'
-            '<div>'
-            '<div class="public-ai-journey-kicker-v18">Creative Journey</div>'
-            '<h3 class="public-ai-journey-title-v18">Peta kesiapan rekomendasi Anda</h3>'
-            '<p class="public-ai-journey-copy-v18">Setiap perubahan input akan memperbarui progres dan arah kreatif secara langsung.</p>'
-            '</div>'
-            f'<div class="public-ai-progress-orb-v18" style="--progress-angle:{progress_angle}deg">'
-            f'<strong>{completion_percent}%</strong><span>siap</span></div>'
-            '</div>'
-            f'<div class="public-ai-journey-grid-v18">{step_html}</div>'
-            '<div class="public-ai-live-chips-v18">'
-            f'<span class="public-ai-live-chip-v18">Layanan <b>{escape(payload.get("layanan") or "Belum dipilih")}</b></span>'
-            f'<span class="public-ai-live-chip-v18">Platform <b>{escape(payload.get("platform_label") or "Belum dipilih")}</b></span>'
-            f'<span class="public-ai-live-chip-v18">Topik <b>{escape(payload.get("topik") or "Belum lengkap")}</b></span>'
-            f'<span class="public-ai-live-chip-v18">Tujuan <b>{escape(payload.get("tujuan") or "Belum dipilih")}</b></span>'
-            '</div>'
-            '</section>'
-        )
-        st.markdown(journey_html, unsafe_allow_html=True)
-
-        try:
-            focus_mode = st.toggle(
-                "Aktifkan Mode Fokus Kreatif",
-                value=False,
-                key="public_ai_focus_mode",
-                help="Menampilkan ringkasan arah kreatif yang berubah mengikuti pilihan Anda.",
+            first_incomplete = next((index for index, done in enumerate(completion_steps) if not done), 3)
+            step_html = "".join(
+                (
+                    f'<article class="public-ai-step-v18 {"is-done" if done else ""} {"is-current" if index == first_incomplete and not ready_done else ""}">'
+                    '<span class="public-ai-step-icon-v18" aria-hidden="true"></span>'
+                    f'<div class="public-ai-step-title-v18">{escape(title)}</div>'
+                    f'<div class="public-ai-step-status-v18">{escape(status)}</div>'
+                    '</article>'
+                )
+                for index, (title, status, done) in enumerate(step_statuses)
             )
-        except AttributeError:
-            focus_mode = st.checkbox(
-                "Aktifkan Mode Fokus Kreatif",
-                value=False,
-                key="public_ai_focus_mode",
-                help="Menampilkan ringkasan arah kreatif yang berubah mengikuti pilihan Anda.",
-            )
-
-        if focus_mode:
-            gaya_focus = payload.get("gaya") or "Gaya natural, informatif, dan mudah dipahami"
-            focus_html = (
-                '<section class="public-ai-focus-v18" aria-label="Mode fokus kreatif">'
-                '<div class="public-ai-focus-title-v18">✦ Creative DNA aktif</div>'
-                '<div class="public-ai-focus-copy-v18">Arah visual ini membantu Anda memeriksa konsistensi konteks sebelum rekomendasi dikirim ke AI.</div>'
-                '<div class="public-ai-focus-grid-v18">'
-                f'<div class="public-ai-focus-item-v18"><b>Narasi</b><span>{escape(payload.get("tujuan") or "Tentukan tujuan konten")}: {escape(payload.get("topik") or "lengkapi topik")}</span></div>'
-                f'<div class="public-ai-focus-item-v18"><b>Karakter</b><span>{escape(gaya_focus[:120])}</span></div>'
-                f'<div class="public-ai-focus-item-v18"><b>Distribusi</b><span>{escape(payload.get("platform_label") or "Pilih platform")} untuk {escape(payload.get("target_audiens") or "target audiens")}</span></div>'
+            journey_html = (
+                '<section class="public-ai-journey-v18" aria-label="Progres pembuatan rekomendasi">'
+                '<div class="public-ai-journey-head-v18">'
+                '<div>'
+                '<div class="public-ai-journey-kicker-v18">Creative Journey</div>'
+                '<h3 class="public-ai-journey-title-v18">Peta kesiapan rekomendasi Anda</h3>'
+                '<p class="public-ai-journey-copy-v18">Progres dan arah kreatif diperbarui setelah tombol rekomendasi ditekan.</p>'
+                '</div>'
+                f'<div class="public-ai-progress-orb-v18" style="--progress-angle:{progress_angle}deg">'
+                f'<strong>{completion_percent}%</strong><span>siap</span></div>'
+                '</div>'
+                f'<div class="public-ai-journey-grid-v18">{step_html}</div>'
+                '<div class="public-ai-live-chips-v18">'
+                f'<span class="public-ai-live-chip-v18">Layanan <b>{escape(payload.get("layanan") or "Belum dipilih")}</b></span>'
+                f'<span class="public-ai-live-chip-v18">Platform <b>{escape(payload.get("platform_label") or "Belum dipilih")}</b></span>'
+                f'<span class="public-ai-live-chip-v18">Topik <b>{escape(payload.get("topik") or "Belum lengkap")}</b></span>'
+                f'<span class="public-ai-live-chip-v18">Tujuan <b>{escape(payload.get("tujuan") or "Belum dipilih")}</b></span>'
                 '</div>'
                 '</section>'
             )
-            st.markdown(focus_html, unsafe_allow_html=True)
+            st.markdown(journey_html, unsafe_allow_html=True)
 
-        with st.container(border=True):
-            action_header = (
-                '<div class="public-ai-action-v16-marker" aria-hidden="true"></div>'
-                '<div class="public-ai-target-header-v16">'
-                '<div class="public-ai-target-heading-v16">'
-                '<span class="public-ai-target-icon-v16" aria-hidden="true">✦</span>'
-                '<div class="public-ai-action-copy-v16">'
-                '<span class="public-ai-section-eyebrow-v20">STEP 04 · AI GENERATION</span>'
-                '<div class="public-ai-action-title-v16">Siap Membuat Rekomendasi</div>'
-                '<div class="public-ai-action-subtitle-v16">AI akan merangkai konteks yang Anda pilih menjadi konsep konten yang terarah.</div>'
-                '</div>'
-                '</div>'
-                '<span class="public-ai-target-chip-v16">✓ Input tervalidasi</span>'
-                '</div>'
-            )
-            st.markdown(action_header, unsafe_allow_html=True)
-            st.markdown(
-                '<div class="public-ai-privacy-v16">'
-                '<span class="public-ai-privacy-icon-v16" aria-hidden="true">◆</span>'
-                '<span>Input akan diproses oleh layanan AI untuk menghasilkan rekomendasi. '
-                'Jangan memasukkan password, token, nomor telepon, alamat, atau data pribadi sensitif.</span>'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-            generate_clicked = st.button(
-                "✨ Buat Rekomendasi Konten dengan AI",
-                key="public_ai_generate",
-                use_container_width=True,
-                type="primary",
-                disabled=limit_reached,
-            )
+            try:
+                focus_mode = st.toggle(
+                    "Aktifkan Mode Fokus Kreatif",
+                    value=False,
+                    key="public_ai_focus_mode",
+                    help="Menampilkan ringkasan arah kreatif yang berubah mengikuti pilihan Anda.",
+                )
+            except AttributeError:
+                focus_mode = st.checkbox(
+                    "Aktifkan Mode Fokus Kreatif",
+                    value=False,
+                    key="public_ai_focus_mode",
+                    help="Menampilkan ringkasan arah kreatif yang berubah mengikuti pilihan Anda.",
+                )
+
+            if focus_mode:
+                gaya_focus = payload.get("gaya") or "Gaya natural, informatif, dan mudah dipahami"
+                focus_html = (
+                    '<section class="public-ai-focus-v18" aria-label="Mode fokus kreatif">'
+                    '<div class="public-ai-focus-title-v18">✦ Creative DNA aktif</div>'
+                    '<div class="public-ai-focus-copy-v18">Arah visual ini membantu Anda memeriksa konsistensi konteks sebelum rekomendasi dikirim ke AI.</div>'
+                    '<div class="public-ai-focus-grid-v18">'
+                    f'<div class="public-ai-focus-item-v18"><b>Narasi</b><span>{escape(payload.get("tujuan") or "Tentukan tujuan konten")}: {escape(payload.get("topik") or "lengkapi topik")}</span></div>'
+                    f'<div class="public-ai-focus-item-v18"><b>Karakter</b><span>{escape(gaya_focus[:120])}</span></div>'
+                    f'<div class="public-ai-focus-item-v18"><b>Distribusi</b><span>{escape(payload.get("platform_label") or "Pilih platform")} untuk {escape(payload.get("target_audiens") or "target audiens")}</span></div>'
+                    '</div>'
+                    '</section>'
+                )
+                st.markdown(focus_html, unsafe_allow_html=True)
+
+            with st.container(border=True):
+                action_header = (
+                    '<div class="public-ai-action-v16-marker" aria-hidden="true"></div>'
+                    '<div class="public-ai-target-header-v16">'
+                    '<div class="public-ai-target-heading-v16">'
+                    '<span class="public-ai-target-icon-v16" aria-hidden="true">✦</span>'
+                    '<div class="public-ai-action-copy-v16">'
+                    '<span class="public-ai-section-eyebrow-v20">STEP 04 · AI GENERATION</span>'
+                    '<div class="public-ai-action-title-v16">Siap Membuat Rekomendasi</div>'
+                    '<div class="public-ai-action-subtitle-v16">AI akan merangkai konteks yang Anda pilih menjadi konsep konten yang terarah.</div>'
+                    '</div>'
+                    '</div>'
+                    '<span class="public-ai-target-chip-v16">✓ Input tervalidasi</span>'
+                    '</div>'
+                )
+                st.markdown(action_header, unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="public-ai-privacy-v16">'
+                    '<span class="public-ai-privacy-icon-v16" aria-hidden="true">◆</span>'
+                    '<span>Input akan diproses oleh layanan AI untuk menghasilkan rekomendasi. '
+                    'Jangan memasukkan password, token, nomor telepon, alamat, atau data pribadi sensitif.</span>'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
+                generate_clicked = st.form_submit_button(
+                    "✨ Buat Rekomendasi Konten dengan AI",
+                    key="public_ai_generate",
+                    use_container_width=True,
+                    type="primary",
+                    disabled=limit_reached,
+                )
 
         if limit_reached:
             st.warning(
