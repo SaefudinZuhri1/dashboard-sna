@@ -4868,12 +4868,16 @@ def render_public_content_ai() -> None:
                     layanan = st.selectbox(
                         "Layanan Telkom Group",
                         options=("IndiHome", "IndiBiz", "Telkomsel"),
+                        index=None,
+                        placeholder="Pilih layanan Telkom Group",
                         key="public_ai_layanan",
                     )
                 with col_platform:
                     platform_label = st.selectbox(
                         "Platform Influencer",
                         options=tuple(PLATFORM_OPTIONS.keys()),
+                        index=None,
+                        placeholder="Pilih platform influencer",
                         key="public_ai_platform",
                     )
 
@@ -4881,6 +4885,8 @@ def render_public_content_ai() -> None:
                 topik_pilihan = st.selectbox(
                     "Topik Konten",
                     options=topic_options,
+                    index=None,
+                    placeholder="Pilih topik konten",
                     key="public_ai_topik_pilihan",
                 )
                 custom_topic = ""
@@ -4957,13 +4963,16 @@ def render_public_content_ai() -> None:
                     audience_choice = st.selectbox(
                         "Target Audiens",
                         options=TARGET_AUDIENCE_OPTIONS,
+                        index=None,
+                        placeholder="Pilih target audiens",
                         key="public_ai_target_choice",
                     )
                 with col_goal:
                     tujuan = st.selectbox(
                         "Tujuan Konten",
                         options=CONTENT_GOAL_OPTIONS,
-                        index=0,
+                        index=None,
+                        placeholder="Pilih tujuan konten",
                         key="public_ai_tujuan",
                     )
 
@@ -4980,7 +4989,7 @@ def render_public_content_ai() -> None:
             target_audiens = custom_audience if audience_choice == "Tulis sendiri" else audience_choice
             payload = {
                 "layanan": _clean_text(layanan, 30),
-                "platform": PLATFORM_OPTIONS.get(platform_label, "twitter"),
+                "platform": PLATFORM_OPTIONS.get(platform_label, ""),
                 "platform_label": _clean_text(platform_label, 30),
                 "topik": _clean_text(topik, 150),
                 "username": _normalize_username(username_raw),
