@@ -4380,6 +4380,7 @@ def _render_light_theme_css() -> None:
             color: #5B6575 !important;
             background: linear-gradient(135deg, #FFF9EF, #FFF8F7, #FFFFFF) !important;
             box-shadow: inset 0 1px 0 rgba(255,255,255,.95) !important;
+            margin-bottom: 20px !important;
         }
         .public-ai-privacy-icon-v16 { color: #9A5D18 !important; }
         .st-key-public_ai_generate button {
