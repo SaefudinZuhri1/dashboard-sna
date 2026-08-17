@@ -4000,8 +4000,17 @@ def _render_light_theme_css() -> None:
             -webkit-background-clip: text !important;
             background-clip: text !important;
         }
-        .public-ai-subtitle-v14 { color: #64748B !important; }
-        .public-ai-subtitle-v14 strong { color: #27364A !important; }
+        .public-ai-subtitle-v14 {
+            color: #405269 !important;
+            -webkit-text-fill-color: #405269 !important;
+            font-weight: 560 !important;
+            text-shadow: 0 1px 0 rgba(255,255,255,.72) !important;
+        }
+        .public-ai-subtitle-v14 strong {
+            color: #172033 !important;
+            -webkit-text-fill-color: #172033 !important;
+            font-weight: 850 !important;
+        }
         .public-ai-badge-v14 {
             border-color: #E3E7ED !important;
             color: #475569 !important;
