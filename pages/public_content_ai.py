@@ -4613,6 +4613,218 @@ def _render_light_theme_css() -> None:
         }
         .public-ai-premium-foot-v21 { color: #7A8797 !important; }
 
+        /* ================================================================
+           FIX v17 - GENERATED RESULT LIGHT THEME
+           Seluruh output rekomendasi memakai palet terang tanpa menyentuh
+           baseline Dark Mode. Fokus pada kontras isi card, navigator, dan
+           action panel setelah rekomendasi berhasil dibuat.
+           ================================================================ */
+
+        /* Navigator hasil rekomendasi. */
+        .public-ai-output-map-head-v18 h3 {
+            color: #253348 !important;
+            -webkit-text-fill-color: #253348 !important;
+        }
+        .public-ai-output-map-head-v18 p {
+            color: #64748B !important;
+            -webkit-text-fill-color: #64748B !important;
+        }
+        .public-ai-output-map-count-v18 {
+            border-color: #DCE5EF !important;
+            color: #526174 !important;
+            background: rgba(255,255,255,.88) !important;
+            box-shadow: 0 6px 16px rgba(15,23,42,.045) !important;
+        }
+        .public-ai-output-map-count-v18 b {
+            color: #3178B8 !important;
+            -webkit-text-fill-color: #3178B8 !important;
+        }
+        .public-ai-output-nav-item-v18 {
+            color: #334155 !important;
+            background: linear-gradient(145deg, rgba(var(--nav-rgb),.075), #FFFFFF 66%) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 6px 16px rgba(15,23,42,.045) !important;
+        }
+        .public-ai-output-nav-item-v18:hover {
+            box-shadow: 0 12px 26px rgba(15,23,42,.10), 0 0 18px rgba(var(--nav-rgb),.10) !important;
+        }
+        .public-ai-output-nav-icon-v18 {
+            background: rgba(var(--nav-rgb),.075) !important;
+            box-shadow: 0 4px 12px rgba(var(--nav-rgb),.09) !important;
+        }
+        .public-ai-output-nav-copy-v18 b {
+            color: #334155 !important;
+            -webkit-text-fill-color: #334155 !important;
+        }
+        .public-ai-output-nav-copy-v18 small {
+            color: #607086 !important;
+            -webkit-text-fill-color: #607086 !important;
+        }
+        .public-ai-output-nav-arrow-v18 {
+            color: #7A8797 !important;
+            -webkit-text-fill-color: #7A8797 !important;
+        }
+
+        /* Card output: Ringkasan, Alasan, Ide, Caption, Hook, Hashtag, Etika. */
+        .public-ai-premium-card-v21::before {
+            opacity: .42 !important;
+        }
+        .public-ai-premium-card-v21::after {
+            border-color: rgba(var(--card-rgb),.13) !important;
+            box-shadow: 0 0 0 24px rgba(var(--card-rgb),.018), 0 0 0 48px rgba(var(--card-rgb),.012) !important;
+        }
+        .public-ai-premium-card-v21:hover {
+            box-shadow: 0 18px 42px rgba(15,23,42,.11), 0 0 0 1px rgba(var(--card-rgb),.09), inset 0 1px 0 rgba(255,255,255,.98) !important;
+        }
+        .public-ai-premium-card-v21:target {
+            box-shadow: 0 20px 46px rgba(15,23,42,.12), 0 0 0 3px rgba(var(--card-rgb),.11), 0 0 24px rgba(var(--card-rgb),.10) !important;
+        }
+        .public-ai-premium-icon-v21 {
+            color: #253348 !important;
+            -webkit-text-fill-color: #253348 !important;
+            background: linear-gradient(145deg, rgba(var(--card-rgb),.16), rgba(var(--card-rgb-2),.08)) !important;
+            box-shadow: 0 8px 20px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.92) !important;
+        }
+        .public-ai-premium-index-v21 {
+            color: #526174 !important;
+            -webkit-text-fill-color: #526174 !important;
+        }
+        .public-ai-premium-title-wrap-v21 h3 {
+            color: #233044 !important;
+            -webkit-text-fill-color: #233044 !important;
+        }
+        .public-ai-premium-title-wrap-v21 p {
+            color: #6A788B !important;
+            -webkit-text-fill-color: #6A788B !important;
+        }
+        .public-ai-premium-chip-v21 {
+            color: #435168 !important;
+            -webkit-text-fill-color: #435168 !important;
+            border-color: rgba(var(--card-rgb),.24) !important;
+            background: rgba(var(--card-rgb),.065) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.94) !important;
+        }
+        .public-ai-premium-chip-v21:hover {
+            color: #2F3D52 !important;
+            background: rgba(var(--card-rgb),.11) !important;
+        }
+        .public-ai-premium-divider-v21 {
+            background: #E8EDF3 !important;
+        }
+        .public-ai-premium-body-v21 {
+            border-color: #E3E9F1 !important;
+            background: linear-gradient(145deg, #FFFFFF, #F8FAFC) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.98) !important;
+        }
+        .public-ai-premium-body-v21 p {
+            color: #46566B !important;
+            -webkit-text-fill-color: #46566B !important;
+            background: linear-gradient(90deg, rgba(var(--card-rgb),.065), rgba(var(--card-rgb),.018) 68%, transparent) !important;
+        }
+        .public-ai-premium-body-v21 p:hover {
+            background: linear-gradient(90deg, rgba(var(--card-rgb),.095), rgba(var(--card-rgb),.028) 72%, transparent) !important;
+        }
+        .public-ai-premium-body-v21 strong {
+            color: #1F2A3A !important;
+            -webkit-text-fill-color: #1F2A3A !important;
+        }
+        .public-ai-premium-body-v21 em {
+            color: #3C4B61 !important;
+            -webkit-text-fill-color: #3C4B61 !important;
+        }
+        .public-ai-premium-body-v21 code {
+            color: #334155 !important;
+            -webkit-text-fill-color: #334155 !important;
+            border-color: rgba(var(--card-rgb),.19) !important;
+            background: rgba(var(--card-rgb),.055) !important;
+        }
+        .public-ai-content-list-v21 li {
+            color: #4A5A70 !important;
+            -webkit-text-fill-color: #4A5A70 !important;
+            border-color: #E5EAF1 !important;
+            background: rgba(var(--card-rgb),.035) !important;
+        }
+        .public-ai-content-list-v21 li:hover {
+            border-color: rgba(var(--card-rgb),.30) !important;
+            background: rgba(var(--card-rgb),.075) !important;
+            box-shadow: 0 8px 18px rgba(15,23,42,.045) !important;
+        }
+        .public-ai-content-list-v21 li strong {
+            color: #253348 !important;
+            -webkit-text-fill-color: #253348 !important;
+        }
+        .public-ai-premium-hashtag-v21 {
+            color: #334155 !important;
+            -webkit-text-fill-color: #334155 !important;
+            border-color: rgba(var(--card-rgb),.24) !important;
+            background: linear-gradient(135deg, rgba(var(--card-rgb),.075), rgba(var(--card-rgb-2),.04), #FFFFFF) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 4px 12px rgba(15,23,42,.035) !important;
+        }
+        .public-ai-premium-hashtag-v21:hover {
+            background: rgba(var(--card-rgb),.11) !important;
+            box-shadow: 0 8px 18px rgba(15,23,42,.07), 0 0 14px rgba(var(--card-rgb),.07) !important;
+        }
+        .public-ai-premium-foot-v21,
+        .public-ai-premium-hover-note-v21,
+        .public-ai-empty-copy-v21 {
+            color: #7A8797 !important;
+            -webkit-text-fill-color: #7A8797 !important;
+        }
+
+        /* Panel aksi setelah seluruh output selesai dibuat. */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-result-actions-v18-marker) {
+            border-color: #DDE5EF !important;
+            background:
+                radial-gradient(circle at 94% 4%, rgba(80,164,255,.075), transparent 31%),
+                radial-gradient(circle at 4% 100%, rgba(229,57,53,.065), transparent 32%),
+                linear-gradient(145deg, #FFFFFF, #F8FAFD) !important;
+            box-shadow: 0 18px 44px rgba(15,23,42,.09), inset 0 1px 0 rgba(255,255,255,.98) !important;
+        }
+        .public-ai-result-actions-head-v18 span {
+            color: #D84B46 !important;
+            -webkit-text-fill-color: #D84B46 !important;
+        }
+        .public-ai-result-actions-head-v18 h3 {
+            color: #26364A !important;
+            -webkit-text-fill-color: #26364A !important;
+        }
+        .public-ai-result-actions-head-v18 p {
+            color: #68778A !important;
+            -webkit-text-fill-color: #68778A !important;
+        }
+        .public-ai-result-actions-orb-v18 {
+            color: #334155 !important;
+            -webkit-text-fill-color: #334155 !important;
+            border-color: #DDE5EF !important;
+            background: linear-gradient(145deg, rgba(255,89,84,.10), rgba(70,153,255,.09), #FFFFFF) !important;
+            box-shadow: 0 0 0 7px rgba(71,127,200,.035), 0 8px 20px rgba(15,23,42,.07) !important;
+        }
+        .st-key-public_ai_regenerate button,
+        .st-key-public_ai_clear_result button,
+        .st-key-public_ai_download_txt button {
+            color: #334155 !important;
+            -webkit-text-fill-color: #334155 !important;
+            box-shadow: 0 6px 16px rgba(15,23,42,.055), inset 0 1px 0 rgba(255,255,255,.96) !important;
+        }
+        .st-key-public_ai_regenerate button {
+            border-color: rgba(82,121,255,.25) !important;
+            background: linear-gradient(135deg, rgba(82,121,255,.10), rgba(135,91,255,.055), #FFFFFF) !important;
+        }
+        .st-key-public_ai_clear_result button {
+            border-color: rgba(229,57,53,.24) !important;
+            background: linear-gradient(135deg, rgba(229,57,53,.09), rgba(255,115,70,.05), #FFFFFF) !important;
+        }
+        .st-key-public_ai_download_txt button {
+            border-color: rgba(40,190,142,.24) !important;
+            background: linear-gradient(135deg, rgba(40,190,142,.09), rgba(39,157,214,.05), #FFFFFF) !important;
+        }
+        .st-key-public_ai_regenerate button:hover,
+        .st-key-public_ai_clear_result button:hover,
+        .st-key-public_ai_download_txt button:hover {
+            color: #1F2937 !important;
+            -webkit-text-fill-color: #1F2937 !important;
+            box-shadow: 0 10px 22px rgba(15,23,42,.10), 0 0 16px rgba(105,145,255,.07) !important;
+        }
+
         /* Alert bawaan di halaman ini tetap kontras di Light Theme. */
         [data-testid="stAlert"] {
             color: #374151 !important;
