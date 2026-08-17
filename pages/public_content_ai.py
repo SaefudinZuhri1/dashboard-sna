@@ -2807,6 +2807,7 @@ def _render_page_css() -> None:
         }
         .public-ai-step-v18:hover::after { transform:translateX(620%) skewX(-20deg); }
         .public-ai-step-icon-v18 {
+            position:relative;
             display:grid;
             place-items:center;
             width:38px;
@@ -2820,11 +2821,41 @@ def _render_page_css() -> None:
             font-weight:900;
             transition:transform .3s ease;
         }
+        .public-ai-step-icon-v18 svg {
+            width:20px;
+            height:20px;
+            display:block;
+            fill:none;
+            stroke:currentColor;
+            stroke-width:1.9;
+            stroke-linecap:round;
+            stroke-linejoin:round;
+        }
         .public-ai-step-v18:hover .public-ai-step-icon-v18 { transform:rotate(-8deg) scale(1.12); }
         .public-ai-step-title-v18 { color:#f6f9ff;font-size:.86rem;font-weight:900; }
         .public-ai-step-status-v18 { margin-top:5px;color:rgba(215,228,245,.62);font-size:0.75rem /* FIX: minimum 12px agar terbaca di tablet */;line-height:1.4; }
-        .public-ai-step-v18.is-done .public-ai-step-icon-v18::after { content:"✓"; }
-        .public-ai-step-v18:not(.is-done) .public-ai-step-icon-v18::after { content:"•"; }
+        /* FIX v14: ikon utama tiap tahap tetap tampil. Status selesai diberi badge centang kecil,
+           bukan mengganti ikon menjadi dot/check generik. */
+        .public-ai-step-v18.is-done .public-ai-step-icon-v18::after {
+            content:"✓";
+            position:absolute;
+            right:-6px;
+            top:-6px;
+            display:grid;
+            place-items:center;
+            width:16px;
+            height:16px;
+            border-radius:999px;
+            color:#fff;
+            background:rgb(var(--step-rgb));
+            border:2px solid rgba(9,17,30,.92);
+            box-sizing:border-box;
+            font-size:9px;
+            font-weight:950;
+            line-height:1;
+            box-shadow:0 3px 9px rgba(var(--step-rgb),.28);
+        }
+        .public-ai-step-v18:not(.is-done) .public-ai-step-icon-v18::after { content:none; }
         .public-ai-step-v18.is-done { border-color:rgba(var(--step-rgb),.42); }
         .public-ai-step-v18.is-current { animation:publicAiStepEnterV18 .55s both cubic-bezier(.16,1,.3,1),publicAiStepCurrentV18 2.4s .9s ease-in-out infinite; }
 
@@ -4288,6 +4319,9 @@ def _render_light_theme_css() -> None:
         }
         .public-ai-step-title-v18 { color: #334155 !important; }
         .public-ai-step-status-v18 { color: #718096 !important; }
+        .public-ai-step-v18.is-done .public-ai-step-icon-v18::after {
+            border-color: #FFFFFF !important;
+        }
         .public-ai-live-chip-v18 {
             border-color: #DEE4EC !important;
             color: #64748B !important;
@@ -5010,22 +5044,31 @@ def render_public_content_ai() -> None:
             completion_percent = int(round((sum(completion_steps) / len(completion_steps)) * 100))
             progress_angle = int(round((completion_percent / 100) * 360))
 
+            # FIX v14: ikon SVG berbeda untuk setiap tahap agar Creative Journey tetap informatif
+            # meskipun tahap belum selesai. SVG memakai currentColor supaya otomatis mengikuti
+            # warna card pada Light maupun Dark Theme tanpa dependency eksternal.
+            step_icons = (
+                '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg>',
+                '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3"></circle><path d="M6.5 19c.7-3.2 2.6-5 5.5-5s4.8 1.8 5.5 5"></path></svg>',
+                '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="12" cy="12" r="1"></circle></svg>',
+                '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3z"></path><path d="M18.5 15.5l.7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3z"></path></svg>',
+            )
             step_statuses = (
-                ("Konteks Konten", "Layanan, platform, dan topik sudah siap" if context_done else "Lengkapi layanan, platform, dan topik", context_done),
-                ("Profil Influencer", f"{payload.get('username') or 'Username belum diisi'}" if influencer_done else "Masukkan username influencer", influencer_done),
-                ("Sasaran", f"{payload.get('target_audiens') or 'Target belum dipilih'} · {payload.get('tujuan') or 'Tujuan belum dipilih'}" if target_done else "Tentukan audiens dan tujuan", target_done),
-                ("Generate", "Siap menghasilkan rekomendasi" if ready_done else ("Kuota sesi habis" if limit_reached else "Menunggu input wajib"), ready_done),
+                ("Konteks Konten", "Layanan, platform, dan topik sudah siap" if context_done else "Lengkapi layanan, platform, dan topik", context_done, step_icons[0]),
+                ("Profil Influencer", f"{payload.get('username') or 'Username belum diisi'}" if influencer_done else "Masukkan username influencer", influencer_done, step_icons[1]),
+                ("Sasaran", f"{payload.get('target_audiens') or 'Target belum dipilih'} · {payload.get('tujuan') or 'Tujuan belum dipilih'}" if target_done else "Tentukan audiens dan tujuan", target_done, step_icons[2]),
+                ("Generate", "Siap menghasilkan rekomendasi" if ready_done else ("Kuota sesi habis" if limit_reached else "Menunggu input wajib"), ready_done, step_icons[3]),
             )
             first_incomplete = next((index for index, done in enumerate(completion_steps) if not done), 3)
             step_html = "".join(
                 (
                     f'<article class="public-ai-step-v18 {"is-done" if done else ""} {"is-current" if index == first_incomplete and not ready_done else ""}">'
-                    '<span class="public-ai-step-icon-v18" aria-hidden="true"></span>'
+                    f'<span class="public-ai-step-icon-v18" aria-hidden="true">{icon_svg}</span>'
                     f'<div class="public-ai-step-title-v18">{escape(title)}</div>'
                     f'<div class="public-ai-step-status-v18">{escape(status)}</div>'
                     '</article>'
                 )
-                for index, (title, status, done) in enumerate(step_statuses)
+                for index, (title, status, done, icon_svg) in enumerate(step_statuses)
             )
             journey_html = (
                 '<section class="public-ai-journey-v18" aria-label="Progres pembuatan rekomendasi">'
