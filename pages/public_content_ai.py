@@ -4208,17 +4208,32 @@ def _render_light_theme_css() -> None:
             -webkit-text-fill-color: #26364A !important;
         }
 
-        /* FIX Light Theme: beri ruang khusus ikon dekoratif pada dropdown Sasaran Komunikasi.
-           Selector dibatasi ke dua field ini agar dropdown pada section lain tidak berubah. */
+        /* FIX v10 Light Theme: ikon Sasaran Komunikasi dipindahkan ke sisi kanan.
+           Pendekatan ini tidak bergantung pada struktur internal teks BaseWeb/Streamlit,
+           sehingga ikon tidak lagi dapat menimpa nilai dropdown. */
+        .st-key-public_ai_target_choice::before,
+        .st-key-public_ai_tujuan::before {
+            left: auto !important;
+            right: 54px !important;
+            width: 28px !important;
+            height: 28px !important;
+            border-radius: 9px !important;
+            background: rgba(var(--field-rgb,120,150,190), .08) !important;
+            border-color: rgba(var(--field-rgb,120,150,190), .20) !important;
+            box-shadow: none !important;
+            animation: none !important;
+        }
         .st-key-public_ai_target_choice [data-baseweb="select"] > div,
         .st-key-public_ai_tujuan [data-baseweb="select"] > div {
-            padding-left: 68px !important;
+            padding-left: 16px !important;
+            padding-right: 92px !important;
         }
         .st-key-public_ai_target_choice [data-baseweb="select"] > div > div:first-child,
         .st-key-public_ai_tujuan [data-baseweb="select"] > div > div:first-child,
         .st-key-public_ai_target_choice [data-baseweb="select"] [role="combobox"],
         .st-key-public_ai_tujuan [data-baseweb="select"] [role="combobox"] {
-            padding-left: 16px !important;
+            padding-left: 0 !important;
+            margin-left: 0 !important;
             min-width: 0 !important;
         }
         .st-key-public_ai_topik_custom input::placeholder,
