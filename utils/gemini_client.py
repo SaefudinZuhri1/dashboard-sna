@@ -31,7 +31,8 @@ ENV_FILE = PROJECT_ROOT / ".env"
 DEFAULT_MODEL_NAME = "gemini-3.5-flash"
 FALLBACK_MODEL_NAMES = ("gemini-3.5-flash-lite",)
 RATE_LIMIT_RETRY_DELAYS = (2, 4, 8)
-DEFAULT_REQUEST_TIMEOUT_SECONDS = 20
+PUBLIC_RECOMMENDATION_RETRY_DELAYS = (1,)
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 30
 MIN_REQUEST_TIMEOUT_SECONDS = 5
 MAX_REQUEST_TIMEOUT_SECONDS = 60
 _GEMINI_COUNTER_DATE_KEY = "_gemini_request_counter_date"
@@ -180,7 +181,13 @@ def _boleh_coba_model_cadangan(error: Exception) -> bool:
     error_name = type(error).__name__.lower()
     return any(
         marker in error_name
-        for marker in ("servererror", "timeouterror", "connectionerror", "notfound")
+        for marker in (
+            "servererror",
+            "timeout",
+            "connectionerror",
+            "connecterror",
+            "notfound",
+        )
     )
 
 
@@ -606,7 +613,7 @@ def _generate_text_cached(
                 raise RuntimeError("Respons Gemini kosong")
 
             if index > 0:
-                LOGGER.warning(
+                LOGGER.info(
                     "Model utama sedang tidak dapat melayani permintaan. "
                     "Permintaan berhasil menggunakan model cadangan %s.",
                     candidate,
@@ -618,7 +625,7 @@ def _generate_text_cached(
                 raise
             has_next_model = index < len(model.model_candidates) - 1
             if has_next_model and _boleh_coba_model_cadangan(error):
-                LOGGER.warning(
+                LOGGER.info(
                     "Permintaan ke model %s gagal sementara (%s). "
                     "Mencoba model cadangan.",
                     candidate,
@@ -1458,26 +1465,46 @@ def get_gemini_runtime_status() -> dict[str, Any]:
 
 
 
+def _public_recommendation_transient_error(error: Exception) -> bool:
+    """True untuk gangguan server/transport yang layak dicoba ulang secara singkat."""
+    if isinstance(error, GeminiRateLimitError):
+        return False
+    status_code = _status_code_error(error)
+    if status_code in {408, 500, 502, 503, 504}:
+        return True
+    error_name = type(error).__name__.casefold()
+    return any(
+        marker in error_name
+        for marker in (
+            "servererror",
+            "readtimeout",
+            "connecttimeout",
+            "timeouterror",
+            "connectionerror",
+            "connecterror",
+        )
+    )
+
+
 def generate_recommendation_with_status(
     prompt: str,
     fallback_text: str = "",
 ) -> dict[str, str]:
-    """Buat rekomendasi melalui client Gemini yang sama beserta status sumbernya.
+    """Buat rekomendasi publik Gemini dengan retry singkat untuk gangguan sementara.
 
-    Fungsi ini tidak membuat konfigurasi atau client Gemini baru. Inisialisasi,
-    model cadangan, cache, serta penanganan error tetap memakai alur stabil yang
-    digunakan halaman Rekomendasi.
+    Satu retry tambahan ini khusus AI Content Studio. Alur halaman Rekomendasi lain tetap
+    memakai fungsi stabilnya sendiri. Error 429 tetap ditangani oleh backoff existing.
     """
     fallback_clean = str(fallback_text or "").strip()
-    try:
-        prompt_clean = str(prompt or "").strip()
-        if not prompt_clean:
-            return {
-                "text": fallback_clean,
-                "source": "fallback",
-                "model_name": "",
-            }
+    prompt_clean = str(prompt or "").strip()
+    if not prompt_clean:
+        return {
+            "text": fallback_clean,
+            "source": "fallback",
+            "model_name": "",
+        }
 
+    try:
         model = init_gemini()
         if model is None:
             return {
@@ -1486,27 +1513,49 @@ def generate_recommendation_with_status(
                 "model_name": "",
             }
 
-        text, model_name = _generate_recommendation_cached(model, prompt_clean)
-        _tampilkan_retry_notices()
-        text_clean = str(text or "").strip()
-        if not text_clean:
-            return {
-                "text": fallback_clean,
-                "source": "fallback",
-                "model_name": "",
-            }
+        last_error: Exception | None = None
+        total_attempts = len(PUBLIC_RECOMMENDATION_RETRY_DELAYS) + 1
+        for attempt_index in range(total_attempts):
+            try:
+                text, model_name = _generate_recommendation_cached(model, prompt_clean)
+                _tampilkan_retry_notices()
+                text_clean = str(text or "").strip()
+                if not text_clean:
+                    return {
+                        "text": fallback_clean,
+                        "source": "fallback",
+                        "model_name": "",
+                    }
 
-        return {
-            "text": text_clean,
-            "source": "gemini",
-            "model_name": str(model_name or ""),
-        }
+                return {
+                    "text": text_clean,
+                    "source": "gemini",
+                    "model_name": str(model_name or ""),
+                }
+            except Exception as error:
+                last_error = error
+                has_retry = attempt_index < len(PUBLIC_RECOMMENDATION_RETRY_DELAYS)
+                if has_retry and _public_recommendation_transient_error(error):
+                    delay_seconds = PUBLIC_RECOMMENDATION_RETRY_DELAYS[attempt_index]
+                    LOGGER.info(
+                        "Gangguan sementara Gemini publik (%s). Mencoba ulang dalam %s detik.",
+                        type(error).__name__,
+                        delay_seconds,
+                    )
+                    time.sleep(delay_seconds)
+                    continue
+                raise
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Permintaan rekomendasi publik gagal tanpa detail error")
     except Exception as error:
         _tampilkan_retry_notices()
         if isinstance(error, GeminiRateLimitError):
             _tampilkan_rate_limit_error()
         LOGGER.warning(
-            "Permintaan rekomendasi publik Gemini gagal (%s). Menggunakan fallback lokal.",
+            "Permintaan rekomendasi publik Gemini gagal setelah retry (%s). "
+            "Menggunakan fallback lokal.",
             type(error).__name__,
         )
         return {
@@ -1514,3 +1563,4 @@ def generate_recommendation_with_status(
             "source": "fallback",
             "model_name": "",
         }
+

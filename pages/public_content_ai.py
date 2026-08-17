@@ -86,6 +86,37 @@ SECTION_ORDER = (
     "Catatan Etika dan Verifikasi",
 )
 
+# Input yang sangat umum dipakai sebagai placeholder/uji coba dan tidak layak
+# menghabiskan kuota AI. Pemeriksaan ini sengaja konservatif: hanya pola yang
+# sangat jelas dianggap input acak, sehingga username normal tetap diterima.
+_PUBLIC_AI_JUNK_TOKENS = {
+    "test",
+    "testing",
+    "tester",
+    "dummy",
+    "contoh",
+    "username",
+    "namaakun",
+    "qwerty",
+    "asdf",
+    "asdfgh",
+    "zxcv",
+    "zxcvbn",
+    "abc",
+    "abcd",
+    "abcde",
+    "123",
+    "1234",
+    "12345",
+    "123456",
+    "xxx",
+    "xxxx",
+    "xxxxx",
+    "null",
+    "none",
+    "kosong",
+}
+
 
 def _init_public_ai_state() -> None:
     """Siapkan state publik dengan key yang tidak bertabrakan dengan dashboard."""
@@ -157,6 +188,47 @@ def _normalize_username(value: Any) -> str:
     return f"@{core}"
 
 
+def _compact_input_signal(value: Any) -> str:
+    """Ambil sinyal alfanumerik lowercase untuk mendeteksi input uji yang jelas."""
+    text = _clean_multiline_text(value, 500).casefold()
+    return re.sub(r"[^a-z0-9]", "", text)
+
+
+def _looks_like_obvious_junk(value: Any, *, username: bool = False) -> bool:
+    """Deteksi placeholder/gibberish yang sangat jelas tanpa lookup profil eksternal.
+
+    Fungsi ini tidak mengklaim bahwa akun ada atau tidak ada di internet. Tujuannya
+    hanya menghentikan input uji/acak sebelum memakai kuota dan memanggil Gemini.
+    """
+    raw = _clean_multiline_text(value, 500)
+    compact = _compact_input_signal(raw)
+    if not compact:
+        return False
+
+    if compact in _PUBLIC_AI_JUNK_TOKENS:
+        return True
+
+    # Contoh: ssss, aaaaa, 11111.
+    if len(compact) >= 4 and len(set(compact)) == 1:
+        return True
+
+    # Contoh pola uji berulang: ababab, 121212, asasasas.
+    if len(compact) >= 6 and re.fullmatch(r"(.{1,2})\1{2,}", compact):
+        return True
+
+    # Deret keyboard yang lazim dipakai untuk mengetes form.
+    keyboard_runs = (
+        "qwertyuiop",
+        "asdfghjkl",
+        "zxcvbnm",
+        "1234567890",
+    )
+    if any(compact in run and len(compact) >= 4 for run in keyboard_runs):
+        return True
+
+    return False
+
+
 def _remaining_cooldown() -> int:
     """Hitung sisa cooldown session dalam detik."""
     last_request = float(st.session_state.get(PUBLIC_AI_LAST_REQUEST_KEY, 0.0) or 0.0)
@@ -165,7 +237,7 @@ def _remaining_cooldown() -> int:
 
 
 def _validate_payload(payload: dict[str, str]) -> list[str]:
-    """Validasi seluruh input wajib sebelum permintaan AI dilakukan."""
+    """Validasi input wajib dan hentikan input uji/acak sebelum request AI."""
     errors: list[str] = []
     if not payload.get("layanan"):
         errors.append("Pilih layanan Telkom Group.")
@@ -173,12 +245,32 @@ def _validate_payload(payload: dict[str, str]) -> list[str]:
         errors.append("Pilih platform influencer.")
     if not payload.get("topik"):
         errors.append("Topik konten wajib diisi.")
-    if not payload.get("username"):
+    elif _looks_like_obvious_junk(payload.get("topik")):
+        errors.append("Topik konten terlihat seperti input uji/acak. Masukkan topik yang jelas dan relevan.")
+
+    username = payload.get("username", "")
+    if not username:
         errors.append(
             "Username influencer belum valid. Gunakan huruf, angka, titik, garis bawah, atau tanda hubung."
         )
+    elif _looks_like_obvious_junk(username, username=True):
+        errors.append(
+            "Username influencer tidak dapat digunakan karena terlihat seperti input uji/acak. "
+            "Periksa username yang benar sebelum membuat rekomendasi."
+        )
+
+    gaya = payload.get("gaya", "")
+    if gaya and _looks_like_obvious_junk(gaya):
+        errors.append(
+            "Gaya atau karakter influencer terlihat seperti input uji/acak. "
+            "Kosongkan field ini atau isi dengan deskripsi yang bermakna."
+        )
+
     if not payload.get("target_audiens"):
         errors.append("Target audiens wajib diisi.")
+    elif _looks_like_obvious_junk(payload.get("target_audiens")):
+        errors.append("Target audiens terlihat seperti input uji/acak. Masukkan target audiens yang jelas.")
+
     if not payload.get("tujuan"):
         errors.append("Pilih tujuan konten.")
     return errors
@@ -5224,6 +5316,9 @@ def render_public_content_ai() -> None:
         if generate_clicked:
             validation_errors = _validate_payload(payload)
             if validation_errors:
+                # Input gagal tidak boleh memakai kuota dan tidak boleh terlihat seolah
+                # menghasilkan rekomendasi lama dari session sebelumnya.
+                _clear_public_result()
                 for message in validation_errors:
                     st.error(message)
             else:
