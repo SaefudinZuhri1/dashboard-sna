@@ -3399,15 +3399,22 @@ def route_page(selected: str) -> None:
 def render_footer() -> None:
     """Tampilkan footer global interaktif pada seluruh halaman dashboard."""
     try:
-        # Footer Light Theme berlaku pada halaman autentikasi publik
-        # (Login dan Register). Footer dashboard/dark mode tetap baseline lama.
-        is_light_auth_footer = (
+        # Footer Light Theme berlaku pada halaman autentikasi publik serta
+        # AI Content Studio publik. Dark Mode dan footer dashboard tetap
+        # menggunakan baseline lama.
+        public_route = str(st.session_state.get("_public_route") or "auth")
+        is_light_public_footer = (
             not bool(st.session_state.get("logged_in", False))
-            and st.session_state.get("page") in {"login", "register"}
-            and str(st.session_state.get("_public_route") or "auth") == "auth"
             and not bool(st.session_state.get("dark_mode", False))
+            and (
+                (
+                    public_route == "auth"
+                    and st.session_state.get("page") in {"login", "register"}
+                )
+                or public_route == "ai_content_studio"
+            )
         )
-        footer_theme_class = " footer-light-login" if is_light_auth_footer else ""
+        footer_theme_class = " footer-light-login" if is_light_public_footer else ""
 
         render_html_iframe(
             dedent(

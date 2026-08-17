@@ -3943,6 +3943,421 @@ def _render_page_css() -> None:
     )
 
 
+def _render_light_theme_css() -> None:
+    """Sesuaikan AI Content Studio saat Light Theme tanpa menyentuh Dark Mode."""
+    if bool(st.session_state.get("dark_mode", False)):
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* ================================================================
+           LIGHT THEME AI CONTENT STUDIO v2.1
+           Override hanya dirender ketika dark_mode=False. CSS Dark Mode
+           baseline di atas tetap utuh dan tidak ditulis ulang.
+           ================================================================ */
+
+        /* Tombol kembali */
+        .st-key-public_ai_back_to_login button {
+            border-color: #D7DEE8 !important;
+            color: #334155 !important;
+            -webkit-text-fill-color: #334155 !important;
+            background: linear-gradient(135deg, #FFFFFF, #F6F8FB) !important;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, .10), inset 0 1px 0 rgba(255,255,255,.92) !important;
+        }
+        .st-key-public_ai_back_to_login button:hover {
+            border-color: rgba(229,57,53,.40) !important;
+            color: #B42318 !important;
+            -webkit-text-fill-color: #B42318 !important;
+            background: linear-gradient(135deg, #FFF7F7, #FFFFFF) !important;
+            box-shadow: 0 14px 30px rgba(15,23,42,.12), 0 0 20px rgba(229,57,53,.07) !important;
+        }
+
+        /* Hero tetap premium, tetapi menjadi terang. */
+        .public-ai-hero-v14 {
+            border-color: rgba(229,57,53,.26) !important;
+            background:
+                radial-gradient(circle at 89% 13%, rgba(139,92,246,.12), transparent 30%),
+                radial-gradient(circle at 92% 78%, rgba(229,57,53,.13), transparent 36%),
+                radial-gradient(circle at 8% 4%, rgba(255,107,102,.09), transparent 31%),
+                linear-gradient(135deg, #FFFFFF 0%, #FFF9F9 54%, #F8F7FF 100%) !important;
+            box-shadow: 0 24px 58px rgba(15,23,42,.12), inset 0 1px 0 rgba(255,255,255,.95) !important;
+        }
+        .public-ai-hero-v14::after {
+            background:
+                linear-gradient(115deg, transparent 16%, rgba(229,57,53,.025) 39%, transparent 58%),
+                repeating-linear-gradient(90deg, transparent 0 52px, rgba(15,23,42,.018) 53px),
+                repeating-linear-gradient(0deg, transparent 0 52px, rgba(15,23,42,.013) 53px) !important;
+        }
+        .public-ai-hero-v14:hover {
+            border-color: rgba(229,57,53,.40) !important;
+            box-shadow: 0 30px 68px rgba(15,23,42,.15), 0 0 30px rgba(229,57,53,.07) !important;
+        }
+        .public-ai-kicker-v14 { color: #C93632 !important; }
+        .public-ai-title-v14 { color: #1F2937 !important; }
+        .public-ai-title-v14 .public-ai-title-accent-v14 {
+            background: linear-gradient(100deg, #1F2937 0%, #B42318 30%, #E53935 56%, #7C3AED 82%, #1F2937 100%) !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+        }
+        .public-ai-subtitle-v14 { color: #64748B !important; }
+        .public-ai-subtitle-v14 strong { color: #27364A !important; }
+        .public-ai-badge-v14 {
+            border-color: #E3E7ED !important;
+            color: #475569 !important;
+            background: rgba(255,255,255,.80) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 8px 18px rgba(15,23,42,.07) !important;
+        }
+        .public-ai-badge-v14:hover {
+            border-color: rgba(229,57,53,.28) !important;
+            background: #FFFFFF !important;
+            box-shadow: 0 12px 24px rgba(15,23,42,.10), 0 0 18px rgba(229,57,53,.05) !important;
+        }
+
+        /* Kuota AI */
+        .public-ai-usage-v14 {
+            border-color: #C9DDF0 !important;
+            background:
+                radial-gradient(circle at 93% 10%, rgba(56,139,225,.10), transparent 35%),
+                linear-gradient(135deg, #F7FBFF, #EEF6FD) !important;
+            box-shadow: 0 14px 34px rgba(15,23,42,.09), inset 0 1px 0 rgba(255,255,255,.96) !important;
+        }
+        .public-ai-usage-v14:hover {
+            border-color: #AFCFEA !important;
+            box-shadow: 0 18px 40px rgba(15,23,42,.12), 0 0 22px rgba(57,130,210,.07) !important;
+        }
+        .public-ai-usage-label-v14 { color: #23405D !important; }
+        .public-ai-usage-caption-v14 { color: #64748B !important; }
+        .public-ai-progress-track-v14 {
+            background: #D9E5F0 !important;
+            box-shadow: inset 0 1px 3px rgba(15,23,42,.10) !important;
+        }
+        .public-ai-usage-count-v14 {
+            border-color: #D4E2EF !important;
+            background: rgba(255,255,255,.78) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 6px 16px rgba(15,23,42,.06) !important;
+        }
+        .public-ai-usage-number-v14 { color: #1E3A56 !important; text-shadow: none !important; }
+        .public-ai-usage-total-v14 { color: #64748B !important; }
+
+        /* Peta 4 tahap */
+        .public-ai-map-card-v20 {
+            border-color: rgba(var(--map-a), .28) !important;
+            background:
+                radial-gradient(circle at 100% 0%, rgba(var(--map-b), .12), transparent 45%),
+                linear-gradient(145deg, rgba(var(--map-a), .055), #FFFFFF 62%) !important;
+            box-shadow: 0 14px 32px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.96) !important;
+        }
+        .public-ai-map-card-v20:hover,
+        .public-ai-map-card-v20:focus-visible {
+            border-color: rgba(var(--map-a), .50) !important;
+            box-shadow: 0 20px 42px rgba(15,23,42,.12), 0 0 22px rgba(var(--map-a), .10) !important;
+        }
+        .public-ai-map-index-v20 { color: rgba(51,65,85,.36) !important; }
+        .public-ai-map-icon-v20 { color: #FFFFFF !important; }
+        .public-ai-map-card-v20 b { color: #253348 !important; }
+        .public-ai-map-card-v20 span:not(.public-ai-map-index-v20) { color: #718096 !important; }
+
+        /* Section Step 01-04 */
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-context-content-v15-marker),
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-context-influencer-v15-marker),
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-target-v16-marker),
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-action-v16-marker) {
+            box-shadow: 0 16px 38px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.96) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-context-content-v15-marker) {
+            border-color: rgba(229,57,53,.24) !important;
+            background:
+                radial-gradient(circle at 92% 4%, rgba(255,159,83,.10), transparent 29%),
+                radial-gradient(circle at 4% 98%, rgba(229,57,53,.055), transparent 31%),
+                linear-gradient(145deg, #FFFFFF, #FFF9F8 62%, #FFFFFF) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-context-influencer-v15-marker) {
+            border-color: rgba(139,92,246,.23) !important;
+            background:
+                radial-gradient(circle at 92% 4%, rgba(67,154,255,.09), transparent 30%),
+                radial-gradient(circle at 3% 96%, rgba(139,92,246,.07), transparent 31%),
+                linear-gradient(145deg, #FFFFFF, #FAF8FF 62%, #FFFFFF) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-target-v16-marker) {
+            border-color: rgba(22,163,145,.22) !important;
+            background:
+                radial-gradient(circle at 91% 5%, rgba(35,190,255,.08), transparent 30%),
+                radial-gradient(circle at 4% 102%, rgba(72,226,169,.07), transparent 33%),
+                linear-gradient(145deg, #FFFFFF, #F7FCFB 62%, #FFFFFF) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-action-v16-marker) {
+            border-color: rgba(229,57,53,.20) !important;
+            background:
+                radial-gradient(circle at 91% 2%, rgba(255,175,60,.09), transparent 31%),
+                radial-gradient(circle at 3% 103%, rgba(255,65,130,.055), transparent 33%),
+                linear-gradient(145deg, #FFFFFF, #FFF9FB 62%, #FFFFFF) !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-context-v15-marker)::before,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-target-v16-marker)::before,
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.public-ai-action-v16-marker)::before {
+            opacity: .34 !important;
+        }
+
+        .public-ai-context-title-v15,
+        .public-ai-target-title-v16,
+        .public-ai-action-title-v16 { color: #253348 !important; }
+        .public-ai-context-title-v15 strong,
+        .public-ai-target-title-v16 strong { color: var(--ctx-accent, var(--target-accent, #E53935)) !important; }
+        .public-ai-section-subtitle-v20,
+        .public-ai-action-subtitle-v16 { color: #64748B !important; }
+        .public-ai-section-eyebrow-v20 { text-shadow: none !important; }
+        .public-ai-context-chip-v15,
+        .public-ai-target-chip-v16 {
+            color: #475569 !important;
+            border-color: rgba(var(--ctx-accent-rgb, var(--target-rgb)), .22) !important;
+            background: rgba(var(--ctx-accent-rgb, var(--target-rgb)), .055) !important;
+            box-shadow: none !important;
+        }
+        .public-ai-context-icon-v15,
+        .public-ai-target-icon-v16 { box-shadow: 0 6px 16px rgba(15,23,42,.08) !important; }
+
+        /* Card field dan elemen input dibuat putih agar batas setiap kontrol jelas. */
+        .st-key-public_ai_layanan,
+        .st-key-public_ai_platform,
+        .st-key-public_ai_topik_pilihan,
+        .st-key-public_ai_topik_custom,
+        .st-key-public_ai_username,
+        .st-key-public_ai_gaya,
+        .st-key-public_ai_target_choice,
+        .st-key-public_ai_tujuan,
+        .st-key-public_ai_target_custom {
+            border-color: rgba(var(--field-rgb, 120,150,190), .20) !important;
+            background: linear-gradient(145deg, rgba(var(--field-rgb,120,150,190),.035), rgba(248,250,252,.84)) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.95) !important;
+        }
+        .st-key-public_ai_layanan:hover,
+        .st-key-public_ai_platform:hover,
+        .st-key-public_ai_topik_pilihan:hover,
+        .st-key-public_ai_topik_custom:hover,
+        .st-key-public_ai_username:hover,
+        .st-key-public_ai_gaya:hover,
+        .st-key-public_ai_target_choice:hover,
+        .st-key-public_ai_tujuan:hover,
+        .st-key-public_ai_target_custom:hover,
+        .st-key-public_ai_layanan:focus-within,
+        .st-key-public_ai_platform:focus-within,
+        .st-key-public_ai_topik_pilihan:focus-within,
+        .st-key-public_ai_topik_custom:focus-within,
+        .st-key-public_ai_username:focus-within,
+        .st-key-public_ai_gaya:focus-within,
+        .st-key-public_ai_target_choice:focus-within,
+        .st-key-public_ai_tujuan:focus-within,
+        .st-key-public_ai_target_custom:focus-within {
+            border-color: rgba(var(--field-rgb,120,150,190), .38) !important;
+            background: #FFFFFF !important;
+            box-shadow: 0 10px 24px rgba(15,23,42,.08), 0 0 18px rgba(var(--field-rgb,120,150,190),.06) !important;
+        }
+        .st-key-public_ai_layanan label,
+        .st-key-public_ai_platform label,
+        .st-key-public_ai_topik_pilihan label,
+        .st-key-public_ai_topik_custom label,
+        .st-key-public_ai_username label,
+        .st-key-public_ai_gaya label,
+        .st-key-public_ai_target_choice label,
+        .st-key-public_ai_tujuan label,
+        .st-key-public_ai_target_custom label,
+        .st-key-public_ai_layanan [data-testid="stWidgetLabel"] p,
+        .st-key-public_ai_platform [data-testid="stWidgetLabel"] p,
+        .st-key-public_ai_topik_pilihan [data-testid="stWidgetLabel"] p,
+        .st-key-public_ai_topik_custom [data-testid="stWidgetLabel"] p,
+        .st-key-public_ai_username [data-testid="stWidgetLabel"] p,
+        .st-key-public_ai_gaya [data-testid="stWidgetLabel"] p,
+        .st-key-public_ai_target_choice [data-testid="stWidgetLabel"] p,
+        .st-key-public_ai_tujuan [data-testid="stWidgetLabel"] p,
+        .st-key-public_ai_target_custom [data-testid="stWidgetLabel"] p {
+            color: #334155 !important;
+            -webkit-text-fill-color: #334155 !important;
+        }
+        .st-key-public_ai_layanan [data-baseweb="select"] > div,
+        .st-key-public_ai_platform [data-baseweb="select"] > div,
+        .st-key-public_ai_topik_pilihan [data-baseweb="select"] > div,
+        .st-key-public_ai_target_choice [data-baseweb="select"] > div,
+        .st-key-public_ai_tujuan [data-baseweb="select"] > div,
+        .st-key-public_ai_topik_custom input,
+        .st-key-public_ai_username input,
+        .st-key-public_ai_target_custom input,
+        .st-key-public_ai_gaya textarea {
+            border-color: #D6DDE7 !important;
+            background: #FFFFFF !important;
+            color: #1F2937 !important;
+            -webkit-text-fill-color: #1F2937 !important;
+            caret-color: #1F2937 !important;
+            box-shadow: inset 0 1px 2px rgba(15,23,42,.035) !important;
+        }
+        .st-key-public_ai_layanan [data-baseweb="select"] *,
+        .st-key-public_ai_platform [data-baseweb="select"] *,
+        .st-key-public_ai_topik_pilihan [data-baseweb="select"] *,
+        .st-key-public_ai_target_choice [data-baseweb="select"] *,
+        .st-key-public_ai_tujuan [data-baseweb="select"] * {
+            color: #26364A !important;
+            -webkit-text-fill-color: #26364A !important;
+        }
+        .st-key-public_ai_topik_custom input::placeholder,
+        .st-key-public_ai_username input::placeholder,
+        .st-key-public_ai_target_custom input::placeholder,
+        .st-key-public_ai_gaya textarea::placeholder {
+            color: #8A96A6 !important;
+            -webkit-text-fill-color: #8A96A6 !important;
+            opacity: 1 !important;
+        }
+        .st-key-public_ai_layanan [data-baseweb="select"]:focus-within > div,
+        .st-key-public_ai_platform [data-baseweb="select"]:focus-within > div,
+        .st-key-public_ai_topik_pilihan [data-baseweb="select"]:focus-within > div,
+        .st-key-public_ai_target_choice [data-baseweb="select"]:focus-within > div,
+        .st-key-public_ai_tujuan [data-baseweb="select"]:focus-within > div,
+        .st-key-public_ai_topik_custom:focus-within input,
+        .st-key-public_ai_username:focus-within input,
+        .st-key-public_ai_target_custom:focus-within input,
+        .st-key-public_ai_gaya:focus-within textarea {
+            border-color: rgba(var(--field-rgb,120,150,190), .72) !important;
+            box-shadow: 0 0 0 3px rgba(var(--field-rgb,120,150,190), .10) !important;
+        }
+
+        .public-ai-influencer-note-v15 {
+            border-color: #D8E4F0 !important;
+            color: #637083 !important;
+            background: linear-gradient(135deg, #F8FBFE, #F2F7FB) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.90) !important;
+        }
+
+        /* Creative Journey */
+        .public-ai-journey-v18 {
+            border-color: rgba(124,92,246,.22) !important;
+            background:
+                radial-gradient(circle at 95% 4%, rgba(255,82,155,.08), transparent 30%),
+                radial-gradient(circle at 4% 100%, rgba(43,179,255,.07), transparent 33%),
+                linear-gradient(145deg, #FFFFFF, #F8F7FF) !important;
+            box-shadow: 0 18px 42px rgba(15,23,42,.10), inset 0 1px 0 rgba(255,255,255,.96) !important;
+        }
+        .public-ai-journey-title-v18 { color: #26364A !important; }
+        .public-ai-journey-copy-v18 { color: #64748B !important; }
+        .public-ai-journey-kicker-v18 { color: #5B67A8 !important; }
+        .public-ai-step-v18 {
+            border-color: #E1E6ED !important;
+            background: rgba(255,255,255,.82) !important;
+            box-shadow: 0 6px 16px rgba(15,23,42,.045) !important;
+        }
+        .public-ai-step-v18:hover {
+            border-color: rgba(var(--step-rgb),.34) !important;
+            background: rgba(var(--step-rgb),.055) !important;
+            box-shadow: 0 10px 22px rgba(15,23,42,.07), 0 0 16px rgba(var(--step-rgb),.05) !important;
+        }
+        .public-ai-step-title-v18 { color: #334155 !important; }
+        .public-ai-step-status-v18 { color: #718096 !important; }
+        .public-ai-live-chip-v18 {
+            border-color: #DEE4EC !important;
+            color: #64748B !important;
+            background: rgba(255,255,255,.82) !important;
+        }
+        .public-ai-live-chip-v18 b { color: #2E3D52 !important; }
+        .public-ai-live-chip-v18:hover {
+            border-color: #C9D9ED !important;
+            background: #F7FAFE !important;
+        }
+        .st-key-public_ai_focus_mode,
+        .st-key-public_ai_focus_mode label,
+        .st-key-public_ai_focus_mode p {
+            color: #3F4D61 !important;
+            -webkit-text-fill-color: #3F4D61 !important;
+        }
+        .public-ai-focus-v18 {
+            border-color: #F1D4A2 !important;
+            background:
+                radial-gradient(circle at 93% 8%, rgba(255,85,145,.06), transparent 31%),
+                linear-gradient(145deg, #FFFDF8, #FFF9F0) !important;
+            box-shadow: 0 14px 34px rgba(15,23,42,.08) !important;
+        }
+        .public-ai-focus-title-v18 { color: #3B4252 !important; }
+        .public-ai-focus-copy-v18 { color: #687588 !important; }
+        .public-ai-focus-item-v18 {
+            border-color: #E6E2EF !important;
+            background: rgba(255,255,255,.78) !important;
+        }
+        .public-ai-focus-item-v18 b { color: #6D5BC7 !important; }
+        .public-ai-focus-item-v18 span { color: #536174 !important; }
+
+        /* Privacy dan CTA */
+        .public-ai-privacy-v16 {
+            border-color: #F1D7AE !important;
+            color: #5B6575 !important;
+            background: linear-gradient(135deg, #FFF9EF, #FFF8F7, #FFFFFF) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.95) !important;
+        }
+        .public-ai-privacy-icon-v16 { color: #9A5D18 !important; }
+        .st-key-public_ai_generate button {
+            color: #FFFFFF !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+        }
+
+        /* Hasil AI juga mengikuti Light Theme jika rekomendasi sudah dibuat. */
+        .public-ai-result-head-v17,
+        .public-ai-output-map-v18 {
+            border-color: #D8E1EC !important;
+            background:
+                radial-gradient(circle at 92% 4%, rgba(86,145,255,.08), transparent 32%),
+                radial-gradient(circle at 5% 98%, rgba(229,57,53,.06), transparent 32%),
+                linear-gradient(145deg, #FFFFFF, #F8FAFD) !important;
+            box-shadow: 0 18px 44px rgba(15,23,42,.10), inset 0 1px 0 rgba(255,255,255,.95) !important;
+        }
+        .public-ai-result-kicker-v17,
+        .public-ai-output-map-kicker-v18 { color: #526A8A !important; }
+        .public-ai-result-title-v17 { color: #26364A !important; }
+        .public-ai-result-title-accent-v17 {
+            background: linear-gradient(100deg, #26364A, #E53935, #6D5BD0) !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+        }
+        .public-ai-result-subtitle-v17,
+        .public-ai-result-caption-v18 { color: #64748B !important; }
+        .public-ai-meta-chip-v17,
+        .public-ai-output-nav-item-v18 {
+            border-color: #E0E6EE !important;
+            color: #475569 !important;
+            background: rgba(255,255,255,.86) !important;
+            box-shadow: 0 6px 16px rgba(15,23,42,.05) !important;
+        }
+        .public-ai-output-nav-copy-v18 b { color: #334155 !important; }
+        .public-ai-output-nav-copy-v18 span { color: #718096 !important; }
+        .public-ai-premium-card-v21 {
+            border-color: rgba(var(--card-rgb), .22) !important;
+            background:
+                radial-gradient(circle at 96% 0%, rgba(var(--card-rgb),.07), transparent 34%),
+                linear-gradient(145deg, #FFFFFF, #F9FAFC) !important;
+            box-shadow: 0 14px 34px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.95) !important;
+        }
+        .public-ai-premium-body-v21 {
+            border-color: #E5E9F0 !important;
+            background: rgba(248,250,252,.84) !important;
+        }
+        .public-ai-premium-title-wrap-v21 h3,
+        .public-ai-premium-card-v21 h3 { color: #2B394E !important; }
+        .public-ai-premium-body-v21,
+        .public-ai-premium-body-v21 p,
+        .public-ai-content-list-v21 li,
+        .public-ai-empty-copy-v21 { color: #536174 !important; }
+        .public-ai-premium-hashtag-v21 {
+            color: #334155 !important;
+            border-color: rgba(var(--card-rgb),.24) !important;
+            background: rgba(var(--card-rgb),.055) !important;
+        }
+        .public-ai-premium-foot-v21 { color: #7A8797 !important; }
+
+        /* Alert bawaan di halaman ini tetap kontras di Light Theme. */
+        [data-testid="stAlert"] {
+            color: #374151 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _render_result(result: dict[str, Any]) -> None:
     """Tampilkan hasil AI sebagai studio output interaktif dan berwarna."""
     payload = result.get("payload") if isinstance(result.get("payload"), dict) else {}
@@ -4225,6 +4640,7 @@ def render_public_content_ai() -> None:
     try:
         _init_public_ai_state()
         _render_page_css()
+        _render_light_theme_css()
 
         # Pembuatan ulang diproses sebelum hasil lama dirender.
         # Alur ini menghindari rerun tambahan setelah respons Gemini selesai.
