@@ -13,7 +13,7 @@ from uuid import uuid4
 import streamlit as st
 
 from utils.gemini_client import generate_recommendation_with_status
-from utils.loading_screen import mulai_loading_aksi, selesaikan_loading_aksi
+from utils.loading_screen import _buat_html_loading_aksi, mulai_loading_aksi, selesaikan_loading_aksi
 
 PUBLIC_AI_MAX_REQUESTS = 5
 PUBLIC_AI_COOLDOWN_SECONDS = 20
@@ -511,6 +511,29 @@ def _render_page_css() -> None:
         [data-testid="stStatusWidget"] {
             display: none !important;
             visibility: hidden !important;
+        }
+
+        /* FIX v15: overlay aksi kustom untuk aktivasi Mode Fokus Kreatif.
+           Toggle tetap berada di dalam st.form sehingga tidak memicu rerun.
+           Browser menampilkan loader secara langsung ketika checkbox berubah ke checked. */
+        .public-ai-focus-toggle-loader-v15 {
+            display: none !important;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        div[data-testid="stForm"]:has(.st-key-public_ai_focus_mode input[type="checkbox"]:checked)
+        .public-ai-focus-toggle-loader-v15 {
+            display: flex !important;
+            visibility: visible;
+            pointer-events: auto;
+            animation: public-ai-focus-loader-cycle-v15 1.45s ease both !important;
+        }
+        @keyframes public-ai-focus-loader-cycle-v15 {
+            0% { opacity: 0; visibility: visible; }
+            10% { opacity: 1; visibility: visible; }
+            78% { opacity: 1; visibility: visible; }
+            100% { opacity: 0; visibility: hidden; pointer-events: none; }
         }
 
         /* Tombol kembali dibuat hidup tanpa mengubah callback/routing. */
@@ -4392,6 +4415,29 @@ def _render_light_theme_css() -> None:
             border-color: rgba(139,92,246,.48) !important;
             box-shadow: 0 0 0 3px rgba(139,92,246,.10), 0 6px 14px rgba(139,92,246,.16) !important;
         }
+        /* State aktif dibuat sangat jelas setelah loader selesai, tanpa rerun tambahan. */
+        .st-key-public_ai_focus_mode:has(input[type="checkbox"]:checked) {
+            border-color: rgba(139,92,246,.42) !important;
+            background:
+                radial-gradient(circle at 90% 15%, rgba(139,92,246,.16), transparent 31%),
+                radial-gradient(circle at 6% 100%, rgba(229,57,53,.10), transparent 35%),
+                linear-gradient(135deg, #FFFFFF 0%, #F6F2FF 58%, #FFF5F9 100%) !important;
+            box-shadow: 0 16px 38px rgba(88,80,164,.15), 0 0 0 1px rgba(139,92,246,.06) inset !important;
+        }
+        .st-key-public_ai_focus_mode:has(input[type="checkbox"]:checked)::before {
+            background: linear-gradient(180deg, #22C55E, #8B5CF6 55%, #38BDF8) !important;
+            box-shadow: 0 0 18px rgba(34,197,94,.22) !important;
+        }
+        .st-key-public_ai_focus_mode:has(input[type="checkbox"]:checked) [data-testid="stWidgetLabel"] p::after,
+        .st-key-public_ai_focus_mode:has(input[type="checkbox"]:checked) label p::after {
+            content: "  • AKTIF";
+            color: #6D28D9 !important;
+            -webkit-text-fill-color: #6D28D9 !important;
+            font-size: .72rem;
+            font-weight: 850;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
         .public-ai-focus-v18 {
             border-color: #F1D4A2 !important;
             background:
@@ -5106,6 +5152,21 @@ def render_public_content_ai() -> None:
                     key="public_ai_focus_mode",
                     help="Menampilkan ringkasan arah kreatif yang berubah mengikuti pilihan Anda.",
                 )
+
+            # FIX v15: loader custom yang sama dengan aksi AI ditanam sebagai elemen tersembunyi.
+            # Karena toggle berada di dalam st.form, aktivasi tidak melakukan rerun; CSS :has()
+            # menampilkan loader langsung di browser saat switch berubah ke posisi aktif.
+            # Saat state fokus sudah tersubmit, loader tidak dirender ulang agar tidak muncul
+            # lagi ketika tombol Generate ditekan.
+            if not focus_mode:
+                focus_loading_html = _buat_html_loading_aksi(
+                    "Mengaktifkan Mode Fokus Kreatif..."
+                ).replace(
+                    'class="telkom-action-loader ',
+                    'class="telkom-action-loader public-ai-focus-toggle-loader-v15 ',
+                    1,
+                )
+                st.markdown(focus_loading_html, unsafe_allow_html=True)
 
             if focus_mode:
                 gaya_focus = payload.get("gaya") or "Gaya natural, informatif, dan mudah dipahami"
