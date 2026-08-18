@@ -132,8 +132,8 @@ def _init_public_ai_state() -> None:
             st.session_state[key] = value
 
 
-def _render_public_ai_quota_card() -> None:
-    """Tampilkan kuota AI sejak halaman pertama dibuka, bahkan sebelum generate."""
+def _build_public_ai_quota_card_html() -> str:
+    """Bangun HTML kuota AI agar selalu dirender bersama hero sejak halaman dibuka."""
     request_count = int(st.session_state.get(PUBLIC_AI_REQUEST_COUNT_KEY, 0) or 0)
     request_count = max(0, min(PUBLIC_AI_MAX_REQUESTS, request_count))
     remaining_requests = max(0, PUBLIC_AI_MAX_REQUESTS - request_count)
@@ -142,7 +142,7 @@ def _render_public_ai_quota_card() -> None:
         min(100, round((remaining_requests / PUBLIC_AI_MAX_REQUESTS) * 100)),
     )
 
-    usage_html = (
+    return (
         '<section class="public-ai-usage-v14" aria-label="Status penggunaan AI">'
         '<div class="public-ai-usage-copy-v14">'
         '<div class="public-ai-usage-label-v14">Kuota AI sesi ini</div>'
@@ -162,7 +162,6 @@ def _render_public_ai_quota_card() -> None:
         '</div>'
         '</section>'
     )
-    st.markdown(usage_html, unsafe_allow_html=True)
 
 
 def _queue_regeneration() -> None:
@@ -5199,9 +5198,10 @@ def render_public_content_ai() -> None:
             '</div>'
             '</section>'
         )
-        st.markdown(hero_html, unsafe_allow_html=True)
-
-        _render_public_ai_quota_card()
+        # Render hero + kuota dalam satu blok HTML. Ini memastikan card kuota
+        # selalu ikut tampil pada render pertama, bukan bergantung pada hasil AI.
+        quota_html = _build_public_ai_quota_card_html()
+        st.markdown(f"{hero_html}\n{quota_html}", unsafe_allow_html=True)
 
         studio_map_html = (
             '<section class="public-ai-studio-map-v20" aria-label="Tahapan AI Content Studio">'
