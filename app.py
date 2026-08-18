@@ -3422,16 +3422,55 @@ def render_footer() -> None:
         )
         footer_theme_class = " footer-light-login" if is_light_public_footer else ""
 
+        # FIX v24 — footer publik dibuat di keyed host yang dapat dikirim lebih
+        # awal pada initial render. Pada route Login/Register/AI Content Studio,
+        # host ini dipasang sebelum page renderer sehingga komponen cookie,
+        # loading, st.stop(), atau rerun singkat tidak dapat membuat footer belum
+        # pernah masuk ke tree Streamlit. CSS `order` menjaga posisi visual tetap
+        # di bagian paling bawah halaman.
+        footer_host = st.container(key="global_footer_host_v24")
+
         # Footer sebelumnya sepenuhnya dirender lewat st.iframe. Visual sekarang
         # memakai delta native Streamlit agar tersedia sejak render pertama.
         # PENTING: gunakan <div role="contentinfo">, bukan tag <footer>. CSS halaman
         # Login/Register sengaja menyembunyikan tag footer bawaan Streamlit dengan
         # selector global `footer { display:none !important; }`; memakai tag footer
         # pada komponen custom akan ikut tersembunyi pada route autentikasi.
-        st.markdown(
+        footer_host.markdown(
             dedent(
                 f"""
                 <style>
+                        /* Host footer tetap terlihat dan selalu ditempatkan terakhir
+                           pada vertical flow Streamlit, walau dibuat lebih awal. */
+                        .st-key-global_footer_host_v24 {{
+                            order: 9999 !important;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            display: block !important;
+                            visibility: visible !important;
+                            opacity: 1 !important;
+                            position: relative !important;
+                            z-index: 1 !important;
+                            flex: 0 0 auto !important;
+                            margin-top: 22px !important;
+                        }}
+
+                        .st-key-global_footer_host_v24 > div,
+                        .st-key-global_footer_host_v24 [data-testid="stVerticalBlock"],
+                        .st-key-global_footer_host_v24 [data-testid="stMarkdownContainer"] {{
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            display: block !important;
+                            visibility: visible !important;
+                            opacity: 1 !important;
+                        }}
+
+                        /* Parent widget Streamlit adalah flex-column; explicit rule
+                           ini memastikan property order host selalu dihormati. */
+                        div[data-testid="stVerticalBlock"]:has(.st-key-global_footer_host_v24) {{
+                            display: flex !important;
+                            flex-direction: column !important;
+                        }}
 
                         .footer-shell,
                         .footer-shell * {{
@@ -4005,6 +4044,12 @@ def main() -> None:
                 hide_sidebar=True,
             )
 
+            # FIX v24: pre-render footer SEBELUM auth/public page. Ini sengaja
+            # dilakukan sebelum pemeriksaan cookie dan page renderer karena dua
+            # bagian tersebut dapat memicu rerun/stop singkat saat cold-start.
+            # Keyed host pada render_footer menjaga footer tetap berada di bawah.
+            render_footer()
+
             restore_status = "none"
             if not st.session_state.get("logged_in", False):
                 restore_status = try_restore_remember_login()
@@ -4016,7 +4061,6 @@ def main() -> None:
                 # rerun berikutnya akan memulihkan sesi secara otomatis.
                 render_auth_page()
                 _selesaikan_loading_awal()
-                render_footer()
                 st.stop()
 
             if restore_status == "ok" or st.session_state.get(
@@ -4064,7 +4108,6 @@ def main() -> None:
                 # Form Login/Register sudah siap. Footer tidak perlu menahan
                 # overlay startup sehingga tampilan pertama muncul lebih cepat.
                 _selesaikan_loading_awal()
-                render_footer()
                 if st.session_state.pop("_logout_just_completed_v2", False):
                     _remove_client_logout_overlay()
                 return
