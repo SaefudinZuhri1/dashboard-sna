@@ -3397,7 +3397,13 @@ def route_page(selected: str) -> None:
 
 
 def render_footer() -> None:
-    """Tampilkan footer global interaktif pada seluruh halaman dashboard."""
+    """Tampilkan footer global stabil pada render pertama dan setiap rerun.
+
+    Visual footer dirender inline sebagai HTML native Streamlit agar tidak
+    bergantung pada lifecycle iframe saat cold-start. Interaksi JavaScript tetap
+    dipasang melalui iframe utilitas tersembunyi sehingga tampilan footer tidak
+    pernah ikut hilang jika iframe terlambat siap.
+    """
     try:
         # Footer Light Theme berlaku pada halaman autentikasi publik serta
         # AI Content Studio publik. Dark Mode dan footer dashboard tetap
@@ -3416,24 +3422,24 @@ def render_footer() -> None:
         )
         footer_theme_class = " footer-light-login" if is_light_public_footer else ""
 
-        render_html_iframe(
+        # Footer sebelumnya sepenuhnya dirender lewat st.iframe. Pada cold-start
+        # Login/Register/AI Content Studio terdapat rerun singkat dari komponen
+        # cookie/loading, sehingga iframe visual kadang belum sempat terpasang.
+        # Memindahkan markup visual ke delta native Streamlit membuat footer ikut
+        # tersedia pada render pertama tanpa mengubah desainnya.
+        st.markdown(
             dedent(
                 f"""
-                <!doctype html>
-                <html lang="id">
-                <head>
-                    <meta charset="utf-8" />
-                    <meta name="viewport" content="width=device-width, initial-scale=1" />
-                    <style>
-                        * {{ box-sizing: border-box; }}
+                <style>
 
-                        html, body {{
-                            margin: 0;
-                            padding: 0;
-                            background: transparent;
+                        .footer-shell,
+                        .footer-shell * {{
+                            box-sizing: border-box;
+                        }}
+
+                        .footer-shell {{
                             color: #FFFFFF;
                             font-family: "Plus Jakarta Sans", "Inter", sans-serif;
-                            overflow: hidden;
                         }}
 
                         .footer-shell {{
@@ -3751,16 +3757,17 @@ def render_footer() -> None:
                         }}
 
                         @media (prefers-reduced-motion: reduce) {{
-                            *, *::before, *::after {{
+                            .footer-shell,
+                            .footer-shell *,
+                            .footer-shell *::before,
+                            .footer-shell *::after {{
                                 animation: none !important;
                                 transition: none !important;
                                 scroll-behavior: auto !important;
                             }}
                         }}
-                    </style>
-                </head>
-                <body>
-                    <footer class="footer-shell{footer_theme_class}" id="dashboardFooter">
+                </style>
+<footer class="footer-shell{footer_theme_class}" id="dashboardFooter">
                         <div class="footer-content">
                             <div class="footer-brand">
                                 <div class="footer-mark" aria-hidden="true">📡</div>
@@ -3788,61 +3795,90 @@ def render_footer() -> None:
                             </div>
                         </div>
                     </footer>
+                """
+            ),
+            unsafe_allow_html=True,
+        )
 
-                    <script>
-                        const footer = document.getElementById('dashboardFooter');
-                        const topButton = document.getElementById('footerTopButton');
-                        const topLabel = document.getElementById('footerTopLabel');
-                        const chips = document.querySelectorAll('.footer-chip');
+        # Interaksi tidak menentukan visibilitas footer. Iframe 0x0 hanya bertugas
+        # memasang listener hover, chip, dan tombol "Ke atas" pada markup native.
+        # Retry singkat mengantisipasi DOM Streamlit yang belum selesai mount.
+        render_html_iframe(
+            dedent(
+                r"""
+                <!doctype html>
+                <html lang="id">
+                <head><meta charset="utf-8" /></head>
+                <body>
+                <script>
+                (() => {
+                    const attachFooterInteraction = (attempt = 0) => {
+                        try {
+                            const parentWindow = window.parent;
+                            const parentDocument = parentWindow.document;
+                            const footer = parentDocument.getElementById('dashboardFooter');
 
-                        footer.addEventListener('mousemove', (event) => {{
-                            const rect = footer.getBoundingClientRect();
-                            const x = ((event.clientX - rect.left) / rect.width) * 100;
-                            const y = ((event.clientY - rect.top) / rect.height) * 100;
-                            footer.style.setProperty('--mouse-x', `${{x}}%`);
-                            footer.style.setProperty('--mouse-y', `${{y}}%`);
-                        }});
+                            if (!footer) {
+                                if (attempt < 80) {
+                                    window.setTimeout(
+                                        () => attachFooterInteraction(attempt + 1),
+                                        50
+                                    );
+                                }
+                                return;
+                            }
 
-                        footer.addEventListener('mouseleave', () => {{
-                            footer.style.setProperty('--mouse-x', '82%');
-                            footer.style.setProperty('--mouse-y', '18%');
-                        }});
+                            if (footer.dataset.telkomFooterReady === '1') return;
+                            footer.dataset.telkomFooterReady = '1';
 
-                        chips.forEach((chip) => {{
-                            chip.addEventListener('click', () => {{
-                                chip.classList.toggle('is-active');
-                            }});
-                        }});
+                            const topButton = footer.querySelector('#footerTopButton');
+                            const topLabel = footer.querySelector('#footerTopLabel');
+                            const chips = footer.querySelectorAll('.footer-chip');
 
-                        const scrollElementToTop = (element, behavior = 'smooth') => {{
-                            if (!element) return false;
+                            footer.addEventListener('mousemove', (event) => {
+                                const rect = footer.getBoundingClientRect();
+                                const x = ((event.clientX - rect.left) / rect.width) * 100;
+                                const y = ((event.clientY - rect.top) / rect.height) * 100;
+                                footer.style.setProperty('--mouse-x', `${x}%`);
+                                footer.style.setProperty('--mouse-y', `${y}%`);
+                            });
 
-                            let scrolled = false;
-                            try {{
-                                if (typeof element.scrollTo === 'function') {{
-                                    element.scrollTo({{ top: 0, left: 0, behavior }});
-                                    scrolled = true;
-                                }}
-                            }} catch (error) {{
-                                // Lanjutkan ke assignment scrollTop sebagai fallback.
-                            }}
+                            footer.addEventListener('mouseleave', () => {
+                                footer.style.setProperty('--mouse-x', '82%');
+                                footer.style.setProperty('--mouse-y', '18%');
+                            });
 
-                            try {{
-                                if ('scrollTop' in element) {{
-                                    element.scrollTop = 0;
-                                    scrolled = true;
-                                }}
-                            }} catch (error) {{
-                                // Elemen tertentu dapat menolak assignment; kandidat lain tetap dicoba.
-                            }}
+                            chips.forEach((chip) => {
+                                chip.addEventListener('click', () => {
+                                    chip.classList.toggle('is-active');
+                                });
+                            });
 
-                            return scrolled;
-                        }};
+                            const scrollElementToTop = (element, behavior = 'smooth') => {
+                                if (!element) return false;
+                                let scrolled = false;
 
-                        const scrollDashboardToTop = () => {{
-                            try {{
-                                const parentWindow = window.parent;
-                                const parentDocument = parentWindow.document;
+                                try {
+                                    if (typeof element.scrollTo === 'function') {
+                                        element.scrollTo({ top: 0, left: 0, behavior });
+                                        scrolled = true;
+                                    }
+                                } catch (error) {
+                                    // Kandidat lain tetap dicoba.
+                                }
+
+                                try {
+                                    if ('scrollTop' in element) {
+                                        element.scrollTop = 0;
+                                        scrolled = true;
+                                    }
+                                } catch (error) {
+                                    // Kandidat lain tetap dicoba.
+                                }
+                                return scrolled;
+                            };
+
+                            const scrollDashboardToTop = () => {
                                 const candidates = [
                                     parentDocument.querySelector('[data-testid="stMain"]'),
                                     parentDocument.querySelector('section[data-testid="stMain"]'),
@@ -3854,82 +3890,72 @@ def render_footer() -> None:
                                     parentDocument.body,
                                 ];
 
-                                // Ikuti rantai parent dari iframe footer karena container scroll
-                                // Streamlit dapat berubah antarversi.
-                                try {{
-                                    let ancestor = window.frameElement;
-                                    while (ancestor) {{
-                                        candidates.push(ancestor);
-                                        ancestor = ancestor.parentElement;
-                                    }}
-                                }} catch (error) {{
-                                    // Kandidat selector di atas tetap cukup sebagai fallback.
-                                }}
-
                                 const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
-                                let scrolled = false;
-                                uniqueCandidates.forEach((candidate) => {{
-                                    scrolled = scrollElementToTop(candidate) || scrolled;
-                                }});
+                                uniqueCandidates.forEach((candidate) => {
+                                    scrollElementToTop(candidate);
+                                });
 
-                                try {{
-                                    parentWindow.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
-                                    scrolled = true;
-                                }} catch (error) {{
-                                    // Root document sudah dicoba melalui daftar kandidat.
-                                }}
+                                try {
+                                    parentWindow.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+                                } catch (error) {
+                                    // Root document sudah dicoba melalui kandidat.
+                                }
 
-                                // Pastikan posisi benar-benar nol setelah animasi browser selesai.
-                                parentWindow.setTimeout(() => {{
-                                    uniqueCandidates.forEach((candidate) => {{
+                                parentWindow.setTimeout(() => {
+                                    uniqueCandidates.forEach((candidate) => {
                                         scrollElementToTop(candidate, 'auto');
-                                    }});
-                                    try {{
-                                        parentWindow.scrollTo({{ top: 0, left: 0, behavior: 'auto' }});
-                                    }} catch (error) {{
-                                        // Tidak perlu menampilkan error ke pengguna.
-                                    }}
-                                }}, 420);
+                                    });
+                                    try {
+                                        parentWindow.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+                                    } catch (error) {
+                                        // Tidak perlu menampilkan error kepada pengguna.
+                                    }
+                                }, 420);
+                            };
 
-                                return scrolled;
-                            }} catch (error) {{
-                                try {{
-                                    window.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
-                                    return true;
-                                }} catch (fallbackError) {{
-                                    return false;
-                                }}
-                            }}
-                        }};
+                            if (topButton) {
+                                topButton.addEventListener('click', (event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
 
-                        topButton.addEventListener('click', (event) => {{
-                            event.preventDefault();
-                            event.stopPropagation();
+                                    topButton.classList.remove('is-clicked');
+                                    void topButton.offsetWidth;
+                                    topButton.classList.add('is-clicked');
+                                    if (topLabel) topLabel.textContent = 'Naik...';
 
-                            topButton.classList.remove('is-clicked');
-                            void topButton.offsetWidth;
-                            topButton.classList.add('is-clicked');
-                            topLabel.textContent = 'Naik...';
+                                    scrollDashboardToTop();
 
-                            scrollDashboardToTop();
+                                    window.setTimeout(() => {
+                                        if (topLabel) topLabel.textContent = 'Ke atas';
+                                        topButton.classList.remove('is-clicked');
+                                    }, 900);
+                                });
+                            }
+                        } catch (error) {
+                            if (attempt < 80) {
+                                window.setTimeout(
+                                    () => attachFooterInteraction(attempt + 1),
+                                    50
+                                );
+                            }
+                        }
+                    };
 
-                            window.setTimeout(() => {{
-                                topLabel.textContent = 'Ke atas';
-                                topButton.classList.remove('is-clicked');
-                            }}, 900);
-                        }});
-                    </script>
+                    attachFooterInteraction();
+                })();
+                </script>
                 </body>
                 </html>
                 """
             ),
-            height=174,
+            width=0,
+            height=0,
             scrolling=False,
+            tab_index=-1,
         )
     except Exception as exc:
         LOGGER.exception("Footer global gagal ditampilkan: %s", exc)
         st.caption(FOOTER_TEXT)
-
 
 def _ensure_database_initialized() -> None:
     """Inisialisasi skema database satu kali pada setiap sesi browser.
