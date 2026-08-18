@@ -132,6 +132,39 @@ def _init_public_ai_state() -> None:
             st.session_state[key] = value
 
 
+def _render_public_ai_quota_card() -> None:
+    """Tampilkan kuota AI sejak halaman pertama dibuka, bahkan sebelum generate."""
+    request_count = int(st.session_state.get(PUBLIC_AI_REQUEST_COUNT_KEY, 0) or 0)
+    request_count = max(0, min(PUBLIC_AI_MAX_REQUESTS, request_count))
+    remaining_requests = max(0, PUBLIC_AI_MAX_REQUESTS - request_count)
+    remaining_percent = max(
+        0,
+        min(100, round((remaining_requests / PUBLIC_AI_MAX_REQUESTS) * 100)),
+    )
+
+    usage_html = (
+        '<section class="public-ai-usage-v14" aria-label="Status penggunaan AI">'
+        '<div class="public-ai-usage-copy-v14">'
+        '<div class="public-ai-usage-label-v14">Kuota AI sesi ini</div>'
+        '<div class="public-ai-progress-track-v14" role="progressbar" '
+        f'aria-valuemin="0" aria-valuemax="{PUBLIC_AI_MAX_REQUESTS}" '
+        f'aria-valuenow="{remaining_requests}" aria-label="Sisa penggunaan AI">'
+        f'<div class="public-ai-progress-fill-v14" style="width:{remaining_percent}%"></div>'
+        '</div>'
+        '<div class="public-ai-usage-caption-v14">'
+        'Setiap sesi browser memperoleh maksimal lima kali pembuatan rekomendasi. '
+        'Satu rekomendasi yang diproses menggunakan satu kuota.'
+        '</div>'
+        '</div>'
+        '<div class="public-ai-usage-count-v14">'
+        f'<div class="public-ai-usage-number-v14">{remaining_requests}</div>'
+        f'<div class="public-ai-usage-total-v14">tersisa dari {PUBLIC_AI_MAX_REQUESTS}</div>'
+        '</div>'
+        '</section>'
+    )
+    st.markdown(usage_html, unsafe_allow_html=True)
+
+
 def _queue_regeneration() -> None:
     """Tandai pembuatan ulang agar diproses sebelum hasil dirender."""
     st.session_state[PUBLIC_AI_REGENERATE_PENDING_KEY] = True
@@ -908,7 +941,7 @@ def _render_page_css() -> None:
             box-shadow: 0 16px 40px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.05);
             transition: transform .32s cubic-bezier(.2,.8,.2,1), border-color .32s ease,
                         box-shadow .32s ease;
-            animation: publicAiUsageEnter .65s .42s both cubic-bezier(.16,1,.3,1);
+            animation: publicAiUsageEnter .52s both cubic-bezier(.16,1,.3,1);
         }
         .public-ai-usage-v14::before {
             content: "";
@@ -5168,32 +5201,7 @@ def render_public_content_ai() -> None:
         )
         st.markdown(hero_html, unsafe_allow_html=True)
 
-        request_count = int(st.session_state.get(PUBLIC_AI_REQUEST_COUNT_KEY, 0) or 0)
-        remaining_requests = max(0, PUBLIC_AI_MAX_REQUESTS - request_count)
-        remaining_percent = max(
-            0,
-            min(100, round((remaining_requests / PUBLIC_AI_MAX_REQUESTS) * 100)),
-        )
-        usage_html = (
-            '<section class="public-ai-usage-v14" aria-label="Status penggunaan AI">'
-            '<div class="public-ai-usage-copy-v14">'
-            '<div class="public-ai-usage-label-v14">Kuota AI sesi ini</div>'
-            '<div class="public-ai-progress-track-v14" role="progressbar" '
-            f'aria-valuemin="0" aria-valuemax="{PUBLIC_AI_MAX_REQUESTS}" '
-            f'aria-valuenow="{remaining_requests}" aria-label="Sisa penggunaan AI">'
-            f'<div class="public-ai-progress-fill-v14" style="width:{remaining_percent}%"></div>'
-            '</div>'
-            '<div class="public-ai-usage-caption-v14">'
-            'Setiap sesi browser memperoleh maksimal lima kali pembuatan rekomendasi.'
-            '</div>'
-            '</div>'
-            '<div class="public-ai-usage-count-v14">'
-            f'<div class="public-ai-usage-number-v14">{remaining_requests}</div>'
-            f'<div class="public-ai-usage-total-v14">tersisa dari {PUBLIC_AI_MAX_REQUESTS}</div>'
-            '</div>'
-            '</section>'
-        )
-        st.markdown(usage_html, unsafe_allow_html=True)
+        _render_public_ai_quota_card()
 
         studio_map_html = (
             '<section class="public-ai-studio-map-v20" aria-label="Tahapan AI Content Studio">'
