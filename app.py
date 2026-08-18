@@ -3422,12 +3422,10 @@ def render_footer() -> None:
         )
         footer_theme_class = " footer-light-login" if is_light_public_footer else ""
 
-        # FIX v24 — footer publik dibuat di keyed host yang dapat dikirim lebih
-        # awal pada initial render. Pada route Login/Register/AI Content Studio,
-        # host ini dipasang sebelum page renderer sehingga komponen cookie,
-        # loading, st.stop(), atau rerun singkat tidak dapat membuat footer belum
-        # pernah masuk ke tree Streamlit. CSS `order` menjaga posisi visual tetap
-        # di bagian paling bawah halaman.
+        # FIX v25 — footer publik tetap memakai keyed host agar stabil, tetapi
+        # host dirender SETELAH halaman publik. Dengan begitu posisi DOM footer
+        # selalu berada di bawah konten, sementara main() memastikan footer sudah
+        # dipanggil sebelum setiap st.stop()/return pada initial render.
         footer_host = st.container(key="global_footer_host_v24")
 
         # Footer sebelumnya sepenuhnya dirender lewat st.iframe. Visual sekarang
@@ -3440,10 +3438,9 @@ def render_footer() -> None:
             dedent(
                 f"""
                 <style>
-                        /* Host footer tetap terlihat dan selalu ditempatkan terakhir
-                           pada vertical flow Streamlit, walau dibuat lebih awal. */
+                        /* Host footer custom harus selalu terlihat. Posisi bawah
+                           dijamin oleh urutan render di main(), bukan CSS order. */
                         .st-key-global_footer_host_v24 {{
-                            order: 9999 !important;
                             width: 100% !important;
                             max-width: 100% !important;
                             display: block !important;
@@ -3463,13 +3460,6 @@ def render_footer() -> None:
                             display: block !important;
                             visibility: visible !important;
                             opacity: 1 !important;
-                        }}
-
-                        /* Parent widget Streamlit adalah flex-column; explicit rule
-                           ini memastikan property order host selalu dihormati. */
-                        div[data-testid="stVerticalBlock"]:has(.st-key-global_footer_host_v24) {{
-                            display: flex !important;
-                            flex-direction: column !important;
                         }}
 
                         .footer-shell,
@@ -4044,11 +4034,11 @@ def main() -> None:
                 hide_sidebar=True,
             )
 
-            # FIX v24: pre-render footer SEBELUM auth/public page. Ini sengaja
-            # dilakukan sebelum pemeriksaan cookie dan page renderer karena dua
-            # bagian tersebut dapat memicu rerun/stop singkat saat cold-start.
-            # Keyed host pada render_footer menjaga footer tetap berada di bawah.
-            render_footer()
+            # FIX v25: footer publik TIDAK lagi di-pre-render sebelum halaman.
+            # Footer harus dirender setelah konten Login/Register/AI Content Studio
+            # agar posisi DOM-nya benar-benar berada di bawah halaman. Jaminan
+            # initial-render dilakukan dengan memanggil render_footer() tepat
+            # sebelum setiap st.stop()/return pada jalur publik.
 
             restore_status = "none"
             if not st.session_state.get("logged_in", False):
@@ -4060,6 +4050,9 @@ def main() -> None:
                 # Form login tetap ditampilkan sekarang; bila cookie valid tersedia,
                 # rerun berikutnya akan memulihkan sesi secara otomatis.
                 render_auth_page()
+                # Footer wajib masuk ke tree pada cold-start sebelum st.stop().
+                # Karena dipanggil setelah halaman, posisinya tetap di bawah.
+                render_footer()
                 _selesaikan_loading_awal()
                 st.stop()
 
@@ -4104,6 +4097,11 @@ def main() -> None:
                             render_auth_page()
                 else:
                     render_auth_page()
+
+                # Halaman publik sudah selesai dirender. Pasang footer sekarang
+                # agar selalu terlihat sejak initial load sekaligus tetap berada
+                # setelah seluruh konten Login/Register/AI Content Studio.
+                render_footer()
 
                 # Form Login/Register sudah siap. Footer tidak perlu menahan
                 # overlay startup sehingga tampilan pertama muncul lebih cepat.
