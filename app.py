@@ -3422,11 +3422,12 @@ def render_footer() -> None:
         )
         footer_theme_class = " footer-light-login" if is_light_public_footer else ""
 
-        # Footer sebelumnya sepenuhnya dirender lewat st.iframe. Pada cold-start
-        # Login/Register/AI Content Studio terdapat rerun singkat dari komponen
-        # cookie/loading, sehingga iframe visual kadang belum sempat terpasang.
-        # Memindahkan markup visual ke delta native Streamlit membuat footer ikut
-        # tersedia pada render pertama tanpa mengubah desainnya.
+        # Footer sebelumnya sepenuhnya dirender lewat st.iframe. Visual sekarang
+        # memakai delta native Streamlit agar tersedia sejak render pertama.
+        # PENTING: gunakan <div role="contentinfo">, bukan tag <footer>. CSS halaman
+        # Login/Register sengaja menyembunyikan tag footer bawaan Streamlit dengan
+        # selector global `footer { display:none !important; }`; memakai tag footer
+        # pada komponen custom akan ikut tersembunyi pada route autentikasi.
         st.markdown(
             dedent(
                 f"""
@@ -3440,6 +3441,9 @@ def render_footer() -> None:
                         .footer-shell {{
                             color: #FFFFFF;
                             font-family: "Plus Jakarta Sans", "Inter", sans-serif;
+                            display: block !important;
+                            visibility: visible !important;
+                            opacity: 1 !important;
                         }}
 
                         .footer-shell {{
@@ -3767,7 +3771,7 @@ def render_footer() -> None:
                             }}
                         }}
                 </style>
-<footer class="footer-shell{footer_theme_class}" id="dashboardFooter">
+<div class="footer-shell{footer_theme_class}" id="dashboardFooter" role="contentinfo" aria-label="Footer Dashboard Analisis Telkom Group">
                         <div class="footer-content">
                             <div class="footer-brand">
                                 <div class="footer-mark" aria-hidden="true">📡</div>
@@ -3794,7 +3798,7 @@ def render_footer() -> None:
                                 </button>
                             </div>
                         </div>
-                    </footer>
+                    </div>
                 """
             ),
             unsafe_allow_html=True,
