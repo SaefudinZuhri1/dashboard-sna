@@ -1,9 +1,11 @@
 """Halaman login pengguna Dashboard Analisis Telkom Group."""
 
+import base64
 import json
 import logging
 
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import extra_streamlit_components as stx
 import streamlit as st
@@ -38,6 +40,33 @@ LOGIN_SUBMISSION_LOCK_KEY = "_login_submission_lock_v2"
 POST_LOGOUT_RESTORE_GUARD_KEY = "_post_logout_restore_guard_v1"
 LOGIN_OVERLAY_ID = "login-transition-client-v1"
 LOGIN_OVERLAY_STYLE_ID = "login-transition-client-style-v1"
+
+
+def _get_telkom_brand_icon_html() -> str:
+    """Ambil ikon resmi Telkom sesuai tema tanpa mengubah bentuk/aset merek."""
+    dark_mode = bool(st.session_state.get("dark_mode", False))
+    filename = (
+        "telkom_indonesia_icon_reverse.png"
+        if dark_mode
+        else "telkom_indonesia_icon.png"
+    )
+    icon_path = (
+        Path(__file__).resolve().parent.parent
+        / "assets"
+        / "brand"
+        / filename
+    )
+
+    try:
+        encoded = base64.b64encode(icon_path.read_bytes()).decode("ascii")
+        return (
+            '<img class="auth-brand-logo" '
+            f'src="data:image/png;base64,{encoded}" '
+            'alt="Ikon resmi Telkom Indonesia">'
+        )
+    except Exception as exc:
+        LOGGER.warning("Ikon resmi Telkom gagal dimuat (%s): %s", icon_path, exc)
+        return '<span class="auth-brand-fallback" aria-hidden="true">📡</span>'
 
 
 def _inject_login_css() -> None:
@@ -237,6 +266,23 @@ def _inject_login_css() -> None:
         }
 
         .auth-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            line-height: 1;
+        }
+
+        .auth-brand-logo {
+            display: block;
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            object-position: center;
+        }
+
+        .auth-brand-fallback {
             font-size: 31px;
             line-height: 1;
         }
@@ -709,7 +755,12 @@ def _inject_login_css() -> None:
                 margin-bottom: 13px !important;
             }
 
-            .auth-icon {
+            .auth-brand-logo {
+                width: 35px !important;
+                height: 35px !important;
+            }
+
+            .auth-brand-fallback {
                 font-size: 28px !important;
             }
 
@@ -1422,13 +1473,14 @@ def show_login_page() -> None:
         # Placeholder dibuat sebelum form agar semua informasi validasi dan
         # error login selalu muncul di atas card, bukan di bagian bawah halaman.
         feedback_slot = st.empty()
+        brand_icon_html = _get_telkom_brand_icon_html()
 
         with st.form("login_form", clear_on_submit=False, border=True):
             st.markdown(
-                """
+                f"""
                 <div class="auth-header">
                     <div class="auth-icon-wrap">
-                        <div class="auth-icon">📡</div>
+                        <div class="auth-icon">{brand_icon_html}</div>
                     </div>
                     <h1 class="auth-title">Dashboard Telkom Group</h1>
                     <p class="auth-subtitle">
