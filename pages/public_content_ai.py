@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from html import escape
 import math
+import random
 import re
 import time
 from typing import Any
@@ -22,6 +23,7 @@ PUBLIC_AI_REQUEST_COUNT_KEY = "public_ai_request_count"
 PUBLIC_AI_LAST_REQUEST_KEY = "public_ai_last_request_at"
 PUBLIC_AI_LAST_PAYLOAD_KEY = "public_ai_last_payload"
 PUBLIC_AI_REGENERATE_PENDING_KEY = "public_ai_regenerate_pending"
+PUBLIC_AI_LAST_CREATIVE_ANGLE_KEY = "public_ai_last_creative_angle"
 
 PLATFORM_OPTIONS = {
     "Twitter/X": "twitter",
@@ -126,6 +128,7 @@ def _init_public_ai_state() -> None:
         PUBLIC_AI_LAST_REQUEST_KEY: 0.0,
         PUBLIC_AI_LAST_PAYLOAD_KEY: None,
         PUBLIC_AI_REGENERATE_PENDING_KEY: False,
+        PUBLIC_AI_LAST_CREATIVE_ANGLE_KEY: "",
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -308,54 +311,233 @@ def _validate_payload(payload: dict[str, str]) -> list[str]:
     return errors
 
 
-def _platform_content_blueprint(platform: str) -> dict[str, str]:
-    """Kembalikan format fallback yang sesuai karakter platform."""
-    key = str(platform or "").casefold()
-    if "tiktok" in key:
-        return {
-            "format": "Video vertikal 35–50 detik",
-            "hook": "Pernah mengalami masalah ini saat sedang butuh koneksi cepat?",
-            "flow": (
-                "Buka dengan situasi yang dekat dengan audiens, jelaskan masalah secara singkat, "
-                "berikan tiga langkah praktis, lalu tutup dengan ajakan berbagi pengalaman."
-            ),
-            "script": (
-                "Hook 0–3 detik: tampilkan situasi masalah. Adegan berikutnya: sebutkan topik utama "
-                "secara ringkas. Berikan tiga langkah praktis dengan teks overlay. Akhiri dengan "
-                "ajakan menyimpan video dan menulis pengalaman di komentar."
-            ),
-            "duration": "35–50 detik",
-        }
-    if "instagram" in key:
-        return {
-            "format": "Carousel 6 slide atau Reels 30–45 detik",
-            "hook": "Sebelum menyalahkan koneksi, cek tiga hal ini terlebih dahulu.",
-            "flow": (
-                "Slide pertama memuat masalah, slide kedua sampai kelima berisi penjelasan dan langkah, "
-                "lalu slide terakhir memuat rangkuman serta ajakan berdiskusi."
-            ),
-            "script": (
-                "Caption: Masalah koneksi sering muncul pada waktu yang tidak tepat. Konten ini merangkum "
-                "langkah awal yang dapat diperiksa pengguna sebelum meminta bantuan. Simpan panduannya, "
-                "bagikan kepada orang yang membutuhkan, dan tulis pertanyaan Anda di komentar."
-            ),
-            "duration": "6 slide atau 30–45 detik",
-        }
-    return {
-        "format": "Thread 5 post atau satu post ringkas",
-        "hook": "Masalah layanan tidak selalu membutuhkan penjelasan yang rumit. Mulai dari tiga pemeriksaan ini.",
-        "flow": (
-            "Post pertama memuat hook, tiga post berikutnya menjelaskan langkah dan konteks, "
-            "kemudian post terakhir memuat rangkuman serta ajakan merespons."
-        ),
-        "script": (
-            "Post 1: jelaskan masalah utama secara ringkas. Post 2–4: berikan langkah yang dapat dilakukan "
-            "audiens tanpa membuat klaim teknis. Post 5: ajak audiens menyampaikan pengalaman dan memeriksa "
-            "informasi resmi sebelum mengambil keputusan."
-        ),
-        "duration": "5 post ringkas",
+
+
+_CREATIVE_ANGLE_CATALOG: tuple[dict[str, Any], ...] = (
+    {
+        "key": "problem_solution",
+        "label": "Problem → Solution",
+        "goals": {"Edukasi", "Klarifikasi isu", "Respons terhadap keluhan"},
+        "lens": "Mulai dari masalah nyata audiens, lalu arahkan ke solusi praktis yang aman dan dapat dilakukan.",
+        "structure": "Masalah → dampak → langkah praktis → batasan/verifikasi → CTA",
+        "hook_style": "Pertanyaan problem-first yang langsung menyentuh situasi audiens.",
+        "cta_style": "Ajak audiens mencoba langkah aman, menyimpan konten, lalu memakai kanal resmi jika perlu.",
+    },
+    {
+        "key": "storytelling",
+        "label": "Micro Storytelling",
+        "goals": {"Awareness", "Promosi layanan", "Meningkatkan engagement", "Memperkuat sentimen positif"},
+        "lens": "Bungkus pesan sebagai cerita singkat dari situasi sehari-hari tanpa mengarang pengalaman asli influencer.",
+        "structure": "Situasi → konflik kecil → titik balik → pelajaran → CTA",
+        "hook_style": "Pembuka berupa skenario singkat yang terasa dekat dan manusiawi.",
+        "cta_style": "Ajak audiens membagikan pengalaman serupa atau menyimpan insight yang paling berguna.",
+    },
+    {
+        "key": "checklist",
+        "label": "Checklist Praktis",
+        "goals": {"Edukasi", "Awareness", "Respons terhadap keluhan"},
+        "lens": "Ubah topik menjadi daftar cek singkat yang bisa langsung dipakai audiens.",
+        "structure": "Hook → checklist 3–5 poin → red flag → rangkuman → CTA",
+        "hook_style": "Janji nilai yang spesifik, misalnya 'cek 4 hal ini sebelum...'.",
+        "cta_style": "Ajak audiens menyimpan checklist dan membagikannya kepada orang yang relevan.",
+    },
+    {
+        "key": "myth_fact",
+        "label": "Mitos vs Fakta",
+        "goals": {"Edukasi", "Klarifikasi isu", "Meningkatkan engagement"},
+        "lens": "Pisahkan asumsi umum dari informasi yang aman untuk disampaikan, tanpa membuat klaim teknis baru.",
+        "structure": "Mitos → klarifikasi → alasan → langkah aman → CTA",
+        "hook_style": "Pernyataan yang memancing rasa ingin tahu seperti 'Benarkah...?'.",
+        "cta_style": "Ajak audiens menulis mitos/pertanyaan berikutnya untuk dibahas.",
+    },
+    {
+        "key": "faq",
+        "label": "FAQ Cepat",
+        "goals": {"Edukasi", "Klarifikasi isu", "Respons terhadap keluhan"},
+        "lens": "Susun rekomendasi sebagai pertanyaan yang paling mungkin ditanyakan audiens dan jawaban ringkasnya.",
+        "structure": "Pertanyaan utama → 3 FAQ → jawaban singkat → kanal verifikasi → CTA",
+        "hook_style": "Pertanyaan langsung yang terdengar seperti pertanyaan pengguna.",
+        "cta_style": "Ajak audiens meninggalkan pertanyaan lanjutan tanpa membagikan data pribadi.",
+    },
+    {
+        "key": "before_after",
+        "label": "Before → After",
+        "goals": {"Awareness", "Promosi layanan", "Memperkuat sentimen positif"},
+        "lens": "Bandingkan kondisi sebelum dan sesudah menerapkan kebiasaan/pendekatan yang disarankan, tanpa menjanjikan hasil layanan.",
+        "structure": "Sebelum → perubahan pendekatan → sesudah → takeaway → CTA",
+        "hook_style": "Kontras situasi sebelum dan sesudah yang mudah divisualkan.",
+        "cta_style": "Ajak audiens mencoba pendekatan yang relevan dan membagikan hasil pengalamannya.",
+    },
+    {
+        "key": "mini_case",
+        "label": "Mini Case / Skenario",
+        "goals": {"Edukasi", "Awareness", "Promosi layanan", "Klarifikasi isu"},
+        "lens": "Gunakan skenario hipotetis yang jelas diberi konteks sebagai ilustrasi, bukan testimoni nyata.",
+        "structure": "Skenario → keputusan → konsekuensi → pelajaran → CTA",
+        "hook_style": "Skenario 'bayangkan ketika...' yang langsung memberi konteks.",
+        "cta_style": "Ajak audiens memilih tindakan yang paling masuk akal atau mendiskusikan skenario.",
+    },
+    {
+        "key": "community",
+        "label": "Community Conversation",
+        "goals": {"Meningkatkan engagement", "Awareness", "Memperkuat sentimen positif"},
+        "lens": "Jadikan konten sebagai pemantik percakapan dua arah dengan pertanyaan yang relevan dan aman.",
+        "structure": "Pemantik → konteks singkat → pilihan/pertanyaan → insight → CTA komunitas",
+        "hook_style": "Pertanyaan opini atau pilihan yang mudah dijawab audiens.",
+        "cta_style": "Ajak audiens menjawab pengalaman/opini tanpa meminta data pribadi.",
+    },
+    {
+        "key": "step_by_step",
+        "label": "Step-by-Step Tutorial",
+        "goals": {"Edukasi", "Respons terhadap keluhan", "Klarifikasi isu"},
+        "lens": "Buat alur tindakan berurutan yang singkat dan mudah diikuti.",
+        "structure": "Tujuan → langkah 1–4 → checkpoint → kanal resmi → CTA",
+        "hook_style": "Pembuka tutorial yang menyebut hasil yang ingin dicapai tanpa menjanjikan keberhasilan pasti.",
+        "cta_style": "Ajak audiens menyimpan tutorial dan kembali ke kanal resmi untuk informasi terbaru.",
+    },
+    {
+        "key": "challenge",
+        "label": "Micro Challenge",
+        "goals": {"Meningkatkan engagement", "Awareness", "Memperkuat sentimen positif"},
+        "lens": "Buat tantangan ringan yang relevan dengan topik dan tidak meminta tindakan berisiko atau data sensitif.",
+        "structure": "Challenge → aturan sederhana → contoh → hasil yang diamati → CTA partisipasi",
+        "hook_style": "Ajakan tantangan singkat dengan batas waktu atau jumlah langkah yang ringan.",
+        "cta_style": "Ajak audiens ikut tantangan dan membagikan insight secara aman.",
+    },
+)
+
+
+def _select_creative_direction(payload: dict[str, str], request_nonce: str) -> dict[str, Any]:
+    """Pilih satu creative angle secara acak-terkontrol dan hindari pengulangan langsung."""
+    goal = str(payload.get("tujuan") or "").strip()
+    preferred = [item for item in _CREATIVE_ANGLE_CATALOG if goal in item.get("goals", set())]
+    pool = preferred if len(preferred) >= 3 else list(_CREATIVE_ANGLE_CATALOG)
+
+    last_key = str(st.session_state.get(PUBLIC_AI_LAST_CREATIVE_ANGLE_KEY, "") or "")
+    non_repeating = [item for item in pool if item.get("key") != last_key]
+    if non_repeating:
+        pool = non_repeating
+
+    # UUID request menjadi seed sehingga pilihan stabil untuk satu request, tetapi berubah
+    # pada klik Generate berikutnya. Ini mencegah random global yang sulit dilacak.
+    rng = random.Random(str(request_nonce or uuid4().hex))
+    selected = dict(rng.choice(pool))
+    selected["variant_index"] = rng.randrange(3)
+    st.session_state[PUBLIC_AI_LAST_CREATIVE_ANGLE_KEY] = str(selected.get("key") or "")
+    return selected
+
+
+def _creative_format(platform: str, angle_key: str) -> str:
+    """Pilih format yang selaras dengan platform dan creative angle terpilih."""
+    platform_key = str(platform or "").casefold()
+    formats: dict[str, dict[str, str]] = {
+        "instagram": {
+            "problem_solution": "Carousel 6 slide atau Reels 30–45 detik",
+            "storytelling": "Reels micro-story 35–50 detik atau carousel naratif 7 slide",
+            "checklist": "Carousel checklist 5–7 slide",
+            "myth_fact": "Carousel Mitos/Fakta 5–6 slide atau Reels split-screen",
+            "faq": "Carousel FAQ 6 slide",
+            "before_after": "Reels before/after 30–45 detik atau carousel komparatif",
+            "mini_case": "Carousel mini case 6–7 slide",
+            "community": "Carousel pertanyaan + Story polling",
+            "step_by_step": "Carousel tutorial 6–8 slide atau Reels tutorial",
+            "challenge": "Reels micro-challenge 20–35 detik + Story follow-up",
+        },
+        "tiktok": {
+            "problem_solution": "Video problem–solution 35–50 detik",
+            "storytelling": "Video micro-story 40–55 detik",
+            "checklist": "Video checklist 30–45 detik dengan text overlay",
+            "myth_fact": "Video Mitos/Fakta 30–45 detik",
+            "faq": "Video FAQ cepat 35–50 detik",
+            "before_after": "Video before/after 30–45 detik",
+            "mini_case": "Video skenario POV 40–55 detik",
+            "community": "Video pertanyaan komunitas 25–40 detik",
+            "step_by_step": "Video tutorial 40–60 detik",
+            "challenge": "Video challenge 20–35 detik",
+        },
+        "twitter": {
+            "problem_solution": "Thread 5–6 post problem–solution",
+            "storytelling": "Thread micro-story 5–7 post",
+            "checklist": "Post checklist ringkas atau thread 4–5 post",
+            "myth_fact": "Thread Mitos/Fakta 4–6 post",
+            "faq": "Thread FAQ 5 post",
+            "before_after": "Thread before/after 4–5 post",
+            "mini_case": "Thread mini case 5–6 post",
+            "community": "Polling + thread konteks singkat",
+            "step_by_step": "Thread tutorial 5–7 post",
+            "challenge": "Post challenge + reply chain",
+        },
+    }
+    group = "instagram" if "insta" in platform_key else "tiktok" if "tiktok" in platform_key else "twitter"
+    return formats[group].get(angle_key, formats[group]["problem_solution"])
+
+def _platform_content_blueprint(
+    platform: str,
+    direction: dict[str, Any],
+    payload: dict[str, str],
+) -> dict[str, str]:
+    """Bangun blueprint fallback yang berubah sesuai creative angle tetapi tetap aman."""
+    angle_key = str(direction.get("key") or "problem_solution")
+    topic = str(payload.get("topik") or "topik layanan").strip()
+    service = str(payload.get("layanan") or "Telkom Group").strip()
+    audience = str(payload.get("target_audiens") or "audiens").strip().lower()
+    content_format = _creative_format(platform, angle_key)
+
+    hooks = {
+        "problem_solution": f"Sedang menghadapi {topic.lower()}? Mulai dari langkah yang paling aman dan mudah diperiksa.",
+        "storytelling": f"Bayangkan {topic.lower()} muncul tepat saat aktivitas penting sedang berjalan—apa yang sebaiknya dilakukan lebih dulu?",
+        "checklist": f"Sebelum mengambil kesimpulan soal {topic.lower()}, cek 4 hal ini dulu.",
+        "myth_fact": f"Benarkah semua masalah {topic.lower()} berarti layanan sedang bermasalah? Yuk bedakan asumsi dan fakta yang perlu diverifikasi.",
+        "faq": f"Pertanyaan yang paling sering muncul soal {topic.lower()}: mulai dari mana?",
+        "before_after": f"Sebelum dan sesudah mengubah cara menghadapi {topic.lower()}: apa yang sebenarnya bisa dibuat lebih terarah?",
+        "mini_case": f"Bayangkan seorang pengguna {service} sedang menghadapi {topic.lower()}. Pilihan pertama apa yang paling masuk akal?",
+        "community": f"Kalau menghadapi {topic.lower()}, Anda biasanya cek sendiri dulu atau langsung mencari bantuan resmi?",
+        "step_by_step": f"Ingin menangani {topic.lower()} dengan lebih terarah? Ikuti langkah ringkas ini dari awal.",
+        "challenge": f"Coba challenge singkat ini: dalam beberapa langkah, cek apa saja yang bisa Anda pastikan terkait {topic.lower()}.",
     }
 
+    flows = {
+        "problem_solution": "Buka dengan masalah audiens, jelaskan dampaknya, berikan 3 langkah praktis, tambahkan batasan informasi, lalu tutup dengan CTA.",
+        "storytelling": "Buka dengan situasi sehari-hari, munculkan konflik kecil, tunjukkan keputusan yang aman, tarik pelajaran, lalu tutup dengan CTA.",
+        "checklist": "Buka dengan manfaat checklist, tampilkan 4 poin singkat, tandai satu red flag, rangkum, lalu arahkan ke kanal resmi bila perlu.",
+        "myth_fact": "Tampilkan satu mitos, luruskan dengan penjelasan aman, beri contoh konteks, sebutkan hal yang harus diverifikasi, lalu CTA pertanyaan.",
+        "faq": "Mulai dari pertanyaan utama, jawab 3 FAQ secara ringkas, jelaskan batas informasi, arahkan ke sumber resmi, lalu CTA.",
+        "before_after": "Tampilkan kondisi sebelum, perubahan pendekatan, kondisi sesudah yang realistis, takeaway, lalu CTA tanpa menjanjikan hasil pasti.",
+        "mini_case": "Bangun skenario hipotetis, tampilkan dua pilihan, jelaskan konsekuensi aman, simpulkan pelajaran, lalu CTA diskusi.",
+        "community": "Ajukan pertanyaan pemantik, beri konteks singkat, tampilkan 2–3 pilihan respons, beri insight netral, lalu CTA komunitas.",
+        "step_by_step": "Nyatakan tujuan, berikan langkah 1–4, tambahkan checkpoint, arahkan ke kanal resmi, lalu CTA simpan konten.",
+        "challenge": "Jelaskan challenge ringan, berikan aturan sederhana, contoh pelaksanaan, hal yang perlu diamati, lalu CTA partisipasi aman.",
+    }
+
+    platform_key = str(platform or "").casefold()
+    if "tiktok" in platform_key:
+        script = (
+            f"0–3 detik: tampilkan hook. 4–12 detik: beri konteks tentang {topic}. "
+            f"Bagian tengah: jalankan struktur {direction.get('label', 'kreatif')} dengan visual/text overlay. "
+            "Bagian akhir: rangkum satu takeaway, tampilkan CTA, dan ingatkan bahwa detail teknis harus dicek di kanal resmi."
+        )
+        duration = "30–55 detik"
+    elif "instagram" in platform_key:
+        script = (
+            f"Slide/Reels pembuka: gunakan hook tentang {topic}. Bagian berikutnya menyusun pesan dengan pola "
+            f"{direction.get('label', 'kreatif')}. Gunakan kalimat pendek, visual yang mudah dipindai, dan satu CTA utama. "
+            "Caption menambah konteks tanpa mengulang seluruh isi serta mengarahkan verifikasi ke kanal resmi."
+        )
+        duration = "5–8 slide atau 30–50 detik"
+    else:
+        script = (
+            f"Post pembuka: gunakan hook tentang {topic}. Post berikutnya membangun alur {direction.get('label', 'kreatif')} "
+            f"untuk {audience}. Sisipkan satu poin verifikasi, lalu tutup dengan CTA yang mendorong respons tanpa meminta data pribadi."
+        )
+        duration = "4–7 post ringkas"
+
+    return {
+        "format": content_format,
+        "hook": hooks.get(angle_key, hooks["problem_solution"]),
+        "flow": flows.get(angle_key, flows["problem_solution"]),
+        "script": script,
+        "duration": duration,
+    }
 
 def _hashtag_for(value: str) -> str:
     """Ubah label menjadi hashtag aman tanpa karakter khusus."""
@@ -363,51 +545,90 @@ def _hashtag_for(value: str) -> str:
     return f"#{compact}" if compact else ""
 
 
-def _build_local_fallback(payload: dict[str, str]) -> str:
-    """Bangun rekomendasi lokal lengkap ketika Gemini tidak tersedia."""
-    blueprint = _platform_content_blueprint(payload["platform_label"])
+def _build_local_fallback(
+    payload: dict[str, str],
+    direction: dict[str, Any],
+) -> str:
+    """Bangun fallback lokal yang tetap bervariasi berdasarkan creative angle."""
+    blueprint = _platform_content_blueprint(
+        payload["platform_label"],
+        direction,
+        payload,
+    )
     style = payload.get("gaya") or "gaya natural dan informatif sesuai arahan pengguna"
     username = payload["username"]
+    angle_label = str(direction.get("label") or "Problem → Solution")
+    angle_lens = str(direction.get("lens") or "Gunakan sudut pandang praktis dan relevan.")
+    variant_index = int(direction.get("variant_index", 0) or 0) % 3
+
+    title_variants = (
+        f"{payload['topik']}: Langkah Praktis untuk {payload['target_audiens']}",
+        f"Cara Membahas {payload['topik']} Tanpa Membuat Klaim Berlebihan",
+        f"{payload['topik']} dari Sudut Pandang {angle_label}",
+    )
+    cta_variants = (
+        "Simpan konten ini, bagikan kepada orang yang relevan, lalu cek kanal resmi bila membutuhkan informasi operasional.",
+        "Tulis pengalaman atau pertanyaan Anda tanpa membagikan data pribadi, lalu gunakan kanal resmi untuk verifikasi lebih lanjut.",
+        "Pilih satu langkah yang paling relevan, praktikkan secara aman, lalu bagikan insight yang Anda dapatkan.",
+    )
+    alt_hook_variants = (
+        (
+            f"Apa hal pertama yang perlu diperiksa saat membahas {payload['topik'].lower()}?",
+            f"Jangan buru-buru menyimpulkan soal {payload['topik'].lower()} sebelum mengecek poin ini.",
+            f"Kalau {payload['topik'].lower()} sedang jadi perhatian, mulai dari konteks yang paling mudah diverifikasi.",
+        ),
+        (
+            f"Pernah bingung harus mulai dari mana saat menghadapi {payload['topik'].lower()}?",
+            f"Ada cara yang lebih terarah untuk membahas {payload['topik'].lower()} tanpa membuat asumsi.",
+            f"Sebelum menyebarkan informasi soal {payload['topik'].lower()}, cek tiga hal penting ini.",
+        ),
+        (
+            f"Coba lihat {payload['topik'].lower()} dari sudut yang berbeda: apa yang benar-benar bisa kita pastikan?",
+            f"Satu topik, tiga cara melihatnya: mana yang paling relevan untuk audiens {payload['target_audiens'].lower()}?",
+            f"Konten tentang {payload['topik'].lower()} tidak harus monoton—mulai dari pertanyaan yang dekat dengan audiens.",
+        ),
+    )
+
     hashtags = [
         _hashtag_for(payload["layanan"]),
         _hashtag_for(payload["topik"]),
         _hashtag_for(payload["tujuan"]),
+        _hashtag_for(angle_label),
         "#TelkomGroup",
-        "#KontenEdukasi",
+        "#KontenDigital",
     ]
     hashtags = [tag for index, tag in enumerate(hashtags) if tag and tag not in hashtags[:index]][:8]
 
     return f"""## Ringkasan Strategi
-Gunakan {username} sebagai identitas kolaborator untuk menyampaikan konten {payload['tujuan'].lower()} mengenai **{payload['topik']}** pada layanan **{payload['layanan']}**. Penyampaian dibuat relevan untuk {payload['target_audiens'].lower()} dengan {style}.
+Gunakan **{angle_label}** sebagai arah kreatif utama untuk membahas **{payload['topik']}** pada layanan **{payload['layanan']}**. {angle_lens} Konten diarahkan kepada {payload['target_audiens'].lower()} dengan tujuan {payload['tujuan'].lower()} dan menggunakan {style}. {username} hanya dipakai sebagai identitas kolaborator, bukan sumber data profil otomatis.
 
 ## Alasan Kesesuaian
-Platform **{payload['platform_label']}** mendukung format {blueprint['format'].lower()}. Topik diposisikan sebagai informasi praktis, bukan klaim tentang profil asli {username}. Rekomendasi ini hanya memakai data yang dimasukkan pengguna dan tidak mengambil data profil secara otomatis.
+Pendekatan **{angle_label}** memberi variasi narasi yang tetap terkontrol karena struktur pesan mengikuti karakter **{payload['platform_label']}** dan tujuan **{payload['tujuan']}**. Format {blueprint['format'].lower()} dipilih agar ide tidak sekadar mengganti kata pada template lama, tetapi benar-benar menggunakan pola penyampaian yang berbeda.
 
 ## Ide Konten Utama
-- **Judul:** {payload['topik']}: Panduan Singkat untuk Pengguna {payload['layanan']}
+- **Judul:** {title_variants[variant_index]}
 - **Format:** {blueprint['format']}
-- **Sudut pembahasan:** Masalah yang dekat dengan audiens, langkah praktis, dan ajakan memeriksa informasi resmi.
+- **Sudut pembahasan:** {angle_lens}
 - **Hook pembuka:** {blueprint['hook']}
 - **Alur isi:** {blueprint['flow']}
-- **Pesan utama:** Audiens mendapatkan penjelasan yang mudah dipahami tanpa janji layanan atau klaim teknis yang belum diverifikasi.
-- **Call to action:** Simpan konten ini, bagikan kepada pengguna lain, lalu tulis pengalaman atau pertanyaan Anda.
+- **Pesan utama:** Audiens mendapatkan konteks yang relevan dan tindakan yang aman tanpa janji layanan atau klaim teknis yang belum diverifikasi.
+- **Call to action:** {cta_variants[variant_index]}
 - **Durasi/panjang:** {blueprint['duration']}
 
 ## Contoh Naskah atau Caption
 {blueprint['script']}
 
 ## Tiga Alternatif Hook
-1. Apa langkah pertama yang perlu dilakukan ketika menghadapi {payload['topik'].lower()}?
-2. Tiga hal sederhana ini sering terlewat oleh pengguna {payload['layanan']}.
-3. Sebelum mengambil kesimpulan, cek panduan singkat berikut.
+1. {alt_hook_variants[variant_index][0]}
+2. {alt_hook_variants[variant_index][1]}
+3. {alt_hook_variants[variant_index][2]}
 
 ## Hashtag
 {' '.join(hashtags)}
 
 ## Catatan Etika dan Verifikasi
-Verifikasi fakta teknis, harga, promo, cakupan jaringan, dan informasi operasional melalui kanal resmi sebelum konten dipublikasikan. Hasil ini tidak menyatakan bahwa sistem telah memeriksa profil {username}.
+Verifikasi fakta teknis, harga, promo, cakupan jaringan, dan informasi operasional melalui kanal resmi sebelum konten dipublikasikan. Hasil ini tidak menyatakan bahwa sistem telah memeriksa profil {username}, dan skenario yang digunakan hanya berfungsi sebagai ilustrasi kreatif.
 """.strip()
-
 
 def _prompt_value(value: Any, max_length: int) -> str:
     """Jadikan nilai input aman sebagai data prompt, bukan instruksi baru."""
@@ -415,8 +636,16 @@ def _prompt_value(value: Any, max_length: int) -> str:
     return text.replace("```", "'''").replace("</", "&lt;/")
 
 
-def _build_gemini_prompt(payload: dict[str, str], request_nonce: str) -> str:
-    """Susun prompt publik terstruktur menggunakan client Gemini proyek."""
+def _build_gemini_prompt(
+    payload: dict[str, str],
+    request_nonce: str,
+    direction: dict[str, Any],
+) -> str:
+    """Susun prompt dengan controlled creative direction agar output tidak monoton."""
+    creative_format = _creative_format(
+        payload.get("platform_label", ""),
+        str(direction.get("key") or "problem_solution"),
+    )
     return f"""
 Anda adalah content strategist senior untuk komunikasi media sosial Telkom Group.
 Buat rekomendasi konten dalam Bahasa Indonesia yang natural, spesifik, realistis, dan dapat dijalankan.
@@ -432,6 +661,18 @@ ATURAN KEAMANAN DAN FAKTUALITAS:
 8. Sesuaikan format dengan karakter platform yang dipilih.
 9. Maksimal 8 hashtag.
 10. Jangan menambahkan pembuka atau penutup di luar tujuh bagian yang diminta.
+
+ATURAN CONTROLLED CREATIVE VARIATION:
+1. Creative angle untuk request ini WAJIB: **{_prompt_value(direction.get('label'), 80)}**.
+2. Lensa strategis: {_prompt_value(direction.get('lens'), 300)}
+3. Struktur narasi: {_prompt_value(direction.get('structure'), 250)}
+4. Gaya hook: {_prompt_value(direction.get('hook_style'), 250)}
+5. Gaya CTA: {_prompt_value(direction.get('cta_style'), 250)}
+6. Format utama yang disarankan untuk request ini: {_prompt_value(creative_format, 150)}
+7. Gunakan angle tersebut secara nyata pada judul, hook, alur, caption/naskah, dan CTA—bukan sekadar menyebut nama angle.
+8. Hindari kalimat generik yang terasa seperti template, misalnya mengulang pola "simpan, bagikan, tulis komentar" di semua CTA. Buat CTA yang relevan dengan angle dan tujuan konten.
+9. Jangan menggunakan pembuka, hook, judul, atau susunan kalimat yang terasa identik dengan template umum bila ada cara yang lebih spesifik terhadap topik.
+10. Variasikan panjang kalimat, ritme, dan framing, tetapi jangan mengorbankan keamanan, faktualitas, atau struktur tujuh bagian.
 
 <DATA_PENGGUNA>
 Layanan: {_prompt_value(payload['layanan'], 30)}
@@ -455,10 +696,10 @@ Keluarkan Markdown dengan TEPAT tujuh heading tingkat dua berikut:
 ## Catatan Etika dan Verifikasi
 
 Pada bagian Ide Konten Utama, tulis Judul, Format, Sudut pembahasan, Hook pembuka, Alur isi, Pesan utama, Call to action, dan Rekomendasi durasi atau panjang konten.
-Pada bagian Contoh Naskah atau Caption, sesuaikan secara konkret dengan Twitter/X, Instagram, atau TikTok yang dipilih.
+Pada bagian Tiga Alternatif Hook, buat ketiga hook benar-benar berbeda pendekatan dan jangan sekadar memparafrase satu kalimat.
+Pada bagian Contoh Naskah atau Caption, sesuaikan secara konkret dengan Twitter/X, Instagram, atau TikTok yang dipilih serta creative angle request ini.
 Pada bagian Catatan Etika dan Verifikasi, wajib mengingatkan verifikasi fakta teknis, promo, harga, cakupan jaringan, dan informasi operasional sebelum publikasi.
 """.strip()
-
 
 def _parse_sections(text: Any) -> dict[str, str]:
     """Pisahkan respons Markdown menjadi section tanpa membuat halaman blank."""
@@ -588,9 +829,10 @@ def _run_generation(payload: dict[str, str]) -> dict[str, Any] | None:
     st.session_state[PUBLIC_AI_LAST_REQUEST_KEY] = time.time()
     st.session_state[PUBLIC_AI_LAST_PAYLOAD_KEY] = payload.copy()
 
-    fallback_text = _build_local_fallback(payload)
     request_nonce = uuid4().hex
-    prompt = _build_gemini_prompt(payload, request_nonce)
+    creative_direction = _select_creative_direction(payload, request_nonce)
+    fallback_text = _build_local_fallback(payload, creative_direction)
+    prompt = _build_gemini_prompt(payload, request_nonce, creative_direction)
     loading_handle = None
     generated_result: dict[str, Any]
 
@@ -609,6 +851,8 @@ def _run_generation(payload: dict[str, str]) -> dict[str, Any] | None:
             "model_name": str(response.get("model_name") or ""),
             "generated_at": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
             "payload": payload.copy(),
+            "creative_angle": str(creative_direction.get("label") or ""),
+            "creative_angle_key": str(creative_direction.get("key") or ""),
         }
     except Exception:
         generated_result = {
@@ -617,6 +861,8 @@ def _run_generation(payload: dict[str, str]) -> dict[str, Any] | None:
             "model_name": "",
             "generated_at": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
             "payload": payload.copy(),
+            "creative_angle": str(creative_direction.get("label") or ""),
+            "creative_angle_key": str(creative_direction.get("key") or ""),
         }
     finally:
         selesaikan_loading_aksi(loading_handle)

@@ -32,6 +32,9 @@ DEFAULT_MODEL_NAME = "gemini-3.5-flash"
 FALLBACK_MODEL_NAMES = ("gemini-3.5-flash-lite",)
 RATE_LIMIT_RETRY_DELAYS = (2, 4, 8)
 PUBLIC_RECOMMENDATION_RETRY_DELAYS = (1,)
+PUBLIC_RECOMMENDATION_TEMPERATURE = 0.92
+PUBLIC_RECOMMENDATION_TOP_P = 0.95
+PUBLIC_RECOMMENDATION_MAX_OUTPUT_TOKENS = 4096
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 30
 MIN_REQUEST_TIMEOUT_SECONDS = 5
 MAX_REQUEST_TIMEOUT_SECONDS = 60
@@ -1465,6 +1468,75 @@ def get_gemini_runtime_status() -> dict[str, Any]:
 
 
 
+def _call_public_recommendation_model(
+    model: GeminiModelAdapter,
+    candidate: str,
+    prompt: str,
+) -> Any:
+    """Panggil Gemini khusus AI Content Studio dengan kreativitas terkontrol."""
+    from google.genai import types
+
+    try:
+        config = types.GenerateContentConfig(
+            temperature=PUBLIC_RECOMMENDATION_TEMPERATURE,
+            top_p=PUBLIC_RECOMMENDATION_TOP_P,
+            max_output_tokens=PUBLIC_RECOMMENDATION_MAX_OUTPUT_TOKENS,
+        )
+    except TypeError:
+        # Kompatibilitas defensif jika versi SDK lama belum menerima top_p.
+        config = types.GenerateContentConfig(
+            temperature=PUBLIC_RECOMMENDATION_TEMPERATURE,
+            max_output_tokens=PUBLIC_RECOMMENDATION_MAX_OUTPUT_TOKENS,
+        )
+
+    return _call_gemini_candidate_with_backoff(
+        model=model,
+        candidate=candidate,
+        prompt=prompt,
+        config=config,
+    )
+
+
+def _generate_public_recommendation_response(
+    model: GeminiModelAdapter,
+    prompt: str,
+) -> tuple[str, str]:
+    """Generate fresh response untuk AI Content Studio tanpa cache hasil kreatif."""
+    last_error: Exception | None = None
+
+    for index, candidate in enumerate(model.model_candidates):
+        try:
+            response = _call_public_recommendation_model(model, candidate, prompt)
+            text = str(getattr(response, "text", "") or "").strip()
+            if not text:
+                raise RuntimeError("Respons Gemini publik kosong")
+
+            if index > 0:
+                LOGGER.info(
+                    "Model utama AI Content Studio tidak tersedia sementara. "
+                    "Permintaan berhasil menggunakan model cadangan %s.",
+                    candidate,
+                )
+            return text, candidate
+        except Exception as error:
+            last_error = error
+            if isinstance(error, GeminiRateLimitError):
+                raise
+            has_next_model = index < len(model.model_candidates) - 1
+            if has_next_model and _boleh_coba_model_cadangan(error):
+                LOGGER.info(
+                    "Permintaan kreatif ke model %s gagal sementara (%s). "
+                    "Mencoba model cadangan.",
+                    candidate,
+                    type(error).__name__,
+                )
+                continue
+            raise
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Tidak ada model Gemini untuk AI Content Studio")
+
 def _public_recommendation_transient_error(error: Exception) -> bool:
     """True untuk gangguan server/transport yang layak dicoba ulang secara singkat."""
     if isinstance(error, GeminiRateLimitError):
@@ -1517,7 +1589,7 @@ def generate_recommendation_with_status(
         total_attempts = len(PUBLIC_RECOMMENDATION_RETRY_DELAYS) + 1
         for attempt_index in range(total_attempts):
             try:
-                text, model_name = _generate_recommendation_cached(model, prompt_clean)
+                text, model_name = _generate_public_recommendation_response(model, prompt_clean)
                 _tampilkan_retry_notices()
                 text_clean = str(text or "").strip()
                 if not text_clean:
