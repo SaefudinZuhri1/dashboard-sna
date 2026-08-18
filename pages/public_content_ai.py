@@ -5397,6 +5397,12 @@ def render_public_content_ai() -> None:
         _render_page_css()
         _render_light_theme_css()
 
+        # FIX v21: request_count wajib tersedia di scope render.
+        # Tanpa ini, eksekusi berhenti setelah STEP 03 saat menghitung limit_reached,
+        # sehingga Creative Journey, Mode Fokus, STEP 04, dan tombol Generate tidak dirender.
+        request_count = int(st.session_state.get(PUBLIC_AI_REQUEST_COUNT_KEY, 0) or 0)
+        request_count = max(0, min(PUBLIC_AI_MAX_REQUESTS, request_count))
+
         # Pembuatan ulang diproses sebelum hasil lama dirender.
         # Alur ini menghindari rerun tambahan setelah respons Gemini selesai.
         if bool(st.session_state.pop(PUBLIC_AI_REGENERATE_PENDING_KEY, False)):
